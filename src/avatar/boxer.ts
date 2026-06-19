@@ -407,71 +407,117 @@ function buildPantherHead(accent: number): Group {
   return g;
 }
 
-/** VALKYRIE → EAGLE: scowling brow, big hooked beak, swept feather crest. */
-function buildEagleHead(accent: number): Group {
+/** VALKYRIE → EAGLE: a bald eagle's head — a smooth crest-less white dome, the
+ *  heavy yellow brow that makes the glare, a fierce pale eye, and the big hooked
+ *  yellow beak with cere and nostrils. Naturally coloured (these materials carry
+ *  no skin `role`/`accent` tag, so neither a skin swap nor the custom-hue slider
+ *  repaints them) so it reads as the real bird whatever the body wears. */
+function buildEagleHead(_accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
 
-  const skull = new Mesh(new SphereGeometry(r * 0.82, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(0.96, 0.98, 1.0);
-  skull.position.y = r * 0.18;
+  // Natural bald-eagle palette.
+  const WHITE = 0xeef1f1;
+  const WHITE_SHADE = 0xd6dadb;
+  const BROWN = 0x46341f;
+  const YELLOW = 0xf4c023;
+  const YELLOW_WARM = 0xe79616; // warmer toward the cere/face, as in the photo
+  const HORN = 0xf3d479; // paler horn at the hooked tip
+  const IRIS = 0xe7dca0;
+  const PUPIL = 0x130f08;
+  const feather = (hex = WHITE) => new MeshStandardMaterial({ color: hex, metalness: 0.05, roughness: 0.74 });
+  const keratin = (hex: number) => new MeshStandardMaterial({ color: hex, metalness: 0.22, roughness: 0.38 });
+  const matte = (hex: number, rough = 0.6) => new MeshStandardMaterial({ color: hex, metalness: 0.08, roughness: rough });
+
+  // Smooth white head — rounded, a touch longer front-to-back, flat-ish crown.
+  // Bald eagles have NO crest, so the dome stays clean (the old mohawk is gone).
+  const skull = new Mesh(new SphereGeometry(r * 0.86, 22, 18), feather());
+  skull.scale.set(0.99, 1.0, 1.08);
+  skull.position.y = r * 0.16;
   g.add(skull);
-  // Scowling brow (two angled plates) + fierce forward eyes.
+  // Full white cheeks/throat carrying down toward the neck.
+  const jowl = new Mesh(new SphereGeometry(r * 0.62, 18, 14), feather());
+  jowl.scale.set(1.04, 0.92, 0.98);
+  jowl.position.set(0, -r * 0.3, -r * 0.14);
+  g.add(jowl);
+
+  // Heavy brow over each eye — the whole glare lives here: a white feather shelf
+  // above a yellow bony ridge that juts forward and frowns down toward the beak.
   for (const side of [-1, 1]) {
-    const brow = new Mesh(new BoxGeometry(r * 0.56, r * 0.18, r * 0.32), chassisMat(accent, 0.05));
-    brow.position.set(side * r * 0.3, r * 0.3, -r * 0.7);
-    brow.rotation.z = side * 0.5;
-    g.add(brow);
-    const eye = new Mesh(new BoxGeometry(r * 0.22, r * 0.16, r * 0.1), glowMat(accent, 2.6));
-    eye.position.set(side * r * 0.34, r * 0.1, -r * 0.82);
-    g.add(eye);
+    const browFeather = new Mesh(new BoxGeometry(r * 0.5, r * 0.2, r * 0.5), feather(WHITE_SHADE));
+    browFeather.position.set(side * r * 0.42, r * 0.36, -r * 0.46);
+    browFeather.rotation.set(0.12, side * 0.2, side * 0.16);
+    g.add(browFeather);
+    const ridge = new Mesh(new BoxGeometry(r * 0.46, r * 0.12, r * 0.36), keratin(YELLOW_WARM));
+    ridge.position.set(side * r * 0.47, r * 0.2, -r * 0.62);
+    ridge.rotation.set(-0.2, side * 0.12, side * 0.05);
+    g.add(ridge);
   }
-  // Upper beak: base box → forward cone → downturned hook; shorter lower beak.
-  const beakBase = new Mesh(new BoxGeometry(r * 0.36, r * 0.36, r * 0.42), chassisMat(accent, 0.05));
-  beakBase.position.set(0, -r * 0.12, -r * 0.9);
-  g.add(beakBase);
-  const beak = new Mesh(new ConeGeometry(r * 0.22, r * 0.72, 4), chassisMat(accent, 0.06));
-  beak.rotation.x = -Math.PI / 2;
-  beak.position.set(0, -r * 0.18, -r * 1.22);
-  g.add(beak);
-  const hook = new Mesh(new ConeGeometry(r * 0.13, r * 0.26, 4), darkMat());
-  hook.rotation.x = -Math.PI * 0.78;
-  hook.position.set(0, -r * 0.34, -r * 1.44);
-  g.add(hook);
-  const lower = new Mesh(new ConeGeometry(r * 0.16, r * 0.44, 4), darkMat());
-  lower.rotation.x = -Math.PI / 2;
-  lower.position.set(0, -r * 0.4, -r * 1.12);
-  g.add(lower);
-  // Cere (nostril band).
-  const cere = new Mesh(new BoxGeometry(r * 0.3, r * 0.14, r * 0.2), darkMat());
-  cere.position.set(0, -r * 0.04, -r * 1.0);
+
+  // Fierce pale-yellow eyes set just under the brow, on the sides of the head,
+  // each with a small dark pupil and a faint alert glint.
+  for (const side of [-1, 1]) {
+    const irisMat = keratin(IRIS);
+    irisMat.emissive = new Color(IRIS);
+    irisMat.emissiveIntensity = 0.14;
+    const iris = new Mesh(new SphereGeometry(r * 0.17, 16, 14), irisMat);
+    iris.scale.z = 0.72;
+    iris.position.set(side * r * 0.6, r * 0.12, -r * 0.5);
+    iris.rotation.y = side * 0.5;
+    g.add(iris);
+    const pupil = new Mesh(new SphereGeometry(r * 0.08, 12, 10), matte(PUPIL, 0.5));
+    pupil.position.set(side * r * 0.69, r * 0.11, -r * 0.6);
+    g.add(pupil);
+  }
+
+  // The beak. A bald eagle's is large and entirely yellow: a deep base at the
+  // cere, a convex culmen sweeping forward, then a sharp hook turning down.
+  const cere = new Mesh(new BoxGeometry(r * 0.44, r * 0.4, r * 0.3), keratin(YELLOW_WARM));
+  cere.position.set(0, -r * 0.06, -r * 0.74);
   g.add(cere);
-  // BIG layered crown plume — a tall mohawk crest of metal feathers sweeping
-  // up and back over the dome, the eagle's signature headdress.
-  const crestBase = new Mesh(new BoxGeometry(r * 0.8, r * 0.2, r * 0.24), darkMat());
-  crestBase.position.set(0, r * 0.8, r * 0.05);
-  crestBase.rotation.x = 0.4;
-  g.add(crestBase);
-  for (let i = -4; i <= 4; i++) {
-    const a = Math.abs(i);
-    const len = r * (1.55 - a * 0.14); // long feathers, tallest in the middle
-    const back = new Mesh(new BoxGeometry(r * 0.1, len, r * 0.15), chassisMat(accent, 0.04));
-    back.position.set(i * r * 0.13, r * (1.06 - a * 0.04), r * (0.18 + a * 0.05));
-    back.rotation.set(0.6 + a * 0.085, i * -0.05, i * 0.13);
-    g.add(back);
-    const vane = new Mesh(new BoxGeometry(r * 0.045, len * 0.84, r * 0.17), glowMat(accent, 0.7 + (4 - a) * 0.13));
-    vane.position.set(i * r * 0.13, r * (1.11 - a * 0.03), r * (0.12 + a * 0.04));
-    vane.rotation.copy(back.rotation);
-    g.add(vane);
-  }
-  // Layered cheek feather plates.
+  const upBase = new Mesh(new BoxGeometry(r * 0.4, r * 0.46, r * 0.42), keratin(YELLOW));
+  upBase.position.set(0, -r * 0.13, -r * 0.96);
+  g.add(upBase);
+  const culmen = new Mesh(new ConeGeometry(r * 0.2, r * 0.66, 6), keratin(YELLOW));
+  culmen.rotation.set(-Math.PI / 2 + 0.16, 0, Math.PI / 6);
+  culmen.position.set(0, -r * 0.2, -r * 1.26);
+  g.add(culmen);
+  const hook = new Mesh(new ConeGeometry(r * 0.13, r * 0.36, 6), keratin(HORN));
+  hook.rotation.x = -Math.PI * 0.82; // turn the tip down and slightly back
+  hook.position.set(0, -r * 0.36, -r * 1.48);
+  g.add(hook);
+  // Shorter lower mandible tucked under.
+  const lower = new Mesh(new ConeGeometry(r * 0.17, r * 0.5, 6), keratin(YELLOW));
+  lower.rotation.set(-Math.PI / 2 + 0.06, 0, Math.PI / 6);
+  lower.position.set(0, -r * 0.37, -r * 1.12);
+  g.add(lower);
+  // Nostrils (nares) in the cere, and the dark gape line running back from the
+  // beak toward the eye — both signature bald-eagle markings.
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 2; i++) {
-      const plate = new Mesh(new BoxGeometry(r * 0.07, r * 0.34, r * 0.4 - i * r * 0.1), chassisMat(accent, 0.04));
-      plate.position.set(side * (r * 0.55 - i * r * 0.08), -r * 0.05 - i * r * 0.12, -r * 0.48 + i * r * 0.1);
-      plate.rotation.set(0, side * 0.5, side * 0.25);
-      g.add(plate);
-    }
+    const nare = new Mesh(new SphereGeometry(r * 0.05, 10, 8), matte(0x4a3a18));
+    nare.scale.z = 0.5;
+    nare.position.set(side * r * 0.13, -r * 0.04, -r * 0.86);
+    g.add(nare);
+    const gape = new Mesh(new BoxGeometry(r * 0.04, r * 0.04, r * 0.5), matte(0x5c4a22));
+    gape.position.set(side * r * 0.16, -r * 0.26, -r * 0.84);
+    gape.rotation.y = side * 0.16;
+    g.add(gape);
+  }
+
+  // Slightly shaggy white nape feathers laid back over the rear crown (the soft
+  // ruff at the back of the head) — character without a crest.
+  for (let i = -2; i <= 2; i++) {
+    const f = new Mesh(new BoxGeometry(r * 0.13, r * 0.1, r * 0.34), feather(WHITE_SHADE));
+    f.position.set(i * r * 0.16, r * 0.52, r * 0.34);
+    f.rotation.set(-0.95, 0, i * 0.05);
+    g.add(f);
+  }
+  // Brown nape shingles low at the back, where the white head meets body plumage.
+  for (let i = 0; i < 3; i++) {
+    const plate = new Mesh(new BoxGeometry(r * (0.92 - i * 0.1), r * 0.16, r * 0.12), feather(BROWN));
+    plate.position.set(0, -r * (0.34 + i * 0.16), r * 0.42 - i * r * 0.04);
+    plate.rotation.x = -0.55 - i * 0.1;
+    g.add(plate);
   }
   return g;
 }
