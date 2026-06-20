@@ -154,20 +154,17 @@ export const MATCH = {
  * Blaston's real eleven league tiers; the thresholds are ours to tune.
  */
 export const PROGRESSION = {
-  // Cumulative XP to REACH each tier. Thresholds match the rank-badge art
-  // (a flat 200-point ladder, Overlord at 2000+); the named emblems live in
-  // src/assets/ranks. Names are Blaston's real eleven league tiers.
+  // Cumulative XP to REACH each tier. Nine tiers, one named emblem each in
+  // src/assets/ranks; a flat ~250-point ladder with Overlord at 2000+.
   tiers: [
     { name: 'BRONZE', xp: 0 },
-    { name: 'SILVER', xp: 200 },
-    { name: 'GOLD', xp: 400 },
-    { name: 'PLATINUM', xp: 600 },
-    { name: 'DIAMOND', xp: 800 },
-    { name: 'CHAMPION', xp: 1000 },
-    { name: 'MASTER', xp: 1200 },
-    { name: 'GRANDMASTER', xp: 1400 },
-    { name: 'ELITE', xp: 1600 },
-    { name: 'LEGENDARY', xp: 1800 },
+    { name: 'SILVER', xp: 250 },
+    { name: 'GOLD', xp: 500 },
+    { name: 'PLATINUM', xp: 750 },
+    { name: 'DIAMOND', xp: 1000 },
+    { name: 'MASTER', xp: 1250 },
+    { name: 'GRANDMASTER', xp: 1500 },
+    { name: 'LEGENDARY', xp: 1750 },
     { name: 'OVERLORD', xp: 2000 },
   ],
 
