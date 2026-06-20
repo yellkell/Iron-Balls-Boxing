@@ -28,7 +28,8 @@ import { Combatant } from '../components/Combatant.js';
 import { Health } from '../components/Health.js';
 import { ballCommands } from '../combat/opponentBus.js';
 import { match } from '../combat/matchState.js';
-import { app, saveStats, training } from '../menu/appState.js';
+import { addXp, app, saveStats, training } from '../menu/appState.js';
+import { xpForTraining } from '../progression/progression.js';
 import { emberBurst } from '../fx/fire.js';
 import * as sfx from '../audio/sfx.js';
 import { ARENA_GAP, FIREBALL, PALETTE, TRAINING } from '../config.js';
@@ -171,9 +172,9 @@ export class TrainingSystem extends createSystem({
     for (const t of [...this.queries.targets.entities]) this.despawn(t);
     if (finished) {
       training.lastScore = training.score;
-      if (training.score > app.stats.trainingBest) {
-        app.stats.trainingBest = training.score;
-      }
+      const newBest = training.score > app.stats.trainingBest;
+      if (newBest) app.stats.trainingBest = training.score;
+      addXp(xpForTraining(training.score, newBest));
       saveStats();
       sfx.matchEnd(training.score > 0);
       app.state = 'menu';

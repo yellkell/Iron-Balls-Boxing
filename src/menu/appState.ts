@@ -12,6 +12,8 @@
  * `state`/`mode` to know when and what to simulate.
  */
 
+import type { QueueMode } from '../progression/progression.js';
+
 export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
 export type AppMode = 'bot' | 'net';
 
@@ -21,16 +23,27 @@ export interface LifetimeStats {
   trainingBest: number;
   ballsThrown: number;
   hitsLanded: number;
+  /** Cumulative progression XP across every mode — drives the tier badge. */
+  xp: number;
 }
+
+const STATS_DEFAULTS: LifetimeStats = {
+  wins: 0,
+  losses: 0,
+  trainingBest: 0,
+  ballsThrown: 0,
+  hitsLanded: 0,
+  xp: 0,
+};
 
 function loadStats(): LifetimeStats {
   try {
     const raw = localStorage.getItem('ff-stats');
-    if (raw) return { wins: 0, losses: 0, trainingBest: 0, ballsThrown: 0, hitsLanded: 0, ...JSON.parse(raw) };
+    if (raw) return { ...STATS_DEFAULTS, ...JSON.parse(raw) };
   } catch {
     /* fresh start */
   }
-  return { wins: 0, losses: 0, trainingBest: 0, ballsThrown: 0, hitsLanded: 0 };
+  return { ...STATS_DEFAULTS };
 }
 
 export const app: {
@@ -38,19 +51,37 @@ export const app: {
   mode: AppMode;
   /** Network side: 0 = host (match authority), 1 = guest. */
   side: 0 | 1;
+  /**
+   * Which ladder a real duel banks toward for THIS player. Quick and ranked
+   * share one queue; each boxer's own selection decides how the bout counts.
+   * Phase 3's RANKED button flips this; default is a casual quick match.
+   */
+  queueMode: QueueMode;
   /** Human-readable connection status for the lobby info panel. */
   netStatus: string;
   /** Aim Training option: targets shoot back so you can train dodging. */
   shootBack: boolean;
   stats: LifetimeStats;
+  /** XP banked by the most recent earning event, for a lobby "+N XP" readout. */
+  lastXpGain: number;
 } = {
   state: 'menu',
   mode: 'bot',
   side: 0,
+  queueMode: 'quick',
   netStatus: 'not connected',
   shootBack: localStorage.getItem('ff-shootback') !== '0',
   stats: loadStats(),
+  lastXpGain: 0,
 };
+
+/** Bank progression XP. Caller persists via saveStats(); returns the amount. */
+export function addXp(amount: number): number {
+  if (amount <= 0) return 0;
+  app.stats.xp += amount;
+  app.lastXpGain = amount;
+  return amount;
+}
 
 export function saveStats(): void {
   try {

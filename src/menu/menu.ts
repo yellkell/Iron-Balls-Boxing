@@ -16,9 +16,10 @@ import {
   PlaneGeometry,
   type Scene,
 } from 'three';
-import { app, training } from './appState.js';
+import { app } from './appState.js';
 import { GAME_TITLE } from '../config.js';
-import { UI, buttonPlate, hazardStrip, plate, stencilFont } from '../ui/industrial.js';
+import { tierForXp } from '../progression/progression.js';
+import { UI, buttonPlate, hazardStrip, plate, segmentBar, stencilFont } from '../ui/industrial.js';
 
 export type PanelId = 'train' | 'duel' | 'info';
 
@@ -160,29 +161,58 @@ function hitDuel(_u: number, v: number): MenuAction | null {
   return null;
 }
 
-/** Right — stats & how-to. Not clickable. */
+/** Right — rank, stats & how-to. Not clickable. */
 function drawInfo(ctx: CanvasRenderingContext2D): void {
   panelBg(ctx, false, UI.text, GAME_TITLE);
 
-  ctx.font = '600 26px system-ui, sans-serif';
+  // --- Bronze→Overlord rank badge + XP bar toward the next tier ---
+  const tier = tierForXp(app.stats.xp);
+  ctx.textAlign = 'left';
+  ctx.font = stencilFont(32);
+  ctx.fillStyle = UI.emberBright;
+  ctx.fillText(tier.name, 40, 104);
+  ctx.textAlign = 'right';
+  ctx.font = '600 22px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText(
+    tier.next === null ? `${app.stats.xp} XP  ·  MAX` : `${app.stats.xp} / ${tier.next} XP`,
+    PW - 40,
+    104,
+  );
+  segmentBar(ctx, 40, 122, PW - 80, 20, tier.progress, UI.ember);
+
+  ctx.strokeStyle = UI.steelDim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(36, 162);
+  ctx.lineTo(PW - 36, 162);
+  ctx.stroke();
+
+  // --- controls (condensed) ---
+  ctx.textAlign = 'center';
+  ctx.font = '600 23px system-ui, sans-serif';
   ctx.fillStyle = UI.amberSoft;
   const lines = [
     'hold trigger — ball orbits your fist',
     'punch + release — throw',
-    'trigger — recall the ball',
-    'a recall through them still hits',
-    'your orbit parries their fire',
-    'stay on your platform!',
+    'trigger — recall (through them still hits)',
+    'your orbit parries · stay on your platform',
   ];
-  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 112 + i * 40));
+  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 198 + i * 34));
 
-  ctx.font = '700 28px system-ui, sans-serif';
+  // --- footer: lifetime record + last XP banked ---
+  ctx.font = '700 26px system-ui, sans-serif';
   ctx.fillStyle = UI.emberBright;
   ctx.fillText(
-    `${app.stats.wins}W / ${app.stats.losses}L  ·  best ${app.stats.trainingBest}${training.lastScore ? `  ·  last ${training.lastScore}` : ''}`,
+    `${app.stats.wins}W / ${app.stats.losses}L  ·  best ${app.stats.trainingBest}`,
     PW / 2,
-    364,
+    348,
   );
+  if (app.lastXpGain > 0) {
+    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillStyle = UI.cool;
+    ctx.fillText(`+${app.lastXpGain} XP last`, PW / 2, 380);
+  }
 }
 
 export function createMenu(scene: Scene): Menu {

@@ -143,6 +143,44 @@ export const MATCH = {
   matchOverDelay: 6, // pause after the match before returning to the lobby
 };
 
+/**
+ * Progression — the Bronze→Overlord ladder. XP is cumulative across every
+ * earning mode (Aim Training, Quick Match, Ranked Match) and only ever climbs;
+ * it sets the player's tier badge and sorts the casual "Quick Match"
+ * leaderboard. (Ranked carries a SEPARATE ELO rating — see the ranked system.)
+ * VS BOT earns nothing, so the ladder can't be farmed against the practice bot.
+ *
+ * `tiers[i].xp` is the cumulative XP needed to REACH that tier. The names are
+ * Blaston's real eleven league tiers; the thresholds are ours to tune.
+ */
+export const PROGRESSION = {
+  tiers: [
+    { name: 'BRONZE', xp: 0 },
+    { name: 'SILVER', xp: 500 },
+    { name: 'GOLD', xp: 1500 },
+    { name: 'PLATINUM', xp: 3500 },
+    { name: 'DIAMOND', xp: 7000 },
+    { name: 'CHAMPION', xp: 12000 },
+    { name: 'MASTER', xp: 20000 },
+    { name: 'GRANDMASTER', xp: 32000 },
+    { name: 'ELITE', xp: 50000 },
+    { name: 'LEGENDARY', xp: 75000 },
+    { name: 'OVERLORD', xp: 110000 },
+  ],
+
+  // Aim Training pays out a fraction of the run score, capped so one hot
+  // streak can't balloon the ladder, plus a bonus for a new personal best.
+  trainingPerScore: 0.1, // XP per point of final run score
+  trainingMax: 300, // … capped per run
+  trainingBestBonus: 100,
+
+  // Duels pay a flat participation amount + a win bonus; ranked is worth more.
+  quickPlay: 50,
+  quickWin: 100, // a quick win banks quickPlay + quickWin = 150
+  rankedPlay: 75,
+  rankedWin: 150, // a ranked win banks rankedPlay + rankedWin = 225
+};
+
 /** The visible platform slab under each boxer. */
 export const PLATFORM = {
   thickness: 0.14, // slab depth below the floor line — reads as a pedestal
