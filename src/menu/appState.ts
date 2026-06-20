@@ -77,6 +77,12 @@ export const app: {
   /** Signed ELO change from the most recent ranked bout, for a "±N ELO" readout. */
   lastEloDelta: number;
   /**
+   * Tier index the player has been SHOWN. PromotionSystem sets it on the first
+   * lobby frame (so a cloud-merge bump isn't mistaken for a promotion), then
+   * plays the promotion FX whenever the live tier climbs above it. -1 = unseen.
+   */
+  shownTier: number;
+  /**
    * Cloud identity. `uid` is the Anonymous Auth user; `synced` is true once the
    * Firestore `players/{uid}` doc is loaded and writes are flowing. Until then
    * the game runs entirely on the localStorage cache.
@@ -92,6 +98,7 @@ export const app: {
   stats: loadStats(),
   lastXpGain: 0,
   lastEloDelta: 0,
+  shownTier: -1,
   profile: { uid: null, synced: false, displayName: '' },
 };
 
