@@ -22,6 +22,7 @@ import {
 import { app, saveShootBack, type AppState } from '../menu/appState.js';
 import { createMenu, type Menu, type MenuAction, type PanelId } from '../menu/menu.js';
 import { net } from '../net/client.js';
+import { fetchBoard } from '../net/leaderboard.js';
 import * as sfx from '../audio/sfx.js';
 
 const _origin = new Vector3();
@@ -111,6 +112,17 @@ export class MenuSystem extends createSystem({}) {
       case 'vs-bot':
         app.mode = 'bot';
         app.state = 'playing';
+        break;
+      case 'info-stats':
+        app.boardView = 'stats';
+        break;
+      case 'info-quick':
+        app.boardView = 'quick';
+        void fetchBoard('quick');
+        break;
+      case 'info-ranked':
+        app.boardView = 'ranked';
+        void fetchBoard('ranked');
         break;
     }
     this.applyState();

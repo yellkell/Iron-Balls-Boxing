@@ -71,6 +71,8 @@ export const app: {
   netStatus: string;
   /** Aim Training option: targets shoot back so you can train dodging. */
   shootBack: boolean;
+  /** Which face the lobby info panel shows: your card, or a leaderboard. */
+  boardView: 'stats' | 'quick' | 'ranked';
   stats: LifetimeStats;
   /** XP banked by the most recent earning event, for a lobby "+N XP" readout. */
   lastXpGain: number;
@@ -95,6 +97,7 @@ export const app: {
   queueMode: 'quick',
   netStatus: 'not connected',
   shootBack: localStorage.getItem('ff-shootback') !== '0',
+  boardView: 'stats',
   stats: loadStats(),
   lastXpGain: 0,
   lastEloDelta: 0,

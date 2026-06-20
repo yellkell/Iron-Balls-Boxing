@@ -18,6 +18,7 @@ import {
 } from 'three';
 import { app } from './appState.js';
 import { rankBadge } from './rankBadges.js';
+import { board } from '../net/leaderboard.js';
 import { GAME_TITLE } from '../config.js';
 import { tierForXp } from '../progression/progression.js';
 import { UI, buttonPlate, hazardStrip, plate, segmentBar, stencilFont } from '../ui/industrial.js';
@@ -30,7 +31,10 @@ export type MenuAction =
   | 'quick-match'
   | 'ranked-match'
   | 'cancel-queue'
-  | 'vs-bot';
+  | 'vs-bot'
+  | 'info-stats'
+  | 'info-quick'
+  | 'info-ranked';
 
 const PW = 512;
 const PH = 400;
@@ -169,69 +173,134 @@ function hitDuel(_u: number, v: number): MenuAction | null {
   return null;
 }
 
-/** Right — rank, stats & how-to. Not clickable. */
+/** Right — your card, or a leaderboard. Tabs across the top switch the view. */
 function drawInfo(ctx: CanvasRenderingContext2D): void {
   panelBg(ctx, false, UI.text, GAME_TITLE);
+  drawInfoTabs(ctx);
+  if (app.boardView === 'quick') drawBoard(ctx, 'quick');
+  else if (app.boardView === 'ranked') drawBoard(ctx, 'ranked');
+  else drawStats(ctx);
+}
 
-  // --- Bronze→Overlord rank badge + XP bar toward the next tier ---
+function drawInfoTabs(ctx: CanvasRenderingContext2D): void {
+  const tabs: Array<[string, typeof app.boardView]> = [
+    ['CARD', 'stats'],
+    ['XP', 'quick'],
+    ['ELO', 'ranked'],
+  ];
+  const y = 84, h = 34, gap = 8;
+  const w = (PW - 72 - gap * 2) / 3;
+  tabs.forEach(([label, key], i) => {
+    const x = 36 + i * (w + gap);
+    const on = app.boardView === key;
+    plate(ctx, x, y, w, h, {
+      cut: 8,
+      fill: on ? 'rgba(255,122,24,0.22)' : 'rgba(18,19,24,0.55)',
+      stroke: on ? UI.ember : UI.steelDim,
+      rivets: false,
+    });
+    ctx.textAlign = 'center';
+    ctx.font = stencilFont(20);
+    ctx.fillStyle = on ? UI.emberBright : UI.textDim;
+    ctx.fillText(label, x + w / 2, y + h / 2 + 1);
+  });
+}
+
+/** CARD view: rank badge, XP bar, record/rating, last gains. */
+function drawStats(ctx: CanvasRenderingContext2D): void {
   const tier = tierForXp(app.stats.xp);
-
-  // The emblem art, left; its native dark backing reads as a metal plaque.
   const badge = rankBadge(tier.index);
-  const bx = 38, by = 84, bh = 96, bw = badge ? (badge.naturalWidth / badge.naturalHeight) * bh : 84;
+  const bx = 40, by = 132, bh = 86, bw = badge ? (badge.naturalWidth / badge.naturalHeight) * bh : 76;
   if (badge) ctx.drawImage(badge, bx, by, bw, bh);
   const textX = bx + bw + 18;
 
   ctx.textAlign = 'left';
   ctx.font = stencilFont(30);
   ctx.fillStyle = UI.emberBright;
-  ctx.fillText(tier.name, textX, 116);
+  ctx.fillText(tier.name, textX, 162);
   ctx.textAlign = 'right';
-  ctx.font = '600 22px system-ui, sans-serif';
+  ctx.font = '600 21px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
   ctx.fillText(
     tier.next === null ? `${app.stats.xp} XP  ·  MAX` : `${app.stats.xp} / ${tier.next} XP`,
-    PW - 38,
-    116,
+    PW - 40,
+    162,
   );
-  segmentBar(ctx, textX, 138, PW - 38 - textX, 18, tier.progress, UI.ember);
+  segmentBar(ctx, textX, 182, PW - 40 - textX, 16, tier.progress, UI.ember);
 
   ctx.strokeStyle = UI.steelDim;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(36, 196);
-  ctx.lineTo(PW - 36, 196);
+  ctx.moveTo(36, 238);
+  ctx.lineTo(PW - 36, 238);
   ctx.stroke();
 
-  // --- controls (condensed) ---
   ctx.textAlign = 'center';
-  ctx.font = '600 23px system-ui, sans-serif';
+  ctx.font = '600 22px system-ui, sans-serif';
   ctx.fillStyle = UI.amberSoft;
-  const lines = [
-    'hold trigger — ball orbits your fist',
-    'punch + release — throw',
-    'trigger — recall the ball',
-    'orbit parries · stay on your platform',
-  ];
-  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 224 + i * 32));
+  ctx.fillText('hold trigger — ball orbits · punch to throw', PW / 2, 270);
+  ctx.fillText('trigger recalls · orbit parries · hold platform', PW / 2, 300);
 
-  // --- footer: lifetime record, rating, and the last gains ---
   const elo = app.stats.placementsLeft > 0 ? `${app.stats.elo} ELO*` : `${app.stats.elo} ELO`;
   ctx.font = '700 25px system-ui, sans-serif';
   ctx.fillStyle = UI.emberBright;
-  ctx.fillText(
-    `${app.stats.wins}W / ${app.stats.losses}L  ·  ${elo}`,
-    PW / 2,
-    348,
-  );
+  ctx.fillText(`${app.stats.wins}W / ${app.stats.losses}L  ·  ${elo}`, PW / 2, 336);
+
   const bits: string[] = [];
   if (app.lastXpGain > 0) bits.push(`+${app.lastXpGain} XP`);
   if (app.lastEloDelta !== 0) bits.push(`${app.lastEloDelta > 0 ? '+' : ''}${app.lastEloDelta} ELO`);
   if (bits.length) {
-    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.font = '600 21px system-ui, sans-serif';
     ctx.fillStyle = UI.cool;
-    ctx.fillText(`${bits.join('   ')}  last bout`, PW / 2, 380);
+    ctx.fillText(`${bits.join('   ')}  last bout`, PW / 2, 366);
   }
+}
+
+/** QUICK (XP) / RANKED (ELO) leaderboard: the top boxers, you highlighted. */
+function drawBoard(ctx: CanvasRenderingContext2D, kind: 'quick' | 'ranked'): void {
+  const isXp = kind === 'quick';
+  ctx.textAlign = 'left';
+  ctx.font = '700 22px system-ui, sans-serif';
+  ctx.fillStyle = UI.amberSoft;
+  ctx.fillText(isXp ? 'TOP BOXERS — XP' : 'TOP BOXERS — ELO', 40, 142);
+  ctx.textAlign = 'right';
+  ctx.fillText(isXp ? 'XP' : 'ELO', PW - 40, 142);
+
+  const rows = board[kind];
+  if (board.error) return boardNote(ctx, board.error);
+  if (!rows.length) return boardNote(ctx, board.loading ? 'loading…' : 'no entries yet — go earn some');
+
+  let y = 178;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const me = r.uid === app.profile.uid && app.profile.uid !== null;
+    ctx.fillStyle = me ? UI.cool : i < 3 ? UI.emberBright : UI.text;
+    ctx.font = me ? '700 22px system-ui, sans-serif' : '600 21px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${i + 1}`, 42, y);
+    const name = r.name.length > 16 ? `${r.name.slice(0, 15)}…` : r.name;
+    ctx.fillText(name, 84, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(String(r.value), PW - 42, y);
+    y += 24;
+  }
+}
+
+function boardNote(ctx: CanvasRenderingContext2D, text: string): void {
+  ctx.textAlign = 'center';
+  ctx.font = '600 22px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText(text, PW / 2, 260);
+}
+
+function hitInfo(u: number, v: number): MenuAction | null {
+  const y = (1 - v) * PH;
+  if (y >= 80 && y <= 122) {
+    if (u < 0.34) return 'info-stats';
+    if (u < 0.67) return 'info-quick';
+    return 'info-ranked';
+  }
+  return null;
 }
 
 export function createMenu(scene: Scene): Menu {
@@ -240,7 +309,7 @@ export function createMenu(scene: Scene): Menu {
 
   const train = makePanel('train', 0.86, 0.68, drawTrain, hitTrain);
   const duel = makePanel('duel', 0.78, 0.62, drawDuel, hitDuel);
-  const info = makePanel('info', 0.78, 0.62, (ctx) => drawInfo(ctx), () => null);
+  const info = makePanel('info', 0.78, 0.62, (ctx) => drawInfo(ctx), hitInfo);
 
   // Shallow arc in front of the player, tilted inward toward the centre.
   const y = 1.45;
