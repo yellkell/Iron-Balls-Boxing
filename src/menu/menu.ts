@@ -186,7 +186,7 @@ function drawInfoTabs(ctx: CanvasRenderingContext2D): void {
   const tabs: Array<[string, typeof app.boardView]> = [
     ['CARD', 'stats'],
     ['XP', 'quick'],
-    ['ELO', 'ranked'],
+    ['RANKED', 'ranked'],
   ];
   const y = 84, h = 34, gap = 8;
   const w = (PW - 72 - gap * 2) / 3;
@@ -262,9 +262,9 @@ function drawBoard(ctx: CanvasRenderingContext2D, kind: 'quick' | 'ranked'): voi
   ctx.textAlign = 'left';
   ctx.font = '700 22px system-ui, sans-serif';
   ctx.fillStyle = UI.amberSoft;
-  ctx.fillText(isXp ? 'TOP BOXERS — XP' : 'TOP BOXERS — ELO', 40, 142);
+  ctx.fillText(isXp ? 'TOP BOXERS — XP' : 'TOP BOXERS — RANKED', 40, 142);
   ctx.textAlign = 'right';
-  ctx.fillText(isXp ? 'XP' : 'ELO', PW - 40, 142);
+  ctx.fillText(isXp ? 'XP' : 'RANKED', PW - 40, 142);
 
   const rows = board[kind];
   if (board.error) return boardNote(ctx, board.error);
