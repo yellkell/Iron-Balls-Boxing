@@ -15,6 +15,9 @@ export type PoseTuple = [number, number, number, number, number, number, number]
 export type PeerMessage =
   /** ~20 Hz body pose: head, left hand, right hand, trigger-orbit flags, hp. */
   | { k: 'pose'; head: PoseTuple; left: PoseTuple; right: PoseTuple; orbit: [boolean, boolean]; hp: number }
+  /** Sent once at the start of a bout: my ladder rating + name, so each side
+   *  can settle its own ELO against the other (ranked is per-player). */
+  | { k: 'hello'; elo: number; name: string }
   /** I punched my `hand` ball: it left from `pos` with velocity `vel`. */
   | { k: 'throw'; hand: 0 | 1; pos: [number, number, number]; vel: [number, number, number] }
   /** I recalled my `hand` ball. */

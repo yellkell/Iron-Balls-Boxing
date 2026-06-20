@@ -61,3 +61,19 @@ export function xpForMatch(won: boolean, mode: QueueMode): number {
   const win = won ? (ranked ? PROGRESSION.rankedWin : PROGRESSION.quickWin) : 0;
   return play + win;
 }
+
+/** Starting ELO for a fresh ladder profile. */
+export const ELO_START = 1000;
+/** Ranked games before a player escapes provisional K and shows on the board. */
+export const PLACEMENTS = 5;
+
+/**
+ * Standard Elo delta for one ranked result. K is high while provisional, then
+ * settles, and tightens again at the top so Overlord ratings don't swing wildly.
+ * Returns the signed rating change (rounded).
+ */
+export function eloDelta(myElo: number, oppElo: number, won: boolean, placementsLeft: number): number {
+  const k = placementsLeft > 0 ? 32 : myElo >= 1800 ? 16 : 24;
+  const expected = 1 / (1 + 10 ** ((oppElo - myElo) / 400));
+  return Math.round(k * ((won ? 1 : 0) - expected));
+}

@@ -24,7 +24,9 @@ import { Health } from '../components/Health.js';
 import { BallState, Fireball } from '../components/Fireball.js';
 import { ballCommands, opponent } from '../combat/opponentBus.js';
 import { match } from '../combat/matchState.js';
-import { app, saveStats } from '../menu/appState.js';
+import { addXp, app, applyRanked, saveStats } from '../menu/appState.js';
+import { xpForMatch } from '../progression/progression.js';
+import { peer, resetPeer, setPeer } from '../net/peerProfile.js';
 import { mirrorPos, mirrorQuat, mirrorVel, net, packPose } from '../net/client.js';
 import { setSpeakerPosition, updateListener } from '../net/voice.js';
 import type { PeerMessage, PoseTuple } from '../net/protocol.js';
@@ -54,12 +56,21 @@ export class NetworkSystem extends createSystem({
 }) {
   private sendTimer = 0;
   private myHp = 100;
+  private helloSent = false;
 
   update(delta: number): void {
     if (app.mode !== 'net' || app.state !== 'playing') {
       // Still drain so stale packets never leak into the next bout.
       if (net.inbox.length) net.inbox.length = 0;
+      this.helloSent = false;
       return;
+    }
+
+    // Trade ladder ratings once per bout so each side can settle its own ELO.
+    if (!this.helloSent) {
+      resetPeer();
+      net.send({ k: 'hello', elo: app.stats.elo, name: app.profile.displayName || 'Boxer' });
+      this.helloSent = true;
     }
 
     this.receive();
@@ -153,6 +164,9 @@ export class NetworkSystem extends createSystem({
         sfx.deflect();
         break;
       }
+      case 'hello':
+        setPeer(msg.elo, msg.name);
+        break;
       case 'state':
         if (app.side === 1) this.applyHostState(msg);
         break;
@@ -178,6 +192,9 @@ export class NetworkSystem extends createSystem({
         match.message = win ? 'YOU WIN THE FIGHT' : 'YOU LOSE';
         if (win) app.stats.wins += 1;
         else app.stats.losses += 1;
+        // Guest-side credit (the host credits itself in GameStateSystem).
+        addXp(xpForMatch(win, app.queueMode));
+        if (app.queueMode === 'ranked' && peer.known) applyRanked(win, peer.elo);
         saveStats();
         sfx.matchEnd(win);
       }

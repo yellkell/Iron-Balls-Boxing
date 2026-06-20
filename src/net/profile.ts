@@ -71,12 +71,19 @@ function defaultName(uid: string): string {
 
 /** Cloud reconcile: monotonic stats take the higher of local vs cloud. */
 function mergeFromCloud(data: Record<string, unknown>): void {
-  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const has = (k: string): boolean => typeof data[k] === 'number' && Number.isFinite(data[k] as number);
+  const num = (k: string): number => (has(k) ? (data[k] as number) : 0);
   const s = app.stats;
-  s.xp = Math.max(s.xp, num(data.xp));
-  s.wins = Math.max(s.wins, num(data.wins));
-  s.losses = Math.max(s.losses, num(data.losses));
-  s.trainingBest = Math.max(s.trainingBest, num(data.trainingBest));
+  // Monotonic stats take the higher of local vs cloud.
+  s.xp = Math.max(s.xp, num('xp'));
+  s.wins = Math.max(s.wins, num('wins'));
+  s.losses = Math.max(s.losses, num('losses'));
+  s.trainingBest = Math.max(s.trainingBest, num('trainingBest'));
+  s.rankedWins = Math.max(s.rankedWins, num('rankedWins'));
+  s.rankedLosses = Math.max(s.rankedLosses, num('rankedLosses'));
+  // ELO is not monotonic — the cloud is authoritative; fewer placements wins.
+  if (has('elo')) s.elo = num('elo');
+  if (has('placementsLeft')) s.placementsLeft = Math.min(s.placementsLeft, num('placementsLeft'));
   if (typeof data.displayName === 'string' && data.displayName) {
     app.profile.displayName = data.displayName;
   }
@@ -91,6 +98,10 @@ function payload(): Record<string, unknown> {
     wins: s.wins,
     losses: s.losses,
     trainingBest: s.trainingBest,
+    elo: s.elo,
+    placementsLeft: s.placementsLeft,
+    rankedWins: s.rankedWins,
+    rankedLosses: s.rankedLosses,
     updatedAt: Date.now(),
   };
 }

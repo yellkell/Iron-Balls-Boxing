@@ -14,8 +14,9 @@ import { createSystem, type Entity } from '@iwsdk/core';
 import { Combatant } from '../components/Combatant.js';
 import { Health } from '../components/Health.js';
 import { match } from '../combat/matchState.js';
-import { addXp, app, saveStats, training } from '../menu/appState.js';
+import { addXp, app, applyRanked, saveStats, training } from '../menu/appState.js';
 import { xpForMatch } from '../progression/progression.js';
+import { peer } from '../net/peerProfile.js';
 import * as sfx from '../audio/sfx.js';
 import { MATCH } from '../config.js';
 import { createScoreboard, type Scoreboard } from '../ui/scoreboard.js';
@@ -139,7 +140,10 @@ export class GameStateSystem extends createSystem({
     else app.stats.losses += 1;
     // Only real duels feed the ladder (bot bouts don't), counted by the mode
     // THIS player queued as — quick or ranked.
-    if (app.mode === 'net') addXp(xpForMatch(win, app.queueMode));
+    if (app.mode === 'net') {
+      addXp(xpForMatch(win, app.queueMode));
+      if (app.queueMode === 'ranked' && peer.known) applyRanked(win, peer.elo);
+    }
     saveStats();
     sfx.matchEnd(win);
     if (app.mode === 'net') this.echoState();

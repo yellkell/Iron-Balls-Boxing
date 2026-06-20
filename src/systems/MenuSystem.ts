@@ -95,6 +95,12 @@ export class MenuSystem extends createSystem({}) {
         saveShootBack();
         break;
       case 'quick-match':
+        app.queueMode = 'quick';
+        app.state = 'queueing';
+        net.queue();
+        break;
+      case 'ranked-match':
+        app.queueMode = 'ranked';
         app.state = 'queueing';
         net.queue();
         break;

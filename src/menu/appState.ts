@@ -12,7 +12,7 @@
  * `state`/`mode` to know when and what to simulate.
  */
 
-import type { QueueMode } from '../progression/progression.js';
+import { ELO_START, PLACEMENTS, eloDelta, type QueueMode } from '../progression/progression.js';
 
 export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
 export type AppMode = 'bot' | 'net';
@@ -25,6 +25,12 @@ export interface LifetimeStats {
   hitsLanded: number;
   /** Cumulative progression XP across every mode — drives the tier badge. */
   xp: number;
+  /** Ranked skill rating — drives the Ranked leaderboard. Moves up and down. */
+  elo: number;
+  /** Ranked games left before the rating leaves provisional / shows on the board. */
+  placementsLeft: number;
+  rankedWins: number;
+  rankedLosses: number;
 }
 
 const STATS_DEFAULTS: LifetimeStats = {
@@ -34,6 +40,10 @@ const STATS_DEFAULTS: LifetimeStats = {
   ballsThrown: 0,
   hitsLanded: 0,
   xp: 0,
+  elo: ELO_START,
+  placementsLeft: PLACEMENTS,
+  rankedWins: 0,
+  rankedLosses: 0,
 };
 
 function loadStats(): LifetimeStats {
@@ -64,6 +74,8 @@ export const app: {
   stats: LifetimeStats;
   /** XP banked by the most recent earning event, for a lobby "+N XP" readout. */
   lastXpGain: number;
+  /** Signed ELO change from the most recent ranked bout, for a "±N ELO" readout. */
+  lastEloDelta: number;
   /**
    * Cloud identity. `uid` is the Anonymous Auth user; `synced` is true once the
    * Firestore `players/{uid}` doc is loaded and writes are flowing. Until then
@@ -79,6 +91,7 @@ export const app: {
   shootBack: localStorage.getItem('ff-shootback') !== '0',
   stats: loadStats(),
   lastXpGain: 0,
+  lastEloDelta: 0,
   profile: { uid: null, synced: false, displayName: '' },
 };
 
@@ -88,6 +101,21 @@ export function addXp(amount: number): number {
   app.stats.xp += amount;
   app.lastXpGain = amount;
   return amount;
+}
+
+/**
+ * Settle a ranked result against the opponent's rating. Updates ELO, burns a
+ * placement, tallies the ranked W/L, and records the delta for the UI. Caller
+ * persists via saveStats(); returns the signed rating change.
+ */
+export function applyRanked(won: boolean, oppElo: number): number {
+  const delta = eloDelta(app.stats.elo, oppElo, won, app.stats.placementsLeft);
+  app.stats.elo = Math.max(0, app.stats.elo + delta);
+  if (app.stats.placementsLeft > 0) app.stats.placementsLeft -= 1;
+  if (won) app.stats.rankedWins += 1;
+  else app.stats.rankedLosses += 1;
+  app.lastEloDelta = delta;
+  return delta;
 }
 
 /**

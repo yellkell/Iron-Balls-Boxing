@@ -28,6 +28,7 @@ export type MenuAction =
   | 'start-training'
   | 'toggle-shootback'
   | 'quick-match'
+  | 'ranked-match'
   | 'cancel-queue'
   | 'vs-bot';
 
@@ -135,30 +136,36 @@ function hitTrain(_u: number, v: number): MenuAction | null {
   return null;
 }
 
-/** Left — 1V1: quick match (or cancel) + vs bot. */
+/** Left — 1V1: quick match, ranked match (or cancel) + vs bot. */
 function drawDuel(ctx: CanvasRenderingContext2D, hover: boolean): void {
   panelBg(ctx, hover, UI.cool, '1 V 1');
 
-  const queueing = app.state === 'queueing';
-  buttonPlate(
-    ctx, 70, 116, PW - 140, 96,
-    queueing ? 'CANCEL' : 'QUICK MATCH',
-    queueing ? UI.amber : UI.cool,
-    hover,
-  );
-  buttonPlate(ctx, 70, 240, PW - 140, 96, 'VS BOT', UI.ember, hover);
+  if (app.state === 'queueing') {
+    buttonPlate(ctx, 70, 150, PW - 140, 92, 'CANCEL', UI.amber, hover);
+    ctx.font = '600 24px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(159,226,255,0.85)';
+    ctx.fillText(`searching — ${app.queueMode} match…`, PW / 2, 300);
+    return;
+  }
 
-  ctx.font = '600 22px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(159,226,255,0.85)';
-  ctx.fillText(queueing ? 'searching for an opponent…' : app.netStatus, PW / 2, 352);
+  buttonPlate(ctx, 64, 92, PW - 128, 76, 'QUICK MATCH', UI.cool, hover);
+  buttonPlate(ctx, 64, 176, PW - 128, 76, 'RANKED', UI.amber, hover);
+  buttonPlate(ctx, 64, 260, PW - 128, 72, 'VS BOT', UI.ember, hover);
+
+  ctx.font = '600 21px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
-  ctx.fillText('online duels carry positional voice chat', PW / 2, 380);
+  ctx.fillText('ranked moves your ELO · quick is casual', PW / 2, 362);
+  ctx.fillStyle = 'rgba(159,226,255,0.7)';
+  ctx.font = '600 19px system-ui, sans-serif';
+  ctx.fillText('online duels carry positional voice chat', PW / 2, 386);
 }
 
 function hitDuel(_u: number, v: number): MenuAction | null {
   const y = (1 - v) * PH;
-  if (y >= 108 && y <= 220) return app.state === 'queueing' ? 'cancel-queue' : 'quick-match';
-  if (y >= 232 && y <= 344) return 'vs-bot';
+  if (app.state === 'queueing') return y >= 140 && y <= 250 ? 'cancel-queue' : null;
+  if (y >= 88 && y <= 172) return 'quick-match';
+  if (y >= 172 && y <= 256) return 'ranked-match';
+  if (y >= 256 && y <= 336) return 'vs-bot';
   return null;
 }
 
@@ -208,18 +215,22 @@ function drawInfo(ctx: CanvasRenderingContext2D): void {
   ];
   lines.forEach((l, i) => ctx.fillText(l, PW / 2, 224 + i * 32));
 
-  // --- footer: lifetime record + last XP banked ---
-  ctx.font = '700 26px system-ui, sans-serif';
+  // --- footer: lifetime record, rating, and the last gains ---
+  const elo = app.stats.placementsLeft > 0 ? `${app.stats.elo} ELO*` : `${app.stats.elo} ELO`;
+  ctx.font = '700 25px system-ui, sans-serif';
   ctx.fillStyle = UI.emberBright;
   ctx.fillText(
-    `${app.stats.wins}W / ${app.stats.losses}L  ·  best ${app.stats.trainingBest}`,
+    `${app.stats.wins}W / ${app.stats.losses}L  ·  ${elo}`,
     PW / 2,
     348,
   );
-  if (app.lastXpGain > 0) {
+  const bits: string[] = [];
+  if (app.lastXpGain > 0) bits.push(`+${app.lastXpGain} XP`);
+  if (app.lastEloDelta !== 0) bits.push(`${app.lastEloDelta > 0 ? '+' : ''}${app.lastEloDelta} ELO`);
+  if (bits.length) {
     ctx.font = '600 22px system-ui, sans-serif';
     ctx.fillStyle = UI.cool;
-    ctx.fillText(`+${app.lastXpGain} XP last`, PW / 2, 380);
+    ctx.fillText(`${bits.join('   ')}  last bout`, PW / 2, 380);
   }
 }
 
