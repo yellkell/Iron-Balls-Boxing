@@ -20,7 +20,7 @@
  *   subcollections, exactly the Firestore WebRTC codelab shape.
  */
 
-import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   addDoc,
   collection,
@@ -53,11 +53,10 @@ const LOBBY_FRESH_MS = 2 * 60 * 1000;
 /** Give P2P this long to come up before declaring failure. */
 const CONNECT_TIMEOUT_MS = 15_000;
 
-let firebaseApp: FirebaseApp | undefined;
-
 function db(): Firestore {
-  firebaseApp ??= initializeApp(firebaseConfig);
-  return getFirestore(firebaseApp);
+  // Reuse the [DEFAULT] app if the profile layer already created it.
+  const fbApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  return getFirestore(fbApp);
 }
 
 export class WebRtcTransport implements Transport {

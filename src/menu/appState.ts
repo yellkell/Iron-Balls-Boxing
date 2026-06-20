@@ -64,6 +64,12 @@ export const app: {
   stats: LifetimeStats;
   /** XP banked by the most recent earning event, for a lobby "+N XP" readout. */
   lastXpGain: number;
+  /**
+   * Cloud identity. `uid` is the Anonymous Auth user; `synced` is true once the
+   * Firestore `players/{uid}` doc is loaded and writes are flowing. Until then
+   * the game runs entirely on the localStorage cache.
+   */
+  profile: { uid: string | null; synced: boolean; displayName: string };
 } = {
   state: 'menu',
   mode: 'bot',
@@ -73,6 +79,7 @@ export const app: {
   shootBack: localStorage.getItem('ff-shootback') !== '0',
   stats: loadStats(),
   lastXpGain: 0,
+  profile: { uid: null, synced: false, displayName: '' },
 };
 
 /** Bank progression XP. Caller persists via saveStats(); returns the amount. */
@@ -83,12 +90,23 @@ export function addXp(amount: number): number {
   return amount;
 }
 
+/**
+ * Optional sink notified after every saveStats() — the profile layer sets this
+ * to push changes up to Firestore. Kept as a hook so appState carries no
+ * Firebase dependency (the SDK stays lazily loaded).
+ */
+let statsListener: (() => void) | null = null;
+export function setStatsListener(fn: (() => void) | null): void {
+  statsListener = fn;
+}
+
 export function saveStats(): void {
   try {
     localStorage.setItem('ff-stats', JSON.stringify(app.stats));
   } catch {
     /* storage unavailable — stats stay in-memory */
   }
+  statsListener?.();
 }
 
 export function saveShootBack(): void {

@@ -11,6 +11,7 @@
  */
 
 import { SessionMode, World } from '@iwsdk/core';
+import { initProfile } from './net/profile.js';
 import { buildArena } from './arena/arena.js';
 import { setupEnvironment } from './arena/environment.js';
 import { setupCombatants } from './combat/setup.js';
@@ -29,6 +30,11 @@ import { PlayerGloveSystem } from './systems/PlayerGloveSystem.js';
 import { FXSystem } from './systems/FXSystem.js';
 
 const container = document.getElementById('scene-container') as HTMLDivElement;
+
+// Bring the cloud profile online in the background (Anonymous Auth + the
+// Firestore players doc). No-ops gracefully until sign-in is enabled; the game
+// boots and plays on the local cache regardless.
+void initProfile();
 
 World.create(container, {
   // Offer an immersive-AR (passthrough) session as soon as the page is
