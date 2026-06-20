@@ -34,7 +34,14 @@ export type MenuAction =
   | 'vs-bot'
   | 'info-stats'
   | 'info-quick'
-  | 'info-ranked';
+  | 'info-ranked'
+  | 'private-open'
+  | 'private-create'
+  | 'private-enter'
+  | 'private-back'
+  | 'kp-del'
+  | 'kp-join'
+  | `kp-${number}`;
 
 const PW = 512;
 const PH = 400;
@@ -140,10 +147,36 @@ function hitTrain(_u: number, v: number): MenuAction | null {
   return null;
 }
 
-/** Left — 1V1: quick match, ranked match (or cancel) + vs bot. */
+/** Left — 1V1. Switches between the mode list and the private-match flow. */
 function drawDuel(ctx: CanvasRenderingContext2D, hover: boolean): void {
   panelBg(ctx, hover, UI.cool, '1 V 1');
+  switch (app.duelView) {
+    case 'private':
+      return drawPrivateMenu(ctx, hover);
+    case 'hosting':
+      return drawHosting(ctx, hover);
+    case 'keypad':
+      return drawKeypad(ctx, hover);
+    default:
+      return drawDuelRoot(ctx, hover);
+  }
+}
 
+function hitDuel(u: number, v: number): MenuAction | null {
+  switch (app.duelView) {
+    case 'private':
+      return hitPrivateMenu(v);
+    case 'hosting':
+      return hitHosting(v);
+    case 'keypad':
+      return hitKeypad(u, v);
+    default:
+      return hitDuelRoot(v);
+  }
+}
+
+function drawDuelRoot(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  // Quick/Ranked search in progress.
   if (app.state === 'queueing') {
     buttonPlate(ctx, 70, 150, PW - 140, 92, 'CANCEL', UI.amber, hover);
     ctx.font = '600 24px system-ui, sans-serif';
@@ -151,25 +184,124 @@ function drawDuel(ctx: CanvasRenderingContext2D, hover: boolean): void {
     ctx.fillText(`searching — ${app.queueMode} match…`, PW / 2, 300);
     return;
   }
-
-  buttonPlate(ctx, 64, 92, PW - 128, 76, 'QUICK MATCH', UI.cool, hover);
-  buttonPlate(ctx, 64, 176, PW - 128, 76, 'RANKED', UI.amber, hover);
-  buttonPlate(ctx, 64, 260, PW - 128, 72, 'VS BOT', UI.ember, hover);
-
-  ctx.font = '600 21px system-ui, sans-serif';
-  ctx.fillStyle = UI.textDim;
-  ctx.fillText('ranked moves your ELO · quick is casual', PW / 2, 362);
-  ctx.fillStyle = 'rgba(159,226,255,0.7)';
+  buttonPlate(ctx, 64, 86, PW - 128, 58, 'QUICK MATCH', UI.cool, hover);
+  buttonPlate(ctx, 64, 152, PW - 128, 58, 'RANKED', UI.amber, hover);
+  buttonPlate(ctx, 64, 218, PW - 128, 58, 'PRIVATE', UI.coolBright, hover);
+  buttonPlate(ctx, 64, 284, PW - 128, 56, 'VS BOT', UI.ember, hover);
   ctx.font = '600 19px system-ui, sans-serif';
-  ctx.fillText('online duels carry positional voice chat', PW / 2, 386);
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('ranked moves your ELO · private = share a code', PW / 2, 372);
 }
 
-function hitDuel(_u: number, v: number): MenuAction | null {
+function hitDuelRoot(v: number): MenuAction | null {
   const y = (1 - v) * PH;
   if (app.state === 'queueing') return y >= 140 && y <= 250 ? 'cancel-queue' : null;
-  if (y >= 88 && y <= 172) return 'quick-match';
-  if (y >= 172 && y <= 256) return 'ranked-match';
-  if (y >= 256 && y <= 336) return 'vs-bot';
+  if (y >= 84 && y <= 146) return 'quick-match';
+  if (y >= 150 && y <= 212) return 'ranked-match';
+  if (y >= 216 && y <= 278) return 'private-open';
+  if (y >= 282 && y <= 342) return 'vs-bot';
+  return null;
+}
+
+function drawPrivateMenu(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  buttonPlate(ctx, 64, 110, PW - 128, 86, 'CREATE MATCH', UI.cool, hover);
+  buttonPlate(ctx, 64, 212, PW - 128, 86, 'ENTER CODE', UI.amber, hover);
+  buttonPlate(ctx, 150, 320, PW - 300, 50, 'BACK', UI.steel, hover);
+  ctx.font = '600 19px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('create a 5-digit code, or type a friend’s', PW / 2, 92);
+}
+
+function hitPrivateMenu(v: number): MenuAction | null {
+  const y = (1 - v) * PH;
+  if (y >= 104 && y <= 202) return 'private-create';
+  if (y >= 206 && y <= 304) return 'private-enter';
+  if (y >= 312 && y <= 378) return 'private-back';
+  return null;
+}
+
+function drawHosting(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  ctx.font = '600 24px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('YOUR MATCH CODE', PW / 2, 116);
+
+  const code = app.privateCode || '·····';
+  ctx.font = stencilFont(72);
+  ctx.fillStyle = UI.coolBright;
+  ctx.fillText(code.split('').join(' '), PW / 2, 188);
+
+  ctx.font = '600 21px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(159,226,255,0.85)';
+  ctx.fillText(app.privateCode ? 'share it · waiting for them…' : 'allocating…', PW / 2, 250);
+
+  buttonPlate(ctx, 110, 296, PW - 220, 70, 'CANCEL', UI.amber, hover);
+}
+
+function hitHosting(v: number): MenuAction | null {
+  const y = (1 - v) * PH;
+  return y >= 290 && y <= 372 ? 'cancel-queue' : null;
+}
+
+// Keypad geometry, shared by draw + hit-test.
+const KP = { x: 56, y: 150, gap: 9, cols: 3, rows: 4, w: PW - 112, h: 218 };
+const KP_KEYS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['DEL', '0', 'JOIN'],
+];
+
+function kpCell(r: number, c: number): { x: number; y: number; w: number; h: number } {
+  const cw = (KP.w - KP.gap * (KP.cols - 1)) / KP.cols;
+  const ch = (KP.h - KP.gap * (KP.rows - 1)) / KP.rows;
+  return { x: KP.x + c * (cw + KP.gap), y: KP.y + r * (ch + KP.gap), w: cw, h: ch };
+}
+
+function drawKeypad(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  // Mid-join: show progress + a cancel.
+  if (app.state === 'queueing') {
+    buttonPlate(ctx, 70, 150, PW - 140, 92, 'CANCEL', UI.amber, hover);
+    ctx.font = '600 24px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(159,226,255,0.85)';
+    ctx.fillText(`joining ${app.codeEntry}…`, PW / 2, 300);
+    return;
+  }
+
+  buttonPlate(ctx, 36, 84, 96, 34, 'BACK', UI.steel, hover);
+
+  // Entered digits, with dots for the empty slots.
+  const slots = Array.from({ length: 5 }, (_, i) => app.codeEntry[i] ?? '·').join(' ');
+  ctx.font = stencilFont(40);
+  ctx.fillStyle = app.netStatus.includes('not found') || app.netStatus.includes('expired') ? UI.danger : UI.coolBright;
+  ctx.fillText(slots, PW / 2 + 28, 104);
+
+  const ready = app.codeEntry.length === 5;
+  for (let r = 0; r < KP.rows; r++) {
+    for (let c = 0; c < KP.cols; c++) {
+      const key = KP_KEYS[r][c];
+      const cell = kpCell(r, c);
+      const accent = key === 'JOIN' ? (ready ? UI.cool : UI.steelDim) : key === 'DEL' ? UI.amber : UI.text;
+      buttonPlate(ctx, cell.x, cell.y, cell.w, cell.h, key, accent, hover);
+    }
+  }
+}
+
+function hitKeypad(u: number, v: number): MenuAction | null {
+  const x = u * PW;
+  const y = (1 - v) * PH;
+  if (app.state === 'queueing') return y >= 140 && y <= 250 ? 'cancel-queue' : null;
+  if (y >= 80 && y <= 122 && x <= 140) return 'private-back';
+  for (let r = 0; r < KP.rows; r++) {
+    for (let c = 0; c < KP.cols; c++) {
+      const cell = kpCell(r, c);
+      if (x >= cell.x && x <= cell.x + cell.w && y >= cell.y && y <= cell.y + cell.h) {
+        const key = KP_KEYS[r][c];
+        if (key === 'DEL') return 'kp-del';
+        if (key === 'JOIN') return 'kp-join';
+        return `kp-${Number(key)}` as MenuAction;
+      }
+    }
+  }
   return null;
 }
 

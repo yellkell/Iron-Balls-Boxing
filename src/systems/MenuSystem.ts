@@ -108,6 +108,8 @@ export class MenuSystem extends createSystem({}) {
       case 'cancel-queue':
         net.cancel();
         app.state = 'menu';
+        app.duelView = 'root';
+        app.codeEntry = '';
         break;
       case 'vs-bot':
         app.mode = 'bot';
@@ -123,6 +125,40 @@ export class MenuSystem extends createSystem({}) {
       case 'info-ranked':
         app.boardView = 'ranked';
         void fetchBoard('ranked');
+        break;
+      case 'private-open':
+        app.duelView = 'private';
+        break;
+      case 'private-create':
+        app.duelView = 'hosting';
+        app.privateCode = '';
+        app.state = 'queueing';
+        net.createPrivate();
+        break;
+      case 'private-enter':
+        app.duelView = 'keypad';
+        app.codeEntry = '';
+        break;
+      case 'private-back':
+        net.cancel();
+        app.duelView = 'root';
+        app.codeEntry = '';
+        break;
+      case 'kp-del':
+        app.codeEntry = app.codeEntry.slice(0, -1);
+        break;
+      case 'kp-join':
+        if (app.codeEntry.length === 5) {
+          app.state = 'queueing';
+          net.joinPrivate(app.codeEntry);
+        }
+        break;
+      default:
+        // kp-0 … kp-9: append a digit (max five).
+        if (action.startsWith('kp-') && app.codeEntry.length < 5) {
+          const d = action.slice(3);
+          if (d >= '0' && d <= '9') app.codeEntry += d;
+        }
         break;
     }
     this.applyState();

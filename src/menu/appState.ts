@@ -73,6 +73,12 @@ export const app: {
   shootBack: boolean;
   /** Which face the lobby info panel shows: your card, or a leaderboard. */
   boardView: 'stats' | 'quick' | 'ranked';
+  /** Which face the 1V1 panel shows: the mode list, or the private-match flow. */
+  duelView: 'root' | 'private' | 'hosting' | 'keypad';
+  /** The 5-digit code shown while hosting a private match. */
+  privateCode: string;
+  /** Digits typed on the join keypad (up to 5). */
+  codeEntry: string;
   stats: LifetimeStats;
   /** XP banked by the most recent earning event, for a lobby "+N XP" readout. */
   lastXpGain: number;
@@ -98,6 +104,9 @@ export const app: {
   netStatus: 'not connected',
   shootBack: localStorage.getItem('ff-shootback') !== '0',
   boardView: 'stats',
+  duelView: 'root',
+  privateCode: '',
+  codeEntry: '',
   stats: loadStats(),
   lastXpGain: 0,
   lastEloDelta: 0,
