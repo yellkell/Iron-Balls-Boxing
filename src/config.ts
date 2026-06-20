@@ -154,31 +154,34 @@ export const MATCH = {
  * Blaston's real eleven league tiers; the thresholds are ours to tune.
  */
 export const PROGRESSION = {
+  // Cumulative XP to REACH each tier. Thresholds match the rank-badge art
+  // (a flat 200-point ladder, Overlord at 2000+); the named emblems live in
+  // src/assets/ranks. Names are Blaston's real eleven league tiers.
   tiers: [
     { name: 'BRONZE', xp: 0 },
-    { name: 'SILVER', xp: 500 },
-    { name: 'GOLD', xp: 1500 },
-    { name: 'PLATINUM', xp: 3500 },
-    { name: 'DIAMOND', xp: 7000 },
-    { name: 'CHAMPION', xp: 12000 },
-    { name: 'MASTER', xp: 20000 },
-    { name: 'GRANDMASTER', xp: 32000 },
-    { name: 'ELITE', xp: 50000 },
-    { name: 'LEGENDARY', xp: 75000 },
-    { name: 'OVERLORD', xp: 110000 },
+    { name: 'SILVER', xp: 200 },
+    { name: 'GOLD', xp: 400 },
+    { name: 'PLATINUM', xp: 600 },
+    { name: 'DIAMOND', xp: 800 },
+    { name: 'CHAMPION', xp: 1000 },
+    { name: 'MASTER', xp: 1200 },
+    { name: 'GRANDMASTER', xp: 1400 },
+    { name: 'ELITE', xp: 1600 },
+    { name: 'LEGENDARY', xp: 1800 },
+    { name: 'OVERLORD', xp: 2000 },
   ],
 
   // Aim Training pays out a fraction of the run score, capped so one hot
   // streak can't balloon the ladder, plus a bonus for a new personal best.
-  trainingPerScore: 0.1, // XP per point of final run score
-  trainingMax: 300, // … capped per run
-  trainingBestBonus: 100,
+  trainingPerScore: 0.01, // XP per point of final run score
+  trainingMax: 40, // … capped per run
+  trainingBestBonus: 15,
 
   // Duels pay a flat participation amount + a win bonus; ranked is worth more.
-  quickPlay: 50,
-  quickWin: 100, // a quick win banks quickPlay + quickWin = 150
-  rankedPlay: 75,
-  rankedWin: 150, // a ranked win banks rankedPlay + rankedWin = 225
+  quickPlay: 8,
+  quickWin: 12, // a quick win banks quickPlay + quickWin = 20
+  rankedPlay: 12,
+  rankedWin: 20, // a ranked win banks rankedPlay + rankedWin = 32
 };
 
 /** The visible platform slab under each boxer. */

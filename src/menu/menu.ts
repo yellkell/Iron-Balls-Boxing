@@ -17,6 +17,7 @@ import {
   type Scene,
 } from 'three';
 import { app } from './appState.js';
+import { rankBadge } from './rankBadges.js';
 import { GAME_TITLE } from '../config.js';
 import { tierForXp } from '../progression/progression.js';
 import { UI, buttonPlate, hazardStrip, plate, segmentBar, stencilFont } from '../ui/industrial.js';
@@ -167,25 +168,32 @@ function drawInfo(ctx: CanvasRenderingContext2D): void {
 
   // --- Bronze→Overlord rank badge + XP bar toward the next tier ---
   const tier = tierForXp(app.stats.xp);
+
+  // The emblem art, left; its native dark backing reads as a metal plaque.
+  const badge = rankBadge(tier.index);
+  const bx = 38, by = 84, bh = 96, bw = badge ? (badge.naturalWidth / badge.naturalHeight) * bh : 84;
+  if (badge) ctx.drawImage(badge, bx, by, bw, bh);
+  const textX = bx + bw + 18;
+
   ctx.textAlign = 'left';
-  ctx.font = stencilFont(32);
+  ctx.font = stencilFont(30);
   ctx.fillStyle = UI.emberBright;
-  ctx.fillText(tier.name, 40, 104);
+  ctx.fillText(tier.name, textX, 116);
   ctx.textAlign = 'right';
   ctx.font = '600 22px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
   ctx.fillText(
     tier.next === null ? `${app.stats.xp} XP  ·  MAX` : `${app.stats.xp} / ${tier.next} XP`,
-    PW - 40,
-    104,
+    PW - 38,
+    116,
   );
-  segmentBar(ctx, 40, 122, PW - 80, 20, tier.progress, UI.ember);
+  segmentBar(ctx, textX, 138, PW - 38 - textX, 18, tier.progress, UI.ember);
 
   ctx.strokeStyle = UI.steelDim;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(36, 162);
-  ctx.lineTo(PW - 36, 162);
+  ctx.moveTo(36, 196);
+  ctx.lineTo(PW - 36, 196);
   ctx.stroke();
 
   // --- controls (condensed) ---
@@ -195,10 +203,10 @@ function drawInfo(ctx: CanvasRenderingContext2D): void {
   const lines = [
     'hold trigger — ball orbits your fist',
     'punch + release — throw',
-    'trigger — recall (through them still hits)',
-    'your orbit parries · stay on your platform',
+    'trigger — recall the ball',
+    'orbit parries · stay on your platform',
   ];
-  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 198 + i * 34));
+  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 224 + i * 32));
 
   // --- footer: lifetime record + last XP banked ---
   ctx.font = '700 26px system-ui, sans-serif';
