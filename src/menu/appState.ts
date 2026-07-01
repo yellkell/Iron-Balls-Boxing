@@ -4,16 +4,19 @@
  *  - 'menu'     : standing on your platform at the floating menu, choosing.
  *  - 'queueing' : you pressed 1V1 QUICK MATCH; waiting for the relay server
  *                 to pair you with another boxer.
- *  - 'playing'  : a bout is live, vs the bot (`mode: 'bot'`) or a real
- *                 opponent over the wire (`mode: 'net'`).
+ *  - 'playing'  : a bout is live — vs the bot (`mode: 'bot'`), a real
+ *                 opponent over the wire (`mode: 'net'`), or an arcade titan
+ *                 (`mode: 'campaign'`, stage in `campaignStage`).
  *  - 'training' : Aim Training — pop-up targets, optional return fire.
  *
  * MenuSystem and NetworkSystem own the transitions; the combat systems read
  * `state`/`mode` to know when and what to simulate.
  */
 
+import { CAMPAIGN } from '../config.js';
+
 export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
-export type AppMode = 'bot' | 'net';
+export type AppMode = 'bot' | 'net' | 'campaign';
 
 export interface LifetimeStats {
   wins: number;
@@ -21,21 +24,47 @@ export interface LifetimeStats {
   trainingBest: number;
   ballsThrown: number;
   hitsLanded: number;
+  /** Currency — the arena pays out in salvaged plate. */
+  scrap: number;
+  /** Lifetime experience; level is derived (see combat/rewards.ts). */
+  xp: number;
+  /** One flag per arcade stage: true once that titan has been felled. */
+  campaignCleared: boolean[];
+}
+
+function freshStats(): LifetimeStats {
+  return {
+    wins: 0,
+    losses: 0,
+    trainingBest: 0,
+    ballsThrown: 0,
+    hitsLanded: 0,
+    scrap: 0,
+    xp: 0,
+    campaignCleared: new Array(CAMPAIGN.stages).fill(false),
+  };
 }
 
 function loadStats(): LifetimeStats {
   try {
     const raw = localStorage.getItem('ff-stats');
-    if (raw) return { wins: 0, losses: 0, trainingBest: 0, ballsThrown: 0, hitsLanded: 0, ...JSON.parse(raw) };
+    if (raw) {
+      const stats = { ...freshStats(), ...JSON.parse(raw) } as LifetimeStats;
+      // Older saves (or a future stage-count bump) may carry a short array.
+      while (stats.campaignCleared.length < CAMPAIGN.stages) stats.campaignCleared.push(false);
+      return stats;
+    }
   } catch {
     /* fresh start */
   }
-  return { wins: 0, losses: 0, trainingBest: 0, ballsThrown: 0, hitsLanded: 0 };
+  return freshStats();
 }
 
 export const app: {
   state: AppState;
   mode: AppMode;
+  /** Which arcade titan is being fought while mode === 'campaign' (0-based). */
+  campaignStage: number;
   /** Network side: 0 = host (match authority), 1 = guest. */
   side: 0 | 1;
   /** Human-readable connection status for the lobby info panel. */
@@ -46,11 +75,18 @@ export const app: {
 } = {
   state: 'menu',
   mode: 'bot',
+  campaignStage: 0,
   side: 0,
   netStatus: 'not connected',
   shootBack: localStorage.getItem('ff-shootback') !== '0',
   stats: loadStats(),
 };
+
+/** An arcade stage is open once every stage before it has been cleared. */
+export function stageUnlocked(stage: number): boolean {
+  if (stage <= 0) return true;
+  return app.stats.campaignCleared[stage - 1] === true;
+}
 
 export function saveStats(): void {
   try {

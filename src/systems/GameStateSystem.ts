@@ -14,6 +14,7 @@ import { createSystem, type Entity } from '@iwsdk/core';
 import { Combatant } from '../components/Combatant.js';
 import { Health } from '../components/Health.js';
 import { match } from '../combat/matchState.js';
+import { awardMatch } from '../combat/rewards.js';
 import { app, saveStats, training } from '../menu/appState.js';
 import * as sfx from '../audio/sfx.js';
 import { MATCH } from '../config.js';
@@ -52,7 +53,9 @@ export class GameStateSystem extends createSystem({
       return;
     }
 
-    if (app.state !== 'playing') {
+    if (app.state !== 'playing' || app.mode === 'campaign') {
+      // Arcade titan bouts are owned end-to-end by CampaignSystem (single
+      // long round, its own HUD) — this system stands down entirely.
       this.scoreboard?.setVisible(false);
       this.wasPlaying = false;
       return;
@@ -136,6 +139,7 @@ export class GameStateSystem extends createSystem({
     match.message = win ? 'YOU WIN THE FIGHT' : 'YOU LOSE';
     if (win) app.stats.wins += 1;
     else app.stats.losses += 1;
+    awardMatch(win); // scrap + XP for bot and quick-match bouts (saves stats)
     saveStats();
     sfx.matchEnd(win);
     if (app.mode === 'net') this.echoState();

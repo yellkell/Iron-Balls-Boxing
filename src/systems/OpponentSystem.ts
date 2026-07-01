@@ -41,7 +41,9 @@ export class OpponentSystem extends createSystem({
     // Lazily create the hitboxes once the opponent combatant entity exists.
     if (!this.built) this.buildHitboxes();
 
-    const fighting = app.state === 'playing';
+    // Arcade titans are driven by CampaignSystem, not the pose bus — the
+    // human-sized rig, its hitboxes and the bus-bound fireballs all stand down.
+    const fighting = app.state === 'playing' && app.mode !== 'campaign';
     opponent.active = fighting;
     for (const piece of rig.all) piece.visible = fighting;
     if (!fighting) {

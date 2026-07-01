@@ -35,6 +35,17 @@ in-your-face boxing feel.
   spatialised onto their avatar's head (HRTF), so their trash talk pans and
   ducks with them. Mic permission is asked when you queue; declining still
   lets you hear them.
+- **ARCADE** — the titan gauntlet, on the console below the training panel.
+  Five boss machines, each bigger than the last (~2.3 m up to ~6 m of plate),
+  each with its own elaborate pit-lane intro: klaxon, strobes, the titan
+  grinding up out of the floor, name card, roar, bell. Titans never throw
+  balls — they wind up **melee and ranged strikes whose kill zones charge up
+  visibly on YOUR platform** (fist-slam discs, duck-under sweep blades, eye
+  beam strips, mortar barrages). Their armour clanks your fire away; damage
+  goes in through the **visor**, the pauldron **pods** while a barrage cooks,
+  and — for double — the chest **core** that vents open after every melee
+  swing. Dodge, then punish: David vs Goliath, souls-style. Wins pay SCRAP +
+  XP like any bout; the **first fell of each titan pays double**.
 
 ## The rules of the platform
 

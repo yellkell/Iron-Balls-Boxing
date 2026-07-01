@@ -20,6 +20,7 @@ import { createSystem, InputComponent, Quaternion, Vector3, type Entity } from '
 import { BallState, Fireball } from '../components/Fireball.js';
 import { createFireVisual, emberBurst, spawnEmber, stampTrail, type FireVisual } from '../fx/fire.js';
 import { ballCommands, opponent } from '../combat/opponentBus.js';
+import { campaign } from '../campaign/campaignState.js';
 import { match } from '../combat/matchState.js';
 import { app, training } from '../menu/appState.js';
 import { net } from '../net/client.js';
@@ -202,8 +203,12 @@ export class FireballSystem extends createSystem({
     const obj = ball.object3D!;
     _dir.copy(_vel).normalize();
 
-    // Aim assist: blend the swing toward the opponent's chest.
-    _aim.set(0, 1.25, -ARENA_GAP).sub(obj.position).normalize();
+    // Aim assist: blend the swing toward the opponent's chest — or, in an
+    // arcade bout, toward the titan's current sweet spot (CampaignSystem
+    // keeps it on the head, or on the core while it's vented open).
+    if (app.mode === 'campaign') _aim.copy(campaign.aimPoint);
+    else _aim.set(0, 1.25, -ARENA_GAP);
+    _aim.sub(obj.position).normalize();
     _dir.lerp(_aim, FIREBALL.aimAssist).normalize();
 
     const speed = Math.min(

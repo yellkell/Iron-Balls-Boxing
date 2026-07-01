@@ -135,6 +135,53 @@ export const BOT = {
   recallDelay: 1.4, // seconds after a throw before it recalls the ball
 };
 
+/**
+ * Progression payouts. A won bout — vs the bot, a quick match, or an arcade
+ * titan you have already felled — pays the base rate. The FIRST time you fell
+ * each arcade titan the payout is doubled.
+ */
+export const REWARDS = {
+  winScrap: 120,
+  winXp: 150,
+  lossScrap: 25,
+  lossXp: 40,
+  /** First-clear multiplier for an arcade campaign stage. */
+  firstClearMult: 2,
+};
+
+/**
+ * ARCADE — the titan gauntlet. Five bosses, each bigger than the last; they
+ * never throw fireballs. Instead they wind up melee and ranged strikes whose
+ * kill zones charge up visibly ON YOUR PLATFORM — read the floor, move, and
+ * punish the weak points that open up after their attacks. Dark-souls pacing
+ * on a two-metre stage.
+ */
+export const CAMPAIGN = {
+  stages: 5,
+
+  // Intro staging: klaxon + strobes, the titan rises, the title card, FIGHT.
+  klaxonTime: 1.2, // warning strobes before anything moves
+  riseTime: 2.6, // seconds the titan takes to surface
+  titleTime: 2.4, // name card + roar hold
+  fightCardTime: 0.9, // the FIGHT flash before the bell
+
+  attackDamage: 20, // every landed titan strike is 20 — same law as fireballs
+  victoryDelay: 8, // seconds of collapse + payout card before the lobby
+  defeatDelay: 5, // seconds of SCRAPPED card before the lobby
+
+  // Weak-point law (Hitbox.damageScale): armour clanks, the visor always
+  // counts, the exposed core takes double.
+  headScale: 1.0,
+  coreScale: 2.0,
+  podScale: 1.5,
+
+  // Strike-zone geometry defaults (per-boss defs tune sizes/cadence).
+  slamRadius: 0.55,
+  beamHalfWidth: 0.22,
+  sweepThickness: 0.19, // half-height of the horizontal blade slice
+  mortarRadius: 0.42,
+};
+
 /** Match format: best-of rounds, Blaston-style pacing. */
 export const MATCH = {
   roundTime: 60, // seconds per round

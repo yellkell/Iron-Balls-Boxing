@@ -86,6 +86,14 @@ export class MenuSystem extends createSystem({}) {
   private run(action: MenuAction): void {
     sfx.ensureAudio();
     sfx.uiClick();
+    // ARCADE stage slots: enter the titan bout (locked slots never hit-test).
+    if (action.startsWith('campaign-')) {
+      app.mode = 'campaign';
+      app.campaignStage = Number(action.slice('campaign-'.length)) || 0;
+      app.state = 'playing';
+      this.applyState();
+      return;
+    }
     switch (action) {
       case 'start-training':
         app.state = 'training';

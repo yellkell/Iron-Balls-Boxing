@@ -17,6 +17,7 @@ import { setupCombatants } from './combat/setup.js';
 import { PlayerBodySystem } from './systems/PlayerBodySystem.js';
 import { OpponentSystem } from './systems/OpponentSystem.js';
 import { BotSystem } from './systems/BotSystem.js';
+import { CampaignSystem } from './systems/CampaignSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
 import { TrainingSystem } from './systems/TrainingSystem.js';
 import { FireballSystem } from './systems/FireballSystem.js';
@@ -61,6 +62,8 @@ World.create(container, {
   world.registerSystem(BotSystem);
   world.registerSystem(NetworkSystem);
   world.registerSystem(OpponentSystem);
+  // ARCADE: the five-titan campaign (its own boss rig, attacks and HUD).
+  world.registerSystem(CampaignSystem);
   // Aim Training: targets, scoring, return fire.
   world.registerSystem(TrainingSystem);
   // The fireballs themselves, then collision (so it sees final positions).

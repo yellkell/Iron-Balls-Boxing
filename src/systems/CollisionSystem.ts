@@ -67,7 +67,7 @@ export class CollisionSystem extends createSystem({
         // balls can be parried — a recalled ball is already leaving.)
         if (!returning && this.tryParry(ball, balls, radius)) continue;
         this.enemyBallVsMe(ball, hitboxes, radius, damage, returning);
-      } else if (inMatch && app.mode === 'bot') {
+      } else if (inMatch && (app.mode === 'bot' || app.mode === 'campaign')) {
         this.myBallVsOpponent(ball, hitboxes, radius, damage, returning);
       } else if (inTraining) {
         this.myBallVsTargets(ball, radius, returning);
@@ -115,8 +115,17 @@ export class CollisionSystem extends createSystem({
     }
   }
 
-  /** My ball (flying or recalled through them) connecting with the bot. */
+  /**
+   * My ball (flying or recalled through them) connecting with the bot or an
+   * arcade titan. Titan bodies are a stack of overlapping spheres with
+   * different `damageScale`s — armour plate (0), the visor (1), the exposed
+   * core (2) — so when several overlap the ball, the BEST multiplier rules:
+   * a punch that finds the core through the plate counts as a core hit, and a
+   * plain armour touch clanks off without a scratch.
+   */
   private myBallVsOpponent(ball: Entity, hitboxes: Entity[], radius: number, damage: number, returning: boolean): void {
+    let best: Entity | null = null;
+    let bestScale = -1;
     for (const hitbox of hitboxes) {
       if ((hitbox.getValue(Hitbox, 'team') ?? 0) !== 1) continue;
       const hbObj = hitbox.object3D;
@@ -124,16 +133,28 @@ export class CollisionSystem extends createSystem({
       hbObj.getWorldPosition(_otherPos);
       const reach = radius + (hitbox.getValue(Hitbox, 'radius') ?? 0.2);
       if (_ballPos.distanceToSquared(_otherPos) > reach * reach) continue;
-
-      const them = (hitbox.getValue(Hitbox, 'owner') as Entity | null) ?? hitbox;
-      this.applyDamage(them, damage);
-      spawnFireImpact(this.world, _ballPos, 0);
-      sfx.hitDealt();
-      app.stats.hitsLanded += 1;
-      if (returning) ball.setValue(Fireball, 'returnHit', 1);
-      else this.spendBall(ball);
-      return;
+      const scale = hitbox.getValue(Hitbox, 'damageScale') ?? 1;
+      if (scale > bestScale) {
+        bestScale = scale;
+        best = hitbox;
+      }
     }
+    if (!best) return;
+
+    if (bestScale <= 0) {
+      // Armour: the ball is spent against the plate — sparks, no damage.
+      emberBurst(_ballPos, 10, true);
+      sfx.armorClank();
+    } else {
+      const them = (best.getValue(Hitbox, 'owner') as Entity | null) ?? best;
+      this.applyDamage(them, damage * bestScale);
+      spawnFireImpact(this.world, _ballPos, 0);
+      if (bestScale > 1) sfx.coreHit();
+      else sfx.hitDealt();
+      app.stats.hitsLanded += 1;
+    }
+    if (returning) ball.setValue(Fireball, 'returnHit', 1);
+    else this.spendBall(ball);
   }
 
   /** My ball vs the pop-up targets: mark the hit, TrainingSystem scores it. */

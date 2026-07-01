@@ -1,10 +1,12 @@
 /**
- * The lobby: three smoked-steel plates on a shallow arc in front of the
- * player — industrial robot-wars styling, translucent so your room stays
- * visible through them. Centre = AIM TRAINING (the headline mode), left =
- * 1V1 (quick match + vs bot), right = stats & connection info. Each panel is
- * a canvas texture on a plane; MenuSystem raycasts the controllers for
- * hover + click and maps the hit UV to an action zone.
+ * The lobby: four smoked-steel plates in front of the player — industrial
+ * robot-wars styling, translucent so your room stays visible through them.
+ * Centre = AIM TRAINING (the tutorial mode), left = 1V1 (quick match + vs
+ * bot), right = stats & connection info, and BELOW the tutorial panel the
+ * ARCADE console — the five-titan campaign gauntlet — tilted up like a
+ * control desk. Each panel is a canvas texture on a plane; MenuSystem
+ * raycasts the controllers for hover + click and maps the hit UV to an
+ * action zone.
  */
 
 import {
@@ -16,18 +18,21 @@ import {
   PlaneGeometry,
   type Scene,
 } from 'three';
-import { app, training } from './appState.js';
+import { app, stageUnlocked, training } from './appState.js';
 import { GAME_TITLE } from '../config.js';
+import { BOSSES } from '../campaign/bosses.js';
+import { playerLevel } from '../combat/rewards.js';
 import { UI, buttonPlate, hazardStrip, plate, stencilFont } from '../ui/industrial.js';
 
-export type PanelId = 'train' | 'duel' | 'info';
+export type PanelId = 'train' | 'duel' | 'info' | 'arcade';
 
 export type MenuAction =
   | 'start-training'
   | 'toggle-shootback'
   | 'quick-match'
   | 'cancel-queue'
-  | 'vs-bot';
+  | 'vs-bot'
+  | `campaign-${number}`;
 
 const PW = 512;
 const PH = 400;
@@ -160,6 +165,96 @@ function hitDuel(_u: number, v: number): MenuAction | null {
   return null;
 }
 
+/**
+ * Below the tutorial — ARCADE: the titan gauntlet. Five stage slots in a
+ * row (cleared / open / locked), the next titan's name, and your wallet.
+ */
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+const SLOT_W = 76;
+const SLOT_H = 104;
+const SLOT_GAP = 9;
+const SLOT_Y = 118;
+const SLOTS_X = (PW - (SLOT_W * 5 + SLOT_GAP * 4)) / 2;
+
+/** A simple stencil padlock for locked stages. */
+function padlock(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+  ctx.strokeStyle = UI.steelDim;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 8, 11, Math.PI, 0);
+  ctx.stroke();
+  ctx.fillStyle = UI.steelDim;
+  ctx.fillRect(cx - 15, cy - 8, 30, 24);
+}
+
+function drawArcade(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  panelBg(ctx, hover, UI.danger, 'ARCADE');
+  ctx.font = '700 22px system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('the titan gauntlet', PW - 40, 44);
+  ctx.textAlign = 'center';
+
+  const cleared = app.stats.campaignCleared;
+  for (let i = 0; i < 5; i++) {
+    const x = SLOTS_X + i * (SLOT_W + SLOT_GAP);
+    const done = cleared[i] === true;
+    const open = stageUnlocked(i);
+    plate(ctx, x, SLOT_Y, SLOT_W, SLOT_H, {
+      cut: 10,
+      fill: done ? 'rgba(255,122,24,0.2)' : open ? 'rgba(255,176,0,0.1)' : 'rgba(150,150,170,0.06)',
+      stroke: done ? UI.ember : open ? UI.amber : UI.steelDim,
+      rivets: false,
+    });
+    if (!open) {
+      padlock(ctx, x + SLOT_W / 2, SLOT_Y + 46);
+    } else {
+      ctx.font = stencilFont(38);
+      ctx.fillStyle = done ? UI.emberBright : UI.amber;
+      ctx.fillText(ROMAN[i], x + SLOT_W / 2, SLOT_Y + 40);
+      ctx.font = '700 20px system-ui, sans-serif';
+      ctx.fillStyle = done ? UI.emberBright : UI.textDim;
+      ctx.fillText(done ? 'FELLED' : 'FIGHT', x + SLOT_W / 2, SLOT_Y + 78);
+    }
+  }
+
+  // Next opponent line: the first unfelled, unlocked titan.
+  const next = BOSSES.findIndex((_, i) => stageUnlocked(i) && cleared[i] !== true);
+  ctx.font = '700 24px system-ui, sans-serif';
+  ctx.fillStyle = UI.amberSoft;
+  ctx.fillText(
+    next >= 0 ? `next: ${BOSSES[next].name} — ${BOSSES[next].epithet}` : 'all five titans felled',
+    PW / 2,
+    262,
+  );
+  ctx.font = '600 21px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('first fell pays double scrap & xp', PW / 2, 296);
+
+  // Wallet readout.
+  ctx.font = stencilFont(26);
+  ctx.fillStyle = UI.text;
+  ctx.fillText(
+    `LV ${playerLevel(app.stats.xp)}  ·  ${app.stats.xp} XP  ·  ${app.stats.scrap} SCRAP`,
+    PW / 2,
+    348,
+  );
+}
+
+function hitArcade(u: number, v: number): MenuAction | null {
+  const x = u * PW;
+  const y = (1 - v) * PH;
+  if (y < SLOT_Y - 8 || y > SLOT_Y + SLOT_H + 8) return null;
+  for (let i = 0; i < 5; i++) {
+    const sx = SLOTS_X + i * (SLOT_W + SLOT_GAP);
+    if (x >= sx && x <= sx + SLOT_W) {
+      return stageUnlocked(i) ? (`campaign-${i}` as MenuAction) : null;
+    }
+  }
+  return null;
+}
+
 /** Right — stats & how-to. Not clickable. */
 function drawInfo(ctx: CanvasRenderingContext2D): void {
   panelBg(ctx, false, UI.text, GAME_TITLE);
@@ -174,14 +269,21 @@ function drawInfo(ctx: CanvasRenderingContext2D): void {
     'your orbit parries their fire',
     'stay on your platform!',
   ];
-  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 112 + i * 40));
+  lines.forEach((l, i) => ctx.fillText(l, PW / 2, 108 + i * 38));
 
   ctx.font = '700 28px system-ui, sans-serif';
   ctx.fillStyle = UI.emberBright;
   ctx.fillText(
     `${app.stats.wins}W / ${app.stats.losses}L  ·  best ${app.stats.trainingBest}${training.lastScore ? `  ·  last ${training.lastScore}` : ''}`,
     PW / 2,
-    364,
+    342,
+  );
+  ctx.font = '700 26px system-ui, sans-serif';
+  ctx.fillStyle = UI.amberSoft;
+  ctx.fillText(
+    `LV ${playerLevel(app.stats.xp)}  ·  ${app.stats.xp} XP  ·  ${app.stats.scrap} SCRAP`,
+    PW / 2,
+    380,
   );
 }
 
@@ -192,6 +294,7 @@ export function createMenu(scene: Scene): Menu {
   const train = makePanel('train', 0.86, 0.68, drawTrain, hitTrain);
   const duel = makePanel('duel', 0.78, 0.62, drawDuel, hitDuel);
   const info = makePanel('info', 0.78, 0.62, (ctx) => drawInfo(ctx), () => null);
+  const arcade = makePanel('arcade', 0.86, 0.66, drawArcade, hitArcade);
 
   // Shallow arc in front of the player, tilted inward toward the centre.
   const y = 1.45;
@@ -200,8 +303,12 @@ export function createMenu(scene: Scene): Menu {
   duel.mesh.rotation.y = 0.48;
   info.mesh.position.set(0.84, y - 0.02, -1.02);
   info.mesh.rotation.y = -0.48;
+  // The arcade console sits BELOW the tutorial panel, leaned back like a
+  // control desk so it reads comfortably from standing height.
+  arcade.mesh.position.set(0, 0.78, -1.06);
+  arcade.mesh.rotation.x = -0.38;
 
-  const panels = [train, duel, info];
+  const panels = [train, duel, info, arcade];
   for (const p of panels) {
     p.redraw(false);
     group.add(p.mesh);

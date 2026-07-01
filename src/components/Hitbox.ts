@@ -14,6 +14,12 @@ export const Hitbox = createComponent(
     team: { type: Types.Int32, default: 0 },
     /** Entity carrying the Health this hitbox belongs to. */
     owner: { type: Types.Entity, default: null },
+    /**
+     * Damage multiplier — the arcade titans' weak-point law. 1 = a normal
+     * body sphere; 0 = armour (the ball clanks off, no damage); >1 = an
+     * exposed weak point. When spheres overlap, the best multiplier wins.
+     */
+    damageScale: { type: Types.Float32, default: 1 },
   },
   'Spherical hit volume for collision.',
 );
