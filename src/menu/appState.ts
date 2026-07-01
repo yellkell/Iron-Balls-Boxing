@@ -30,6 +30,10 @@ export interface LifetimeStats {
   xp: number;
   /** One flag per arcade stage: true once that titan has been felled. */
   campaignCleared: boolean[];
+  /** Unlocked by felling the final titan: the gold CHAMPION platform. */
+  championPlatform: boolean;
+  /** Loadout: which platform skin stands under you. */
+  platformSkin: 'standard' | 'champion';
 }
 
 function freshStats(): LifetimeStats {
@@ -42,6 +46,8 @@ function freshStats(): LifetimeStats {
     scrap: 0,
     xp: 0,
     campaignCleared: new Array(CAMPAIGN.stages).fill(false),
+    championPlatform: false,
+    platformSkin: 'standard',
   };
 }
 
@@ -63,6 +69,12 @@ function loadStats(): LifetimeStats {
 export const app: {
   state: AppState;
   mode: AppMode;
+  /**
+   * Which lobby page is showing while state is 'menu'/'queueing': the main
+   * panel arc, or the ARCADE campaign sub-menu (the titan line-up). Fights
+   * launched from the sub-menu return to it.
+   */
+  menuPage: 'main' | 'campaign';
   /** Which arcade titan is being fought while mode === 'campaign' (0-based). */
   campaignStage: number;
   /** Network side: 0 = host (match authority), 1 = guest. */
@@ -75,6 +87,7 @@ export const app: {
 } = {
   state: 'menu',
   mode: 'bot',
+  menuPage: 'main',
   campaignStage: 0,
   side: 0,
   netStatus: 'not connected',

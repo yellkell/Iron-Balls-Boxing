@@ -19,7 +19,7 @@ import {
   Vector3,
   type Intersection,
 } from 'three';
-import { app, saveShootBack, type AppState } from '../menu/appState.js';
+import { app, saveShootBack, saveStats, type AppState } from '../menu/appState.js';
 import { createMenu, type Menu, type MenuAction, type PanelId } from '../menu/menu.js';
 import { net } from '../net/client.js';
 import * as sfx from '../audio/sfx.js';
@@ -38,6 +38,7 @@ export class MenuSystem extends createSystem({}) {
   private ray = new Raycaster();
   private hovered: PanelId | null = null;
   private lastState: AppState | null = null;
+  private lastPage: 'main' | 'campaign' | null = null;
   private pointers: Record<'left' | 'right', Pointer> = {} as Record<'left' | 'right', Pointer>;
   private redrawTimer = 0;
 
@@ -46,6 +47,7 @@ export class MenuSystem extends createSystem({}) {
     this.pointers.left = this.makePointer();
     this.pointers.right = this.makePointer();
     this.applyState();
+    this.syncPlatformSkin();
   }
 
   update(delta: number): void {
@@ -56,9 +58,16 @@ export class MenuSystem extends createSystem({}) {
       return;
     }
 
-    // Lobby / queueing: hover + click the panels.
+    // Page flips (CampaignSystem sends you back to the line-up after a bout).
+    if (app.menuPage !== this.lastPage) {
+      this.lastPage = app.menuPage;
+      this.menu.syncPage();
+      this.menu.redrawAll(this.hovered);
+    }
+
+    // Lobby / queueing: hover + click the visible page's panels.
     let hover: PanelId | null = null;
-    const meshes = this.menu.panels.map((p) => p.mesh);
+    const meshes = this.menu.panels.filter((p) => p.mesh.visible).map((p) => p.mesh);
     for (const hand of ['left', 'right'] as const) {
       const hit = this.updatePointer(hand, meshes);
       if (!hit) continue;
@@ -101,6 +110,19 @@ export class MenuSystem extends createSystem({}) {
       case 'toggle-shootback':
         app.shootBack = !app.shootBack;
         saveShootBack();
+        break;
+      case 'open-campaign':
+        app.menuPage = 'campaign';
+        break;
+      case 'close-campaign':
+        app.menuPage = 'main';
+        break;
+      case 'toggle-platform':
+        if (app.stats.championPlatform) {
+          app.stats.platformSkin = app.stats.platformSkin === 'champion' ? 'standard' : 'champion';
+          saveStats();
+          this.syncPlatformSkin();
+        }
         break;
       case 'quick-match':
         app.state = 'queueing';
@@ -167,11 +189,21 @@ export class MenuSystem extends createSystem({}) {
     }
   }
 
+  /** Stand on the platform skin your loadout says you've earned. */
+  private syncPlatformSkin(): void {
+    const champ = app.stats.platformSkin === 'champion' && app.stats.championPlatform;
+    const standard = this.scene.getObjectByName('player-platform');
+    const champion = this.scene.getObjectByName('player-platform-champion');
+    if (standard) standard.visible = !champ;
+    if (champion) champion.visible = champ;
+  }
+
   // --- visibility per state --------------------------------------------------
 
   private applyState(): void {
     const inLobby = app.state === 'menu' || app.state === 'queueing';
     this.menu.setVisible(inLobby);
+    this.syncPlatformSkin(); // the champion platform can be earned mid-session
 
     // The title banner shows only in the lobby.
     const banner = this.scene.getObjectByName('title-banner');

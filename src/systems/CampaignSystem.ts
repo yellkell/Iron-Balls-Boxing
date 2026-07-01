@@ -44,7 +44,7 @@ import { Hitbox } from '../components/Hitbox.js';
 import { PlayerBodyPart } from '../components/PlayerBodyPart.js';
 import { match } from '../combat/matchState.js';
 import { awardCampaign } from '../combat/rewards.js';
-import { app } from '../menu/appState.js';
+import { app, saveStats } from '../menu/appState.js';
 import { emberBurst } from '../fx/fire.js';
 import { spawnFireImpact } from '../fx/effects.js';
 import { feedback } from '../fx/feedback.js';
@@ -839,6 +839,14 @@ export class CampaignSystem extends createSystem({
       `+${payout.scrap} SCRAP  ·  +${payout.xp} XP`,
       payout.doubled ? 'FIRST FELL — DOUBLE PAYOUT' : 'already felled — standard payout',
     ];
+    // Felling the king crowns you: the CHAMPION platform joins your loadout.
+    // (Also granted retroactively to saves that beat GOLIATH pre-reward.)
+    if (app.campaignStage === BOSSES.length - 1 && !app.stats.championPlatform) {
+      app.stats.championPlatform = true;
+      app.stats.platformSkin = 'champion';
+      saveStats();
+      this.payoutLines.push('★ CHAMPION PLATFORM UNLOCKED ★');
+    }
     this.hud.showCard('TITAN FELLED', this.payoutLines, this.accentCss());
     sfx.matchEnd(true);
     sfx.bossRoar(this.def.scale * 0.8); // the death bellow
@@ -889,6 +897,9 @@ export class CampaignSystem extends createSystem({
   }
 
   private finish(): void {
+    // Back to the titan line-up, not the main arc — win or lose, the
+    // gauntlet is where you pick your next fight (or your rematch).
+    app.menuPage = 'campaign';
     app.state = 'menu';
     this.teardown();
   }

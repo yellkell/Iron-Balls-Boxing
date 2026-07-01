@@ -26,7 +26,9 @@ in-your-face boxing feel.
 - **AIM TRAINING** — the heart of the game. Bullseye discs and humanoid
   cutouts pop up across the gap; land your fire while they're up. Streaks
   multiply your score and the cadence ramps. Flip **targets shoot back** on
-  and the cutouts return blue fire so you train dodging between throws.
+  and the cutouts return blue fire so you train dodging between throws. In
+  the **last 30 seconds**, gold **drones** join the mix — small strafing
+  hover-targets that demand a led shot and pay 300 a pop.
 - **VS BOT** — spar an iron boxer that strafes, ducks, reactively dodges your
   throws and hurls fire back on a cadence.
 - **1V1 QUICK MATCH** — competitive online duels through the bundled relay
@@ -36,16 +38,22 @@ in-your-face boxing feel.
   ducks with them. Mic permission is asked when you queue; declining still
   lets you hear them.
 - **ARCADE** — the titan gauntlet, on the console below the training panel.
-  Five boss machines, each bigger than the last (~2.3 m up to ~6 m of plate),
-  each with its own elaborate pit-lane intro: klaxon, strobes, the titan
-  grinding up out of the floor, name card, roar, bell. Titans never throw
-  balls — they wind up **melee and ranged strikes whose kill zones charge up
-  visibly on YOUR platform** (fist-slam discs, duck-under sweep blades, eye
-  beam strips, mortar barrages). Their armour clanks your fire away; damage
-  goes in through the **visor**, the pauldron **pods** while a barrage cooks,
-  and — for double — the chest **core** that vents open after every melee
-  swing. Dodge, then punish: David vs Goliath, souls-style. Wins pay SCRAP +
-  XP like any bout; the **first fell of each titan pays double**.
+  The CAMPAIGN plate opens the **titan line-up**: five boss cards left to
+  right, each wearing its own hand-drawn icon (hook, piston, crosshair,
+  shield, crown) — you fight them in order, and after every bout (the
+  collapse, the fanfare) you land back on this line-up. Five boss machines,
+  each bigger than the last (~2.3 m up to ~6 m of plate), each with its own
+  elaborate pit-lane intro: klaxon, strobes, the titan grinding up out of
+  the floor, name card, roar, bell. Titans never throw balls — they wind up
+  **melee and ranged strikes whose kill zones charge up visibly on YOUR
+  platform** (fist-slam discs, duck-under sweep blades, eye beam strips,
+  mortar barrages). Their armour clanks your fire away; damage goes in
+  through the **visor**, the pauldron **pods** while a barrage cooks, and —
+  for double — the chest **core** that vents open after every melee swing.
+  Dodge, then punish: David vs Goliath, souls-style. Wins pay SCRAP + XP
+  like any bout; the **first fell of each titan pays double** — and the
+  first fell of GOLIATH awards the gold **CHAMPION platform**, equippable
+  from the LOADOUT row on the line-up.
 
 ## The rules of the platform
 

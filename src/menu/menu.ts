@@ -21,10 +21,11 @@ import {
 import { app, stageUnlocked, training } from './appState.js';
 import { GAME_TITLE } from '../config.js';
 import { BOSSES } from '../campaign/bosses.js';
+import { drawBossIcon } from '../campaign/icons.js';
 import { playerLevel } from '../combat/rewards.js';
 import { UI, buttonPlate, hazardStrip, plate, stencilFont } from '../ui/industrial.js';
 
-export type PanelId = 'train' | 'duel' | 'info' | 'arcade';
+export type PanelId = 'train' | 'duel' | 'info' | 'arcade' | 'campaign';
 
 export type MenuAction =
   | 'start-training'
@@ -32,6 +33,9 @@ export type MenuAction =
   | 'quick-match'
   | 'cancel-queue'
   | 'vs-bot'
+  | 'open-campaign'
+  | 'close-campaign'
+  | 'toggle-platform'
   | `campaign-${number}`;
 
 const PW = 512;
@@ -50,6 +54,8 @@ export interface Menu {
   panels: MenuPanel[];
   setVisible: (v: boolean) => void;
   redrawAll: (hoverId: PanelId | null) => void;
+  /** Show the right panels for `app.menuPage` (main arc vs campaign line-up). */
+  syncPage: () => void;
 }
 
 /** The shared panel skeleton: smoked plate, hazard chip, stencil title. */
@@ -80,10 +86,12 @@ function makePanel(
   hMeters: number,
   draw: (ctx: CanvasRenderingContext2D, hover: boolean) => void,
   hitTest: MenuPanel['hitTest'],
+  canvasW = PW,
+  canvasH = PH,
 ): MenuPanel {
   const canvas = document.createElement('canvas');
-  canvas.width = PW;
-  canvas.height = PH;
+  canvas.width = canvasW;
+  canvas.height = canvasH;
   const ctx = canvas.getContext('2d')!;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -166,26 +174,22 @@ function hitDuel(_u: number, v: number): MenuAction | null {
 }
 
 /**
- * Below the tutorial — ARCADE: the titan gauntlet. Five stage slots in a
- * row (cleared / open / locked), the next titan's name, and your wallet.
+ * Below the tutorial — ARCADE: the door to the titan gauntlet. One big
+ * CAMPAIGN plate that opens the boss line-up sub-menu, a teaser row of the
+ * five titan icons showing your progress, and your wallet.
  */
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
-const SLOT_W = 76;
-const SLOT_H = 104;
-const SLOT_GAP = 9;
-const SLOT_Y = 118;
-const SLOTS_X = (PW - (SLOT_W * 5 + SLOT_GAP * 4)) / 2;
 
 /** A simple stencil padlock for locked stages. */
-function padlock(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+function padlock(ctx: CanvasRenderingContext2D, cx: number, cy: number, s = 1): void {
   ctx.strokeStyle = UI.steelDim;
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 5 * s;
   ctx.beginPath();
-  ctx.arc(cx, cy - 8, 11, Math.PI, 0);
+  ctx.arc(cx, cy - 8 * s, 11 * s, Math.PI, 0);
   ctx.stroke();
   ctx.fillStyle = UI.steelDim;
-  ctx.fillRect(cx - 15, cy - 8, 30, 24);
+  ctx.fillRect(cx - 15 * s, cy - 8 * s, 30 * s, 24 * s);
 }
 
 function drawArcade(ctx: CanvasRenderingContext2D, hover: boolean): void {
@@ -196,41 +200,22 @@ function drawArcade(ctx: CanvasRenderingContext2D, hover: boolean): void {
   ctx.fillText('the titan gauntlet', PW - 40, 44);
   ctx.textAlign = 'center';
 
+  buttonPlate(ctx, 70, 104, PW - 140, 100, 'CAMPAIGN', UI.danger, hover);
+
+  // Progress teaser: the five titan icons, lit as you fell them.
   const cleared = app.stats.campaignCleared;
   for (let i = 0; i < 5; i++) {
-    const x = SLOTS_X + i * (SLOT_W + SLOT_GAP);
+    const cx = PW / 2 + (i - 2) * 84;
+    const cy = 258;
     const done = cleared[i] === true;
     const open = stageUnlocked(i);
-    plate(ctx, x, SLOT_Y, SLOT_W, SLOT_H, {
-      cut: 10,
-      fill: done ? 'rgba(255,122,24,0.2)' : open ? 'rgba(255,176,0,0.1)' : 'rgba(150,150,170,0.06)',
-      stroke: done ? UI.ember : open ? UI.amber : UI.steelDim,
-      rivets: false,
-    });
-    if (!open) {
-      padlock(ctx, x + SLOT_W / 2, SLOT_Y + 46);
-    } else {
-      ctx.font = stencilFont(38);
-      ctx.fillStyle = done ? UI.emberBright : UI.amber;
-      ctx.fillText(ROMAN[i], x + SLOT_W / 2, SLOT_Y + 40);
-      ctx.font = '700 20px system-ui, sans-serif';
-      ctx.fillStyle = done ? UI.emberBright : UI.textDim;
-      ctx.fillText(done ? 'FELLED' : 'FIGHT', x + SLOT_W / 2, SLOT_Y + 78);
-    }
+    drawBossIcon(ctx, i, cx, cy, 26, done ? UI.emberBright : open ? UI.amberSoft : UI.steelDim);
+    if (!open) padlock(ctx, cx, cy, 0.55);
   }
 
-  // Next opponent line: the first unfelled, unlocked titan.
-  const next = BOSSES.findIndex((_, i) => stageUnlocked(i) && cleared[i] !== true);
-  ctx.font = '700 24px system-ui, sans-serif';
-  ctx.fillStyle = UI.amberSoft;
-  ctx.fillText(
-    next >= 0 ? `next: ${BOSSES[next].name} — ${BOSSES[next].epithet}` : 'all five titans felled',
-    PW / 2,
-    262,
-  );
   ctx.font = '600 21px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
-  ctx.fillText('first fell pays double scrap & xp', PW / 2, 296);
+  ctx.fillText('five titans · first fell pays double scrap & xp', PW / 2, 308);
 
   // Wallet readout.
   ctx.font = stencilFont(26);
@@ -238,18 +223,150 @@ function drawArcade(ctx: CanvasRenderingContext2D, hover: boolean): void {
   ctx.fillText(
     `LV ${playerLevel(app.stats.xp)}  ·  ${app.stats.xp} XP  ·  ${app.stats.scrap} SCRAP`,
     PW / 2,
-    348,
+    352,
   );
 }
 
-function hitArcade(u: number, v: number): MenuAction | null {
-  const x = u * PW;
+function hitArcade(_u: number, v: number): MenuAction | null {
   const y = (1 - v) * PH;
-  if (y < SLOT_Y - 8 || y > SLOT_Y + SLOT_H + 8) return null;
+  if (y >= 96 && y <= 240) return 'open-campaign';
+  return null;
+}
+
+/**
+ * The campaign sub-menu — the titan line-up. Five cards left to right (you
+ * fight them in order): bespoke icon, name, FELLED / FIGHT / locked, with
+ * chevrons marking the path. BACK returns to the main arc; the LOADOUT row
+ * equips the CHAMPION platform once GOLIATH has been felled.
+ */
+
+const CW = 1024;
+const CH = 480;
+const CARD_W = 168;
+const CARD_H = 252;
+const CARD_GAP = 16;
+const CARD_Y = 84;
+const CARDS_X = (CW - (CARD_W * 5 + CARD_GAP * 4)) / 2;
+const BACK_RECT = [40, 396, 170, 60] as const;
+const LOADOUT_RECT = [560, 396, 424, 60] as const;
+
+function accentCss(accent: number): string {
+  return `#${accent.toString(16).padStart(6, '0')}`;
+}
+
+function drawCampaign(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  ctx.clearRect(0, 0, CW, CH);
+  plate(ctx, 8, 8, CW - 16, CH - 16, {
+    cut: 30,
+    fill: hover ? 'rgba(14,15,20,0.62)' : UI.ink,
+    stroke: hover ? UI.danger : UI.steel,
+  });
+  hazardStrip(ctx, 40, 34, 60, 18, UI.amber);
+  ctx.textAlign = 'left';
+  ctx.font = stencilFont(42);
+  ctx.fillStyle = UI.danger;
+  ctx.fillText('THE TITAN GAUNTLET', 118, 46);
+  ctx.textAlign = 'right';
+  ctx.font = '700 24px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('fight them in order · left to right', CW - 48, 46);
+  ctx.textAlign = 'center';
+
+  const cleared = app.stats.campaignCleared;
   for (let i = 0; i < 5; i++) {
-    const sx = SLOTS_X + i * (SLOT_W + SLOT_GAP);
-    if (x >= sx && x <= sx + SLOT_W) {
-      return stageUnlocked(i) ? (`campaign-${i}` as MenuAction) : null;
+    const x = CARDS_X + i * (CARD_W + CARD_GAP);
+    const cx = x + CARD_W / 2;
+    const done = cleared[i] === true;
+    const open = stageUnlocked(i);
+    const boss = BOSSES[i];
+    const accent = accentCss(boss.accent);
+
+    plate(ctx, x, CARD_Y, CARD_W, CARD_H, {
+      cut: 14,
+      fill: done ? 'rgba(255,122,24,0.14)' : open ? 'rgba(255,176,0,0.08)' : 'rgba(150,150,170,0.05)',
+      stroke: done ? UI.ember : open ? accent : UI.steelDim,
+      rivets: false,
+    });
+
+    ctx.font = stencilFont(24);
+    ctx.fillStyle = open ? UI.textDim : UI.steelDim;
+    ctx.fillText(ROMAN[i], cx, CARD_Y + 26);
+
+    drawBossIcon(ctx, i, cx, CARD_Y + 106, 46, done ? UI.emberBright : open ? accent : UI.steelDim);
+    if (!open) padlock(ctx, cx, CARD_Y + 106);
+
+    ctx.font = stencilFont(19);
+    ctx.fillStyle = open ? UI.text : UI.steelDim;
+    ctx.fillText(open ? boss.name : 'SEALED', cx, CARD_Y + 186);
+
+    ctx.font = '700 20px system-ui, sans-serif';
+    if (done) {
+      ctx.fillStyle = UI.emberBright;
+      ctx.fillText('FELLED ✓', cx, CARD_Y + 224);
+    } else if (open) {
+      ctx.fillStyle = UI.amber;
+      ctx.fillText('FIGHT', cx, CARD_Y + 224);
+    } else {
+      ctx.fillStyle = UI.steelDim;
+      ctx.fillText('fell the last', cx, CARD_Y + 224);
+    }
+
+    // Path chevron toward the next card.
+    if (i < 4) {
+      ctx.fillStyle = cleared[i] ? UI.ember : UI.steelDim;
+      const ax = x + CARD_W + CARD_GAP / 2;
+      const ay = CARD_Y + 106;
+      ctx.beginPath();
+      ctx.moveTo(ax - 6, ay - 10);
+      ctx.lineTo(ax + 6, ay);
+      ctx.lineTo(ax - 6, ay + 10);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // BACK to the main arc.
+  buttonPlate(ctx, BACK_RECT[0], BACK_RECT[1], BACK_RECT[2], BACK_RECT[3], '← BACK', UI.cool, hover);
+
+  // Loadout: the champion platform reward lives here.
+  const [lx, ly, lw, lh] = LOADOUT_RECT;
+  if (app.stats.championPlatform) {
+    const champ = app.stats.platformSkin === 'champion';
+    plate(ctx, lx, ly, lw, lh, {
+      cut: 12,
+      fill: champ ? 'rgba(255,215,0,0.16)' : 'rgba(18,19,24,0.72)',
+      stroke: champ ? '#ffd700' : UI.steel,
+      rivets: false,
+    });
+    ctx.font = '700 24px system-ui, sans-serif';
+    ctx.fillStyle = champ ? '#ffd700' : UI.textDim;
+    ctx.fillText(`LOADOUT — PLATFORM: ${champ ? 'CHAMPION ★' : 'STANDARD'}`, lx + lw / 2, ly + lh / 2 + 1);
+  } else {
+    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillStyle = UI.steelDim;
+    ctx.fillText('fell GOLIATH to claim the CHAMPION platform', lx + lw / 2, ly + lh / 2 + 1);
+  }
+}
+
+function hitCampaign(u: number, v: number): MenuAction | null {
+  const x = u * CW;
+  const y = (1 - v) * CH;
+  if (x >= BACK_RECT[0] && x <= BACK_RECT[0] + BACK_RECT[2] && y >= BACK_RECT[1] - 6 && y <= BACK_RECT[1] + BACK_RECT[3] + 6) {
+    return 'close-campaign';
+  }
+  if (
+    app.stats.championPlatform &&
+    x >= LOADOUT_RECT[0] && x <= LOADOUT_RECT[0] + LOADOUT_RECT[2] &&
+    y >= LOADOUT_RECT[1] - 6 && y <= LOADOUT_RECT[1] + LOADOUT_RECT[3] + 6
+  ) {
+    return 'toggle-platform';
+  }
+  if (y >= CARD_Y - 6 && y <= CARD_Y + CARD_H + 6) {
+    for (let i = 0; i < 5; i++) {
+      const sx = CARDS_X + i * (CARD_W + CARD_GAP);
+      if (x >= sx && x <= sx + CARD_W) {
+        return stageUnlocked(i) ? (`campaign-${i}` as MenuAction) : null;
+      }
     }
   }
   return null;
@@ -295,6 +412,7 @@ export function createMenu(scene: Scene): Menu {
   const duel = makePanel('duel', 0.78, 0.62, drawDuel, hitDuel);
   const info = makePanel('info', 0.78, 0.62, (ctx) => drawInfo(ctx), () => null);
   const arcade = makePanel('arcade', 0.86, 0.66, drawArcade, hitArcade);
+  const campaign = makePanel('campaign', 1.56, 0.73, drawCampaign, hitCampaign, CW, CH);
 
   // Shallow arc in front of the player, tilted inward toward the centre.
   const y = 1.45;
@@ -307,13 +425,24 @@ export function createMenu(scene: Scene): Menu {
   // control desk so it reads comfortably from standing height.
   arcade.mesh.position.set(0, 0.78, -1.06);
   arcade.mesh.rotation.x = -0.38;
+  // The campaign sub-menu takes centre stage on its own page.
+  campaign.mesh.position.set(0, 1.4, -1.3);
 
-  const panels = [train, duel, info, arcade];
+  const mainPanels: PanelId[] = ['train', 'duel', 'info', 'arcade'];
+  const panels = [train, duel, info, arcade, campaign];
   for (const p of panels) {
     p.redraw(false);
     group.add(p.mesh);
   }
   scene.add(group);
+
+  const syncPage = (): void => {
+    const onMain = app.menuPage === 'main';
+    for (const p of panels) {
+      p.mesh.visible = onMain ? mainPanels.includes(p.id) : p.id === 'campaign';
+    }
+  };
+  syncPage();
 
   return {
     group,
@@ -324,5 +453,6 @@ export function createMenu(scene: Scene): Menu {
     redrawAll: (hoverId) => {
       for (const p of panels) p.redraw(p.id === hoverId);
     },
+    syncPage,
   };
 }

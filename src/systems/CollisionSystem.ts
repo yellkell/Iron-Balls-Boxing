@@ -172,7 +172,7 @@ export class CollisionSystem extends createSystem({
       target.setValue(TrainingTarget, 'state', TargetState.Falling);
       target.setValue(TrainingTarget, 'age', 0);
       spawnFireImpact(this.world, _ballPos, 0);
-      sfx.trainingTargetHit((target.getValue(TrainingTarget, 'kind') ?? 0) as 0 | 1);
+      sfx.trainingTargetHit((target.getValue(TrainingTarget, 'kind') ?? 0) as 0 | 1 | 2);
       app.stats.hitsLanded += 1;
       if (returning) ball.setValue(Fireball, 'returnHit', 1);
       else this.spendBall(ball);

@@ -31,6 +31,7 @@ import {
 } from 'three';
 import type { World } from '@iwsdk/core';
 import { ARENA_GAP, OCTAGON_VERTICES, PALETTE, PLATFORM } from '../config.js';
+import { app } from '../menu/appState.js';
 import { hazardTexture } from '../materials/hazard.js';
 import { octagonSlab } from './octagon.js';
 import { createTitleBanner } from './banner.js';
@@ -46,10 +47,10 @@ function makeRimRing(color: number): Line {
 }
 
 /** Flat hazard-striped warning band laid along each rim edge. */
-function makeHazardBand(): Group {
+function makeHazardBand(color?: string): Group {
   const band = new Group();
   band.name = 'hazard-band';
-  const tex = hazardTexture();
+  const tex = hazardTexture(color);
   const width = 0.1;
   const n = OCTAGON_VERTICES.length;
   for (let i = 0; i < n; i++) {
@@ -101,8 +102,10 @@ function makeCornerBolts(): Group {
  * One boxer's pedestal: a gunmetal slab sunk so its top face sits at floor
  * level (your real floor IS the platform top), hazard banding and corner
  * bolts around the rim, and a thin team-colour glow line marking the edge.
+ * `opts` re-skins it — the CHAMPION variant earned by felling GOLIATH wears
+ * gold banding and burns brighter.
  */
-function makePlatform(color: number): Group {
+function makePlatform(color: number, opts: { hazard?: string; glow?: number } = {}): Group {
   const group = new Group();
 
   const slab = new Mesh(
@@ -110,7 +113,7 @@ function makePlatform(color: number): Group {
     new MeshStandardMaterial({
       color: PALETTE.gunmetalDark,
       emissive: color,
-      emissiveIntensity: 0.22,
+      emissiveIntensity: opts.glow ?? 0.22,
       metalness: 0.88,
       roughness: 0.38,
     }),
@@ -119,7 +122,7 @@ function makePlatform(color: number): Group {
   slab.position.y = -PLATFORM.thickness;
   group.add(slab);
 
-  group.add(makeHazardBand());
+  group.add(makeHazardBand(opts.hazard));
   group.add(makeCornerBolts());
   group.add(makeRimRing(color));
   return group;
@@ -135,6 +138,15 @@ export function buildArena(world: World): Object3D {
   const mine = makePlatform(PALETTE.ember);
   mine.name = 'player-platform';
   arena.add(mine);
+
+  // The CHAMPION pedestal — the loadout reward for felling GOLIATH. Built
+  // alongside and visibility-swapped with the standard one (MenuSystem
+  // syncs it to the equipped skin).
+  const champion = makePlatform(0xffd700, { hazard: '#ffd700', glow: 0.5 });
+  champion.name = 'player-platform-champion';
+  champion.visible = app.stats.platformSkin === 'champion' && app.stats.championPlatform;
+  mine.visible = !champion.visible;
+  arena.add(champion);
 
   // The opponent's pedestal across the gap — same shape, blue rim.
   const theirs = makePlatform(PALETTE.coolFlame);

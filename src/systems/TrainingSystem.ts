@@ -9,6 +9,10 @@
  * Flip SHOOT BACK on and the cutouts take pot-shots at you with blue fire so
  * you train dodging between throws. Your health regens in training; the run
  * ends at the bell (or early if you go down).
+ *
+ * THE CLOSING STRETCH: once fewer than TRAINING.bonusWindow seconds remain,
+ * gold DRONES join the spawn mix — small strafing hover-targets that demand
+ * a led shot and pay a jackpot.
  */
 
 import { createSystem, Vector3, type Entity } from '@iwsdk/core';
@@ -17,11 +21,13 @@ import {
   CylinderGeometry,
   DoubleSide,
   Group,
+  IcosahedronGeometry,
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
+  TorusGeometry,
 } from 'three';
 import { TargetKind, TargetState, TrainingTarget } from '../components/TrainingTarget.js';
 import { Combatant } from '../components/Combatant.js';
@@ -198,11 +204,30 @@ export class TrainingSystem extends createSystem({
     }
     if (live >= TRAINING.maxLive) return;
 
-    const kind = Math.random() < 0.5 ? TargetKind.Disc : TargetKind.Cutout;
-    const x = (Math.random() * 2 - 1) * 1.3;
+    // The closing stretch mixes gold drones in with the regulars.
+    const droneWindow = training.timeLeft <= TRAINING.bonusWindow;
+    const kind =
+      droneWindow && Math.random() < TRAINING.droneChance
+        ? TargetKind.Drone
+        : Math.random() < 0.5
+          ? TargetKind.Disc
+          : TargetKind.Cutout;
+
+    const drone = kind === TargetKind.Drone;
+    // Keep a drone's whole strafe lane on the range.
+    const x = (Math.random() * 2 - 1) * (drone ? 1.3 - TRAINING.droneDriftAmp : 1.3);
     const z = -ARENA_GAP + (Math.random() * 1.6 - 0.5);
-    const upY = kind === TargetKind.Disc ? 1.0 + Math.random() * 0.9 : 1.25;
-    const radius = kind === TargetKind.Disc ? TRAINING.discRadius : TRAINING.cutoutRadius;
+    const upY =
+      kind === TargetKind.Disc ? 1.0 + Math.random() * 0.9 :
+      kind === TargetKind.Cutout ? 1.25 :
+      1.35 + Math.random() * 0.5; // drones fly high
+    const radius =
+      kind === TargetKind.Disc ? TRAINING.discRadius :
+      kind === TargetKind.Cutout ? TRAINING.cutoutRadius :
+      TRAINING.droneRadius;
+    const holdTime = drone
+      ? TRAINING.droneHold * (0.9 + Math.random() * 0.3)
+      : TRAINING.holdTime * (0.85 + Math.random() * 0.5);
 
     const e = this.buildTargetEntity(kind);
     const obj = e.object3D!;
@@ -212,13 +237,16 @@ export class TrainingSystem extends createSystem({
       kind,
       state: TargetState.Rising,
       age: 0,
-      holdTime: TRAINING.holdTime * (0.85 + Math.random() * 0.5),
+      holdTime,
       radius,
       upY,
       shootTimer:
         kind === TargetKind.Cutout && app.shootBack && Math.random() < TRAINING.shootChance
           ? TRAINING.shootDelay
           : -1,
+      baseX: x,
+      driftAmp: drone ? TRAINING.droneDriftAmp * (0.8 + Math.random() * 0.4) : 0,
+      driftRate: drone ? TRAINING.droneDriftRate * (0.85 + Math.random() * 0.4) : 0,
     });
   }
 
@@ -243,6 +271,14 @@ export class TrainingSystem extends createSystem({
         }
         case TargetState.Holding: {
           obj.position.y = upY + Math.sin(age * 3) * 0.02;
+          // Drones strafe their lane (and spin) — lead the shot.
+          const amp = t.getValue(TrainingTarget, 'driftAmp') ?? 0;
+          if (amp > 0) {
+            const base = t.getValue(TrainingTarget, 'baseX') ?? 0;
+            const rate = t.getValue(TrainingTarget, 'driftRate') ?? 0;
+            obj.position.x = base + Math.sin(age * rate) * amp;
+            obj.rotation.y += delta * 4;
+          }
           this.maybeShoot(t, delta);
           if (age >= (t.getValue(TrainingTarget, 'holdTime') ?? 2.6)) {
             t.setValue(TrainingTarget, 'state', TargetState.Leaving);
@@ -303,11 +339,15 @@ export class TrainingSystem extends createSystem({
     training.hits += 1;
     training.streak += 1;
     training.bestStreak = Math.max(training.bestStreak, training.streak);
-    const base = kind === TargetKind.Disc ? TRAINING.discPoints : TRAINING.cutoutPoints;
+    const base =
+      kind === TargetKind.Disc ? TRAINING.discPoints :
+      kind === TargetKind.Cutout ? TRAINING.cutoutPoints :
+      TRAINING.dronePoints;
     training.score += base + TRAINING.streakBonus * (training.streak - 1);
     if (t.object3D) {
       t.object3D.getWorldPosition(_pos);
-      emberBurst(_pos, 10, false);
+      // A downed drone rains gold.
+      emberBurst(_pos, kind === TargetKind.Drone ? 26 : 10, false);
     }
   }
 
@@ -323,6 +363,45 @@ export class TrainingSystem extends createSystem({
 
   private buildTargetEntity(kind: number): Entity {
     const group = new Group();
+
+    if (kind === TargetKind.Drone) {
+      // The gold hover-drone: a glowing core in a gyro halo with stub fins.
+      // No stick — it flies (TrainingSystem strafes it while it holds).
+      const gold = 0xffd700;
+      const core = new Mesh(
+        new IcosahedronGeometry(TRAINING.droneRadius * 0.75, 1),
+        new MeshStandardMaterial({
+          color: 0x4a3a08,
+          emissive: gold,
+          emissiveIntensity: 1.7,
+          metalness: 0.6,
+          roughness: 0.3,
+        }),
+      );
+      group.add(core);
+      const halo = new Mesh(
+        new TorusGeometry(TRAINING.droneRadius * 1.25, 0.014, 8, 24),
+        new MeshStandardMaterial({
+          color: PALETTE.iron,
+          emissive: gold,
+          emissiveIntensity: 0.6,
+          metalness: 0.8,
+          roughness: 0.35,
+        }),
+      );
+      halo.rotation.x = Math.PI / 2.4; // tipped gyro ring
+      group.add(halo);
+      for (const side of [-1, 1]) {
+        const fin = new Mesh(
+          new CylinderGeometry(0.008, 0.02, 0.09, 6),
+          new MeshStandardMaterial({ color: PALETTE.iron, metalness: 0.7, roughness: 0.4 }),
+        );
+        fin.rotation.z = side * (Math.PI / 2);
+        fin.position.x = side * TRAINING.droneRadius * 1.1;
+        group.add(fin);
+      }
+      return this.world.createTransformEntity(group);
+    }
 
     if (kind === TargetKind.Disc) {
       discTex ??= discTexture();

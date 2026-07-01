@@ -221,6 +221,15 @@ export const TRAINING = {
   discPoints: 100,
   cutoutPoints: 150,
   streakBonus: 25, // extra points per current streak step
+  // The DRONE: a small strafing gold hover-target that only joins the mix in
+  // the closing stretch of a run — hard to lead, worth a jackpot.
+  bonusWindow: 30, // drones appear when this many seconds remain
+  droneChance: 0.35, // spawn roll share once the window opens
+  dronePoints: 300,
+  droneRadius: 0.13, // small — a genuine skill shot
+  droneHold: 2.2, // up for less time than the static targets
+  droneDriftAmp: 0.55, // strafe half-range (m)
+  droneDriftRate: 2.4, // strafe angular rate (rad/s)
   // Shoot-back: cutouts hurl a blue ball at you while they're up.
   shootChance: 0.55, // chance a cutout takes its shot
   shootDelay: 0.7, // aim time before it fires

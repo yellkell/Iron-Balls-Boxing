@@ -194,16 +194,26 @@ export function hitDealt(): void {
   tone({ freq: 260, to: 78, type: 'sine', dur: 0.18, gain: 0.3 });
 }
 
-/** Aim Training target impacts: disc = bright gong, cutout = hollow armour. */
-export function trainingTargetHit(kind: 0 | 1): void {
+/**
+ * Aim Training target impacts: disc = bright gong, cutout = hollow armour,
+ * drone = a jackpot — rising bell run over a shattering clank.
+ */
+export function trainingTargetHit(kind: 0 | 1 | 2): void {
   if (kind === 0) {
     clank(920, 0.18, 0.42);
     clank(1380, 0.08, 0.26, 0.015);
     tone({ freq: 740, to: 980, type: 'triangle', dur: 0.11, gain: 0.12 });
-  } else {
+  } else if (kind === 1) {
     clank(360, 0.18, 0.28);
     tone({ freq: 150, to: 58, type: 'sawtooth', dur: 0.16, gain: 0.2 });
     whooshNoise(0.09, 0.08, 520, 180);
+  } else {
+    clank(1100, 0.2, 0.4);
+    clank(1650, 0.1, 0.3, 0.02);
+    [880, 1109, 1319, 1760].forEach((f, i) =>
+      tone({ freq: f, type: 'triangle', dur: 0.14, gain: 0.14, delay: 0.04 + i * 0.07 }),
+    );
+    whooshNoise(0.3, 0.1, 900, 2600);
   }
 }
 
