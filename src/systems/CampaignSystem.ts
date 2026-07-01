@@ -31,7 +31,7 @@ import {
   PointLight,
 } from 'three';
 import { BOSSES, buildTitan, type AttackKind, type BossDef, type TitanRig } from '../campaign/bosses.js';
-import { campaign } from '../campaign/campaignState.js';
+import { campaign, fmtRunTime } from '../campaign/campaignState.js';
 import {
   beamTelegraph,
   circleTelegraph,
@@ -79,6 +79,18 @@ interface ActiveAttack {
   time: number;
   chargeTime: number;
   arm: 0 | 1;
+  /** WIDOWMAKER's law: beams re-aim at you until the late lock. */
+  tracks: boolean;
+  /** Per-beam lateral offsets, kept so tracking re-aims stay parallel. */
+  beamOffsets: number[];
+}
+
+/** A burning floor patch left by JUGGERNAUT's mortars — the ground war. */
+interface BurnPatch {
+  x: number;
+  z: number;
+  ttl: number;
+  tg: Telegraph;
 }
 
 /** A short-lived strike visual driven by a closure. */
@@ -116,14 +128,21 @@ export class CampaignSystem extends createSystem({
   private cooldown = 2.5;
   private lastKind: AttackKind | null = null;
   private strikes: Strike[] = [];
+  private patches: BurnPatch[] = [];
   private coreOpen = 0; // seconds left on the vented-core window
   private invuln = 0; // player i-frames after eating a strike
   private strikeSwing: [number, number] = [0, 0]; // post-strike arm follow-through
   private flinch = 0;
+  private enraged = false;
   private lastBossHp = 0;
   private hudTimer = 0;
   private emberTimer = 0;
+  private cardTimer = 0; // auto-clear for transient cards (ENRAGED)
   private payoutLines: string[] = [];
+  // Gauntlet runs: fight-time-only clock, and whether this victory chains on.
+  private runClock = 0;
+  private advanceAfterVictory = false;
+  private victoryDelay = CAMPAIGN.victoryDelay;
 
   init(): void {
     this.hud = createCampaignHud(this.scene);
@@ -165,28 +184,52 @@ export class CampaignSystem extends createSystem({
 
   // --- lifecycle -------------------------------------------------------------
 
+  private runMode(): boolean {
+    return app.campaignMode !== 'single';
+  }
+
   private begin(): void {
+    this.runClock = 0;
+    this.hud.setVisible(true);
+    this.light.visible = true;
+    this.stageSetup(true, 'a titan approaches the pit');
+  }
+
+  /** Chain to the next titan mid-run — no lobby, straight into its intro. */
+  private advanceRun(): void {
+    app.campaignStage += 1;
+    // GAUNTLET refits you between titans; HARDCORE sends you in as you are.
+    this.stageSetup(app.campaignMode === 'gauntlet', 'the next titan approaches');
+  }
+
+  /** Everything one titan bout needs: rig, pools, weak points, intro cue. */
+  private stageSetup(healPlayer: boolean, warning: string): void {
     this.def = BOSSES[clamp(app.campaignStage, 0, BOSSES.length - 1)];
     this.rig?.dispose();
     this.rig = buildTitan(this.def);
     this.rig.root.position.set(0, -this.rig.height - 0.4, this.bossZ());
     // The rig's face (visor/core) sits on local −Z, same as the duel boxer —
     // yaw the whole machine to face the player across the gap.
-    this.rig.root.rotation.y = Math.PI;
+    this.rig.root.rotation.set(0, Math.PI, 0);
     this.scene.add(this.rig.root);
 
     // Health pools: the titan borrows the opponent combatant's Health.
     const boss = this.combatant(1);
     boss?.setValue(Health, 'max', this.def.health);
     boss?.setValue(Health, 'current', this.def.health);
-    const me = this.combatant(0);
-    me?.setValue(Health, 'current', me.getValue(Health, 'max') ?? COMBAT.playerHealth);
+    if (healPlayer) {
+      const me = this.combatant(0);
+      me?.setValue(Health, 'current', me.getValue(Health, 'max') ?? COMBAT.playerHealth);
+    }
     this.lastBossHp = this.def.health;
 
     this.ensureHitboxes();
+    this.clearPatches();
     this.attack = null;
     this.coreOpen = 0;
     this.invuln = 0;
+    this.enraged = false;
+    this.cardTimer = 0;
     this.cooldown = rand(this.def.cooldownMin, this.def.cooldownMax) + 0.8;
     this.lastKind = null;
     campaign.coreOpen = false;
@@ -198,13 +241,11 @@ export class CampaignSystem extends createSystem({
 
     this.light.color.setHex(this.def.accent);
     this.light.position.set(0, this.rig.height * 0.8 + 1, this.bossZ() + 1.2);
-    this.light.visible = true;
     this.light.intensity = 0;
 
     this.phase = 'intro';
     this.t = 0;
-    this.hud.setVisible(true);
-    this.hud.showCard('WARNING', ['a titan approaches the pit'], '#ffb000');
+    this.hud.showCard('WARNING', [warning], '#ffb000');
     sfx.klaxon();
   }
 
@@ -212,6 +253,7 @@ export class CampaignSystem extends createSystem({
     this.phase = 'idle';
     this.attack?.telegraphs.forEach((t) => t?.dispose());
     this.attack = null;
+    this.clearPatches();
     for (const s of this.strikes) s.dispose();
     this.strikes = [];
     this.rig?.dispose();
@@ -231,7 +273,12 @@ export class CampaignSystem extends createSystem({
   // --- intro ceremony ---------------------------------------------------------
 
   private intro(delta: number): void {
-    const { klaxonTime, riseTime, titleTime, fightCardTime } = CAMPAIGN;
+    // Runs get the condensed ceremony — the clock only ticks in fights, but
+    // nobody speedruns for the klaxon.
+    const T = this.runMode()
+      ? CAMPAIGN.runIntro
+      : { klaxon: CAMPAIGN.klaxonTime, rise: CAMPAIGN.riseTime, title: CAMPAIGN.titleTime, fightCard: CAMPAIGN.fightCardTime };
+    const { klaxon: klaxonTime, rise: riseTime, title: titleTime, fightCard: fightCardTime } = T;
     const rig = this.rig!;
 
     // Strobing pit light while the klaxon sounds; steady key light after.
@@ -298,6 +345,13 @@ export class CampaignSystem extends createSystem({
 
   private fight(delta: number): void {
     this.invuln = Math.max(0, this.invuln - delta);
+    if (this.runMode()) this.runClock += delta; // fights only — intros are free
+
+    // Transient card (ENRAGED) auto-clears.
+    if (this.cardTimer > 0) {
+      this.cardTimer -= delta;
+      if (this.cardTimer <= 0) this.hud.showCard('', []);
+    }
 
     // The vented-core punish window.
     if (this.coreOpen > 0) {
@@ -305,14 +359,27 @@ export class CampaignSystem extends createSystem({
       if (this.coreOpen <= 0) campaign.coreOpen = false;
     }
 
+    this.updatePatches(delta);
+
     // Watch the health pools.
-    const bossHp = this.combatant(1)?.getValue(Health, 'current') ?? 0;
+    const boss = this.combatant(1);
+    const bossHp = boss?.getValue(Health, 'current') ?? 0;
+    const bossMax = boss?.getValue(Health, 'max') ?? 1;
     const meHp = this.combatant(0)?.getValue(Health, 'current') ?? 0;
     if (bossHp < this.lastBossHp) {
       this.flinch = 0.35;
       this.hudTimer = 0; // instant bar update on damage
     }
     this.lastBossHp = bossHp;
+
+    // GOLIATH's law: wound it deep enough and it stops playing fair.
+    if (!this.enraged && this.def.enrageAt > 0 && bossHp > 0 && bossHp / bossMax <= this.def.enrageAt) {
+      this.enraged = true;
+      this.flinch = 0.35;
+      this.hud.showCard('ENRAGED', [], this.accentCss());
+      this.cardTimer = 1.3;
+      sfx.bossRoar(this.def.scale * 0.9);
+    }
 
     if (bossHp <= 0) {
       this.toVictory();
@@ -330,6 +397,37 @@ export class CampaignSystem extends createSystem({
     } else {
       this.advanceAttack(delta);
     }
+  }
+
+  // --- burning ground (JUGGERNAUT / GOLIATH) ---------------------------------
+
+  private spawnPatch(x: number, z: number): void {
+    const tg = circleTelegraph(CAMPAIGN.patchRadius);
+    tg.group.position.set(x, 0.013, z);
+    this.scene.add(tg.group);
+    this.patches.push({ x, z, ttl: CAMPAIGN.patchTime, tg });
+  }
+
+  private updatePatches(delta: number): void {
+    for (let i = this.patches.length - 1; i >= 0; i--) {
+      const p = this.patches[i];
+      p.ttl -= delta;
+      if (p.ttl <= 0) {
+        p.tg.dispose();
+        this.patches.splice(i, 1);
+        continue;
+      }
+      p.tg.update(1, this.time); // full fill = the fast red pulse
+      if (this.invuln <= 0 && this.zoneTouchesPlayer({ kind: 'circle', x: p.x, z: p.z, r: CAMPAIGN.patchRadius })) {
+        this.invuln = 0.7;
+        this.damagePlayer(CAMPAIGN.attackDamage);
+      }
+    }
+  }
+
+  private clearPatches(): void {
+    for (const p of this.patches) p.tg.dispose();
+    this.patches = [];
   }
 
   /** Pick a weighted attack (avoiding an immediate repeat) and telegraph it. */
@@ -356,24 +454,34 @@ export class CampaignSystem extends createSystem({
     this.lastKind = kind;
 
     this.playerHead(_head);
-    const chargeTime = this.def.charge[kind];
+    const chargeTime = this.def.charge[kind] * (this.enraged ? CAMPAIGN.enrageChargeMult : 1);
     const zones: Zone[] = [];
     const telegraphs: (Telegraph | null)[] = [];
     const staggers: number[] = [];
+    const beamOffsets: number[] = [];
     // Strike with the nearer arm. The root carries a π yaw, so arm 0
     // (local −X) hangs on the world +X side.
     const arm: 0 | 1 = _head.x < 0 ? 1 : 0;
 
     if (kind === 'slam') {
       const r = CAMPAIGN.slamRadius + this.def.scale * 0.04;
-      const x = clamp(_head.x, -OCTAGON_HALF_WIDTH + 0.15, OCTAGON_HALF_WIDTH - 0.15);
-      const z = clamp(_head.z, -OCTAGON_HALF_DEPTH + 0.1, OCTAGON_HALF_DEPTH - 0.1);
-      zones.push({ kind: 'circle', x, z, r });
-      const tg = circleTelegraph(r);
-      tg.group.position.set(x, 0.014, z);
-      this.scene.add(tg.group);
-      telegraphs.push(tg);
-      staggers.push(0);
+      const x0 = clamp(_head.x, -OCTAGON_HALF_WIDTH + 0.15, OCTAGON_HALF_WIDTH - 0.15);
+      const z0 = clamp(_head.z, -OCTAGON_HALF_DEPTH + 0.1, OCTAGON_HALF_DEPTH - 0.1);
+      const count = this.def.slamStyle === 'single' ? 1 : Math.max(1, this.def.slamCount);
+      // A marching drumline steps toward the open side of the platform.
+      const marchDir = x0 > 0 ? -1 : 1;
+      for (let i = 0; i < count; i++) {
+        const x =
+          this.def.slamStyle === 'march' && i > 0
+            ? clamp(x0 + marchDir * CAMPAIGN.marchStep * i, -OCTAGON_HALF_WIDTH + 0.15, OCTAGON_HALF_WIDTH - 0.15)
+            : x0; // 'rehit' re-marks the SAME crater
+        zones.push({ kind: 'circle', x, z: z0, r });
+        const tg = circleTelegraph(r);
+        tg.group.position.set(x, 0.014, z0);
+        this.scene.add(tg.group);
+        telegraphs.push(tg);
+        staggers.push(i * (this.def.slamStyle === 'rehit' ? CAMPAIGN.rehitDelay : CAMPAIGN.marchDelay));
+      }
     } else if (kind === 'sweep') {
       // A horizontal blade slice just under head height: duck it. Never
       // below 1.3 m — the pelvis is pinned near 0.95 m, so lower slices
@@ -390,20 +498,14 @@ export class CampaignSystem extends createSystem({
       for (let i = 0; i < this.def.beams; i++) {
         // A strip through (or beside) the player, raked from the titan.
         const offset = i === 0 ? 0 : (Math.random() < 0.5 ? -1 : 1) * rand(0.5, 0.8);
-        const px = clamp(_head.x + offset, -OCTAGON_HALF_WIDTH, OCTAGON_HALF_WIDTH);
-        const pz = clamp(_head.z, -OCTAGON_HALF_DEPTH + 0.1, OCTAGON_HALF_DEPTH - 0.1);
-        // Direction from the titan through that point, flattened to XZ.
-        _v.set(px - this.rig!.root.position.x, 0, pz - this.bossZ()).normalize();
-        zones.push({ kind: 'beam', x: px, z: pz, dx: _v.x, dz: _v.z, halfW: CAMPAIGN.beamHalfWidth });
-        const len = 3.2;
-        const tg = beamTelegraph(CAMPAIGN.beamHalfWidth, len);
-        // Group origin at the NEAR (player-side) end; local −Z runs back
-        // toward the titan.
-        tg.group.position.set(px + _v.x * 1.5, 0.014, pz + _v.z * 1.5);
-        tg.group.rotation.y = Math.atan2(_v.x, _v.z); // local −Z → −dir
+        const zone: Zone = { kind: 'beam', x: 0, z: 0, dx: 0, dz: 1, halfW: CAMPAIGN.beamHalfWidth };
+        const tg = beamTelegraph(CAMPAIGN.beamHalfWidth, 3.2);
         this.scene.add(tg.group);
+        zones.push(zone);
         telegraphs.push(tg);
+        beamOffsets.push(offset);
         staggers.push(i * 0.35);
+        this.aimBeam(zone, tg, offset); // initial aim (tracking re-aims later)
       }
     } else {
       // Barrage: first shell on your feet, the rest scattered, landing in a
@@ -430,33 +532,66 @@ export class CampaignSystem extends createSystem({
       time: 0,
       chargeTime,
       arm,
+      tracks: kind === 'beam' && this.def.beamTracks,
+      beamOffsets,
     };
     sfx.chargeWhine(chargeTime);
+  }
+
+  /** Aim one beam zone (and its telegraph) at the player, offset sideways. */
+  private aimBeam(zone: Zone & { kind: 'beam' }, tg: Telegraph, offset: number): void {
+    this.playerHead(_head);
+    const px = clamp(_head.x + offset, -OCTAGON_HALF_WIDTH, OCTAGON_HALF_WIDTH);
+    const pz = clamp(_head.z, -OCTAGON_HALF_DEPTH + 0.1, OCTAGON_HALF_DEPTH - 0.1);
+    // Direction from the titan through that point, flattened to XZ.
+    _v.set(px - this.rig!.root.position.x, 0, pz - this.bossZ()).normalize();
+    zone.x = px;
+    zone.z = pz;
+    zone.dx = _v.x;
+    zone.dz = _v.z;
+    // Group origin at the NEAR (player-side) end; local −Z runs back
+    // toward the titan.
+    tg.group.position.set(px + _v.x * 1.5, 0.014, pz + _v.z * 1.5);
+    tg.group.rotation.y = Math.atan2(_v.x, _v.z); // local −Z → −dir
   }
 
   private advanceAttack(delta: number): void {
     const a = this.attack!;
     a.time += delta;
-    const fill = clamp(a.time / a.chargeTime, 0, 1);
-    for (const tg of a.telegraphs) tg?.update(fill, this.time);
 
-    // Detonations.
+    // WIDOWMAKER's law: the beam strips FOLLOW you until the late lock —
+    // dodging early just tells it where you were.
+    if (a.tracks && a.time < a.chargeTime * CAMPAIGN.beamLockAt) {
+      for (let i = 0; i < a.zones.length; i++) {
+        const zone = a.zones[i];
+        const tg = a.telegraphs[i];
+        if (zone.kind === 'beam' && tg) this.aimBeam(zone, tg, a.beamOffsets[i] ?? 0);
+      }
+    }
+
+    // Each zone runs its OWN countdown to its own detonation — a marching
+    // drumline or a staggered barrage reads as a sequence of fills, not one.
     let allDone = true;
     for (let i = 0; i < a.zones.length; i++) {
       if (a.resolved[i]) continue;
-      if (a.time >= a.chargeTime + a.staggers[i]) {
+      const dueAt = a.chargeTime + a.staggers[i];
+      if (a.time >= dueAt) {
         a.resolved[i] = true;
         a.telegraphs[i]?.dispose();
         a.telegraphs[i] = null;
         this.detonate(a.kind, a.zones[i], i === 0);
       } else {
+        a.telegraphs[i]?.update(clamp(a.time / dueAt, 0, 1), this.time);
         allDone = false;
       }
     }
 
     if (allDone && a.time >= a.chargeTime + (a.staggers[a.zones.length - 1] ?? 0) + 0.4) {
+      // A finished melee pattern is the punish cue: the core vents AFTER the
+      // last hit of the chain, never in the middle of it.
+      if (a.kind === 'slam' || a.kind === 'sweep') this.openCore();
       this.attack = null;
-      this.cooldown = rand(this.def.cooldownMin, this.def.cooldownMax);
+      this.cooldown = rand(this.def.cooldownMin, this.def.cooldownMax) * (this.enraged ? CAMPAIGN.enrageCooldownMult : 1);
     }
   }
 
@@ -468,18 +603,20 @@ export class CampaignSystem extends createSystem({
       sfx.slamImpact();
       if (zone.kind === 'circle') this.spawnFistCrash(zone.x, zone.z);
       this.strikeSwing[this.attack!.arm] = 0.6;
-      this.openCore();
     } else if (kind === 'sweep') {
       sfx.sweepWhoosh();
       if (zone.kind === 'sweep') this.spawnBladeSweep(zone.y, this.attack!.arm);
       this.strikeSwing[this.attack!.arm] = 0.6;
-      this.openCore();
     } else if (kind === 'beam') {
       sfx.beamBlast();
       if (zone.kind === 'beam') this.spawnBeamColumn(zone);
     } else {
       if (first || Math.random() < 0.6) sfx.mortarThump();
-      if (zone.kind === 'circle') this.spawnMortarBurst(zone.x, zone.z);
+      if (zone.kind === 'circle') {
+        this.spawnMortarBurst(zone.x, zone.z);
+        // The fortress doctrine: every shell claims the ground it hit.
+        if (this.def.burnPatches) this.spawnPatch(zone.x, zone.z);
+      }
     }
 
     if (hit && this.invuln <= 0) {
@@ -691,9 +828,10 @@ export class CampaignSystem extends createSystem({
     const rig = this.rig!;
     const fighting = this.phase === 'fight';
 
-    // Idle drift + hover bob (frozen mid-collapse).
+    // Idle drift + hover bob (frozen mid-collapse). Enraged machines pace.
     if (fighting || this.phase === 'intro') {
-      const sway = fighting ? Math.sin(this.time * 0.45) * this.def.swayAmp : 0;
+      const swayRate = this.enraged ? 0.85 : 0.45;
+      const sway = fighting ? Math.sin(this.time * swayRate) * this.def.swayAmp : 0;
       rig.root.position.x += (sway - rig.root.position.x) * Math.min(1, delta * 1.6);
       if (fighting) rig.root.position.y = Math.sin(this.time * 1.1) * 0.04 * this.def.scale;
     }
@@ -707,9 +845,11 @@ export class CampaignSystem extends createSystem({
     rig.head.lookAt(_head.x, _head.y, _head.z);
     rig.head.rotateY(Math.PI);
 
-    // Visor heat: calm → blazing while a beam cooks.
+    // Visor heat: calm → blazing while a beam cooks; permanently furious
+    // once enraged.
     const beamCharging = this.attack?.kind === 'beam' ? clamp(this.attack.time / this.attack.chargeTime, 0, 1) : 0;
-    rig.visorMat.emissiveIntensity = 1.8 + beamCharging * 3.2 + Math.sin(this.time * 3) * 0.2;
+    rig.visorMat.emissiveIntensity =
+      1.8 + beamCharging * 3.2 + (this.enraged ? 1.6 + Math.sin(this.time * 10) * 0.6 : Math.sin(this.time * 3) * 0.2);
 
     // Core shutters: dim steel until it vents, then it blazes and breathes.
     const open = this.coreOpen > 0;
@@ -830,24 +970,63 @@ export class CampaignSystem extends createSystem({
     match.phase = 'matchOver';
     this.attack?.telegraphs.forEach((t) => t?.dispose());
     this.attack = null;
+    this.clearPatches();
     campaign.coreOpen = false;
     this.parkHitboxes();
 
     app.stats.wins += 1;
     const payout = awardCampaign(app.campaignStage, true);
-    this.payoutLines = [
-      `+${payout.scrap} SCRAP  ·  +${payout.xp} XP`,
-      payout.doubled ? 'FIRST FELL — DOUBLE PAYOUT' : 'already felled — standard payout',
-    ];
-    // Felling the king crowns you: the CHAMPION platform joins your loadout.
-    // (Also granted retroactively to saves that beat GOLIATH pre-reward.)
-    if (app.campaignStage === BOSSES.length - 1 && !app.stats.championPlatform) {
-      app.stats.championPlatform = true;
-      app.stats.platformSkin = 'champion';
-      saveStats();
-      this.payoutLines.push('★ CHAMPION PLATFORM UNLOCKED ★');
+    const lastStage = app.campaignStage === BOSSES.length - 1;
+    const run = this.runMode();
+
+    // Mid-run fells chain straight to the next titan after a short collapse.
+    this.advanceAfterVictory = run && !lastStage;
+    this.victoryDelay = this.advanceAfterVictory ? CAMPAIGN.runVictoryDelay : CAMPAIGN.victoryDelay;
+
+    if (this.advanceAfterVictory) {
+      this.hud.showCard(
+        'TITAN FELLED',
+        [`clock ${fmtRunTime(this.runClock)}`, `next: ${BOSSES[app.campaignStage + 1].name}`],
+        this.accentCss(),
+      );
+      sfx.roundEnd(true); // the full fanfare waits for the end of the run
+      sfx.bossRoar(this.def.scale * 0.8);
+      return;
     }
-    this.hud.showCard('TITAN FELLED', this.payoutLines, this.accentCss());
+
+    if (run && lastStage) {
+      // The run is complete: the clock goes on the board.
+      const hardcore = app.campaignMode === 'hardcore';
+      const board = hardcore ? app.stats.runTimesHardcore : app.stats.runTimesGauntlet;
+      board.push(this.runClock);
+      board.sort((a, b) => a - b);
+      board.splice(CAMPAIGN.leaderboardSize);
+      const record = board[0] === this.runClock;
+      this.payoutLines = [
+        `time ${fmtRunTime(this.runClock)}`,
+        record ? '★ NEW RECORD ★' : `best ${fmtRunTime(board[0])}`,
+      ];
+      if (!hardcore && !app.stats.hardcoreUnlocked) {
+        app.stats.hardcoreUnlocked = true;
+        this.payoutLines.push('HARDCORE UNLOCKED — no healing, no mercy');
+      }
+      saveStats();
+      this.hud.showCard(hardcore ? 'HARDCORE COMPLETE' : 'GAUNTLET COMPLETE', this.payoutLines, this.accentCss());
+    } else {
+      this.payoutLines = [
+        `+${payout.scrap} SCRAP  ·  +${payout.xp} XP`,
+        payout.doubled ? 'FIRST FELL — DOUBLE PAYOUT' : 'already felled — standard payout',
+      ];
+      // Felling the king crowns you: the CHAMPION platform joins your loadout.
+      // (Also granted retroactively to saves that beat GOLIATH pre-reward.)
+      if (lastStage && !app.stats.championPlatform) {
+        app.stats.championPlatform = true;
+        app.stats.platformSkin = 'champion';
+        saveStats();
+        this.payoutLines.push('★ CHAMPION PLATFORM UNLOCKED ★');
+      }
+      this.hud.showCard('TITAN FELLED', this.payoutLines, this.accentCss());
+    }
     sfx.matchEnd(true);
     sfx.bossRoar(this.def.scale * 0.8); // the death bellow
   }
@@ -858,12 +1037,22 @@ export class CampaignSystem extends createSystem({
     match.phase = 'matchOver';
     this.attack?.telegraphs.forEach((t) => t?.dispose());
     this.attack = null;
+    this.clearPatches();
     campaign.coreOpen = false;
     this.parkHitboxes();
 
     app.stats.losses += 1;
     const payout = awardCampaign(app.campaignStage, false);
-    this.hud.showCard('SCRAPPED', [`the titan stands`, `+${payout.scrap} scrap · +${payout.xp} xp`], '#e8352a');
+    if (this.runMode()) {
+      // A run dies where you do — no continues, back to the line-up.
+      this.hud.showCard(
+        'RUN OVER',
+        [`felled ${app.campaignStage} of ${BOSSES.length}`, `clock ${fmtRunTime(this.runClock)}`],
+        '#e8352a',
+      );
+    } else {
+      this.hud.showCard('SCRAPPED', ['the titan stands', `+${payout.scrap} scrap · +${payout.xp} xp`], '#e8352a');
+    }
     sfx.matchEnd(false);
     sfx.bossRoar(this.def.scale); // it laughs, kind of
   }
@@ -873,7 +1062,7 @@ export class CampaignSystem extends createSystem({
     if (this.phase === 'victory') {
       // Collapse: pitch forward (toward the player — the root carries a π
       // yaw, so positive X pitch tips the face down), sink, shed fire.
-      const k = clamp(this.t / 3.2, 0, 1);
+      const k = clamp(this.t / Math.min(3.2, this.victoryDelay), 0, 1);
       rig.root.rotation.x = 0.45 * k * k;
       rig.root.position.y = -rig.height * 0.55 * k * k;
       this.emberTimer -= delta;
@@ -888,7 +1077,10 @@ export class CampaignSystem extends createSystem({
         spawnFireImpact(this.world, _v, 1);
       }
       this.light.intensity = Math.max(0, 5 * (1 - k));
-      if (this.t >= CAMPAIGN.victoryDelay) this.finish();
+      if (this.t >= this.victoryDelay) {
+        if (this.advanceAfterVictory) this.advanceRun();
+        else this.finish();
+      }
     } else {
       // Defeat: it looms and powers down the show.
       this.light.intensity = Math.max(0, 5 - this.t);
@@ -921,7 +1113,8 @@ export class CampaignSystem extends createSystem({
       playerHp: me?.getValue(Health, 'current') ?? 0,
       playerMax: me?.getValue(Health, 'max') ?? 1,
       coreOpen: this.coreOpen > 0,
-      hint: 'dodge the marked zones · punish the open core',
+      hint: this.def.hint,
+      timer: this.runMode() ? fmtRunTime(this.runClock) : '',
     });
   }
 

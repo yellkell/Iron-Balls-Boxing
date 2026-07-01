@@ -34,6 +34,12 @@ export interface LifetimeStats {
   championPlatform: boolean;
   /** Loadout: which platform skin stands under you. */
   platformSkin: 'standard' | 'champion';
+  /** Best GAUNTLET RUN times (seconds of fight time), ascending, capped. */
+  runTimesGauntlet: number[];
+  /** Best HARDCORE run times — no healing between titans. */
+  runTimesHardcore: number[];
+  /** Set by finishing your first gauntlet run: hardcore opens. */
+  hardcoreUnlocked: boolean;
 }
 
 function freshStats(): LifetimeStats {
@@ -48,6 +54,9 @@ function freshStats(): LifetimeStats {
     campaignCleared: new Array(CAMPAIGN.stages).fill(false),
     championPlatform: false,
     platformSkin: 'standard',
+    runTimesGauntlet: [],
+    runTimesHardcore: [],
+    hardcoreUnlocked: false,
   };
 }
 
@@ -77,6 +86,12 @@ export const app: {
   menuPage: 'main' | 'campaign';
   /** Which arcade titan is being fought while mode === 'campaign' (0-based). */
   campaignStage: number;
+  /**
+   * How the campaign is being played: one titan ('single'), the timed
+   * back-to-back GAUNTLET RUN (health refills between titans), or HARDCORE
+   * (same run, no healing).
+   */
+  campaignMode: 'single' | 'gauntlet' | 'hardcore';
   /** Network side: 0 = host (match authority), 1 = guest. */
   side: 0 | 1;
   /** Human-readable connection status for the lobby info panel. */
@@ -89,6 +104,7 @@ export const app: {
   mode: 'bot',
   menuPage: 'main',
   campaignStage: 0,
+  campaignMode: 'single',
   side: 0,
   netStatus: 'not connected',
   shootBack: localStorage.getItem('ff-shootback') !== '0',
@@ -99,6 +115,11 @@ export const app: {
 export function stageUnlocked(stage: number): boolean {
   if (stage <= 0) return true;
   return app.stats.campaignCleared[stage - 1] === true;
+}
+
+/** The gauntlet run opens once every titan has been felled at least once. */
+export function gauntletUnlocked(): boolean {
+  return app.stats.campaignCleared.every((c) => c === true);
 }
 
 export function saveStats(): void {

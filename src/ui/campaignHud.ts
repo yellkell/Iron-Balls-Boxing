@@ -40,6 +40,8 @@ export interface CampaignHud {
     playerMax: number;
     coreOpen: boolean;
     hint: string;
+    /** The gauntlet-run clock (empty outside runs). */
+    timer: string;
   }): void;
   /** Big centre card: headline + up to three sub lines. Empty title clears. */
   showCard(title: string, lines: string[], accent?: string): void;
@@ -103,7 +105,7 @@ export function createCampaignHud(scene: Scene): CampaignHud {
       group.visible = v;
     },
 
-    updateBoards({ stageLabel, bossName, accent, bossHp, bossMax, playerHp, playerMax, coreOpen, hint }) {
+    updateBoards({ stageLabel, bossName, accent, bossHp, bossMax, playerHp, playerMax, coreOpen, hint, timer }) {
       // The titan's board: name, its accent, big red-line health.
       {
         const { ctx, tex } = right;
@@ -125,10 +127,10 @@ export function createCampaignHud(scene: Scene): CampaignHud {
         ctx.fillText(String(Math.ceil(bossHp)), W - 40, 308);
         tex.needsUpdate = true;
       }
-      // Your board: health + the survival hint.
+      // Your board: health, the survival hint, and the run clock in runs.
       {
         const { ctx, tex } = left;
-        header(ctx, 'YOU', UI.emberBright);
+        header(ctx, 'YOU', UI.emberBright, timer);
         plate(ctx, 28, 124, W - 56, 110, { cut: 16, fill: UI.ink, rivets: false });
         segmentBar(ctx, 52, 148, W - 104, 60, playerHp / playerMax, UI.emberBright);
         ctx.textAlign = 'left';

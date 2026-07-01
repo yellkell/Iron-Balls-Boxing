@@ -22,11 +22,23 @@ import { PALETTE } from '../config.js';
 
 export type AttackKind = 'slam' | 'sweep' | 'beam' | 'barrage';
 
+/**
+ * How a titan's slam lands — its melee signature:
+ *  - 'single' : one fist, one disc.
+ *  - 'rehit'  : the SAME disc detonates again moments later — punishes
+ *               rushing back into the crater (RUSTHOOK's patience test).
+ *  - 'march'  : a drumline of discs stepping across the platform, each with
+ *               its own countdown — move on the beat (PISTONKAISER's rhythm).
+ */
+export type SlamStyle = 'single' | 'rehit' | 'march';
+
 export interface BossDef {
   name: string;
   epithet: string;
   /** One line of pit-lane hype for the intro card. */
   taunt: string;
+  /** The survival lesson shown on your board — each titan teaches one. */
+  hint: string;
   /** Signature glow colour — visor, core, trims, telegraph strikes. */
   accent: number;
   /** Rig size multiplier; the duel boxer is roughly scale 1. */
@@ -49,13 +61,45 @@ export interface BossDef {
   beams: number;
   /** Lateral drift amplitude while idling (metres). */
   swayAmp: number;
+
+  // --- signature mechanics: what makes THIS fight feel different ---
+  /** Melee signature (see SlamStyle). */
+  slamStyle: SlamStyle;
+  /** Detonations in a rehit/march pattern (1 for 'single'). */
+  slamCount: number;
+  /** Beam telegraphs TRACK the player and only lock late — dodge late. */
+  beamTracks: boolean;
+  /** Mortar shells leave burning floor patches — the platform shrinks. */
+  burnPatches: boolean;
+  /** Enrage threshold as an HP fraction (0 = never): faster, angrier. */
+  enrageAt: number;
 }
 
+/**
+ * The five titans, and the fight each one IS:
+ *
+ *  I   RUSTHOOK — the patience test. Slow, heavy, and its slam crater
+ *      detonates a second time: greed gets you killed, waiting gets you a
+ *      long open core. Teaches the loop.
+ *  II  PISTONKAISER — the rhythm fight. Slams come as a marching three-beat
+ *      drumline, each disc running its own countdown; you move on the beat
+ *      or you get forged. Sweeps keep you honest between bars.
+ *  III WIDOWMAKER — the precision fight. Its beam strip TRACKS you while it
+ *      charges and only locks in late — an early dodge is a wasted dodge.
+ *      The heaviest sweep user; the duel gets personal.
+ *  IV  JUGGERNAUT — the ground war. Mortars leave BURNING floor patches and
+ *      twin beams cut lanes: safe ground shrinks and you fight for footing
+ *      more than for shots.
+ *  V   GOLIATH — the exam. Marching slams, tracking twin beams, burning
+ *      ground — and at half health it ENRAGES: a roar, a blazing visor, and
+ *      everything comes faster.
+ */
 export const BOSSES: BossDef[] = [
   {
     name: 'RUSTHOOK',
     epithet: 'the scrapyard sentinel',
     taunt: 'dredged from the pit floor · never oiled, never beaten',
+    hint: 'its crater strikes TWICE — do not rush back in',
     accent: PALETTE.coolFlame,
     scale: 1.6,
     health: 160,
@@ -68,11 +112,17 @@ export const BOSSES: BossDef[] = [
     barrageCount: 3,
     beams: 1,
     swayAmp: 0.5,
+    slamStyle: 'rehit',
+    slamCount: 2,
+    beamTracks: false,
+    burnPatches: false,
+    enrageAt: 0,
   },
   {
     name: 'PISTONKAISER',
     epithet: 'the forge hammer',
     taunt: 'four hundred tonnes of drop-forge temper',
+    hint: 'three hammers on a beat — keep moving',
     accent: PALETTE.amber,
     scale: 2.1,
     health: 220,
@@ -85,28 +135,40 @@ export const BOSSES: BossDef[] = [
     barrageCount: 3,
     beams: 1,
     swayAmp: 0.6,
+    slamStyle: 'march',
+    slamCount: 3,
+    beamTracks: false,
+    burnPatches: false,
+    enrageAt: 0,
   },
   {
     name: 'WIDOWMAKER',
     epithet: 'arena executioner',
     taunt: 'undefeated in the southern pits · counts in corpses',
+    hint: 'the beam FOLLOWS you — dodge late, not early',
     accent: 0x7cff4a,
     scale: 2.7,
     health: 300,
     zOffset: 1.0,
     cooldownMin: 1.9,
     cooldownMax: 2.8,
-    charge: { slam: 1.45, sweep: 1.7, beam: 1.4, barrage: 1.7 },
-    weights: { slam: 3, sweep: 4, beam: 3, barrage: 3 },
+    charge: { slam: 1.45, sweep: 1.7, beam: 1.55, barrage: 1.7 },
+    weights: { slam: 3, sweep: 4, beam: 4, barrage: 2 },
     coreOpenTime: 3.0,
     barrageCount: 4,
     beams: 1,
     swayAmp: 0.7,
+    slamStyle: 'single',
+    slamCount: 1,
+    beamTracks: true,
+    burnPatches: false,
+    enrageAt: 0,
   },
   {
     name: 'JUGGERNAUT',
     epithet: 'the rolling fortress',
     taunt: 'they stopped counting the machines it has eaten',
+    hint: 'the floor stays HOT — fight for your footing',
     accent: 0xb26bff,
     scale: 3.4,
     health: 380,
@@ -114,28 +176,39 @@ export const BOSSES: BossDef[] = [
     cooldownMin: 1.6,
     cooldownMax: 2.4,
     charge: { slam: 1.3, sweep: 1.5, beam: 1.25, barrage: 1.5 },
-    weights: { slam: 3, sweep: 3, beam: 4, barrage: 4 },
+    weights: { slam: 3, sweep: 2, beam: 4, barrage: 5 },
     coreOpenTime: 2.6,
     barrageCount: 5,
     beams: 2,
     swayAmp: 0.55,
+    slamStyle: 'single',
+    slamCount: 1,
+    beamTracks: false,
+    burnPatches: true,
+    enrageAt: 0,
   },
   {
     name: 'GOLIATH',
     epithet: 'king of the scrap',
     taunt: 'the pit was dug to bury it · it climbed back out',
+    hint: 'survive the rage — it breaks before you do',
     accent: PALETTE.danger,
     scale: 4.4,
     health: 480,
     zOffset: 1.7,
     cooldownMin: 1.35,
     cooldownMax: 2.1,
-    charge: { slam: 1.15, sweep: 1.35, beam: 1.1, barrage: 1.35 },
+    charge: { slam: 1.15, sweep: 1.35, beam: 1.2, barrage: 1.35 },
     weights: { slam: 3, sweep: 3, beam: 4, barrage: 4 },
     coreOpenTime: 2.2,
     barrageCount: 6,
     beams: 2,
     swayAmp: 0.4,
+    slamStyle: 'march',
+    slamCount: 2,
+    beamTracks: true,
+    burnPatches: true,
+    enrageAt: 0.5,
   },
 ];
 

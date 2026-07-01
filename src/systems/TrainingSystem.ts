@@ -21,13 +21,11 @@ import {
   CylinderGeometry,
   DoubleSide,
   Group,
-  IcosahedronGeometry,
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
-  TorusGeometry,
 } from 'three';
 import { TargetKind, TargetState, TrainingTarget } from '../components/TrainingTarget.js';
 import { Combatant } from '../components/Combatant.js';
@@ -98,8 +96,42 @@ function cutoutTexture(): CanvasTexture {
   return tex;
 }
 
+/**
+ * Canvas octa-target face — pub OCTA HUNT style: concentric gold-and-black
+ * octagon rings around a gold centre.
+ */
+function octaTexture(): CanvasTexture {
+  const S = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const octagon = (r: number): void => {
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const x = S / 2 + Math.cos(a) * r;
+      const y = S / 2 + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  };
+  const rings: Array<[number, string]> = [
+    [0.5, '#ffd700'], [0.38, '#15161a'], [0.27, '#ffd700'], [0.16, '#15161a'], [0.08, '#ffd700'],
+  ];
+  for (const [r, c] of rings) {
+    octagon(S * r);
+    ctx.fillStyle = c;
+    ctx.fill();
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.minFilter = LinearFilter;
+  return tex;
+}
+
 let discTex: CanvasTexture | undefined;
 let cutoutTex: CanvasTexture | undefined;
+let octaTex: CanvasTexture | undefined;
 
 export class TrainingSystem extends createSystem({
   targets: { required: [TrainingTarget] },
@@ -271,13 +303,15 @@ export class TrainingSystem extends createSystem({
         }
         case TargetState.Holding: {
           obj.position.y = upY + Math.sin(age * 3) * 0.02;
-          // Drones strafe their lane (and spin) — lead the shot.
+          // Octa drones strafe their lane — lead the shot. The plate (the
+          // group's first child) twirls around its own facing axis so the
+          // octagon visibly spins without swinging off the player.
           const amp = t.getValue(TrainingTarget, 'driftAmp') ?? 0;
           if (amp > 0) {
             const base = t.getValue(TrainingTarget, 'baseX') ?? 0;
             const rate = t.getValue(TrainingTarget, 'driftRate') ?? 0;
             obj.position.x = base + Math.sin(age * rate) * amp;
-            obj.rotation.y += delta * 4;
+            obj.children[0].rotation.y += delta * 3;
           }
           this.maybeShoot(t, delta);
           if (age >= (t.getValue(TrainingTarget, 'holdTime') ?? 2.6)) {
@@ -365,41 +399,27 @@ export class TrainingSystem extends createSystem({
     const group = new Group();
 
     if (kind === TargetKind.Drone) {
-      // The gold hover-drone: a glowing core in a gyro halo with stub fins.
-      // No stick — it flies (TrainingSystem strafes it while it holds).
-      const gold = 0xffd700;
-      const core = new Mesh(
-        new IcosahedronGeometry(TRAINING.droneRadius * 0.75, 1),
-        new MeshStandardMaterial({
-          color: 0x4a3a08,
-          emissive: gold,
-          emissiveIntensity: 1.7,
-          metalness: 0.6,
-          roughness: 0.3,
-        }),
+      // The gold OCTA drone — pub octa-hunt style: a flat eight-sided plate
+      // (concentric gold/black octagon rings on both faces, glowing gold rim)
+      // that hangs in the air with no stick and spins in-plane while it
+      // strafes. TrainingSystem drives the motion.
+      octaTex ??= octaTexture();
+      const plate = new Mesh(
+        new CylinderGeometry(TRAINING.droneRadius * 1.2, TRAINING.droneRadius * 1.2, 0.03, 8),
+        [
+          new MeshStandardMaterial({
+            color: PALETTE.iron,
+            emissive: 0xffd700,
+            emissiveIntensity: 0.9,
+            metalness: 0.7,
+            roughness: 0.35,
+          }),
+          new MeshBasicMaterial({ map: octaTex }),
+          new MeshBasicMaterial({ map: octaTex }),
+        ],
       );
-      group.add(core);
-      const halo = new Mesh(
-        new TorusGeometry(TRAINING.droneRadius * 1.25, 0.014, 8, 24),
-        new MeshStandardMaterial({
-          color: PALETTE.iron,
-          emissive: gold,
-          emissiveIntensity: 0.6,
-          metalness: 0.8,
-          roughness: 0.35,
-        }),
-      );
-      halo.rotation.x = Math.PI / 2.4; // tipped gyro ring
-      group.add(halo);
-      for (const side of [-1, 1]) {
-        const fin = new Mesh(
-          new CylinderGeometry(0.008, 0.02, 0.09, 6),
-          new MeshStandardMaterial({ color: PALETTE.iron, metalness: 0.7, roughness: 0.4 }),
-        );
-        fin.rotation.z = side * (Math.PI / 2);
-        fin.position.x = side * TRAINING.droneRadius * 1.1;
-        group.add(fin);
-      }
+      plate.rotation.x = Math.PI / 2; // cap faces the player
+      group.add(plate);
       return this.world.createTransformEntity(group);
     }
 

@@ -180,6 +180,22 @@ export const CAMPAIGN = {
   beamHalfWidth: 0.22,
   sweepThickness: 0.19, // half-height of the horizontal blade slice
   mortarRadius: 0.42,
+
+  // Signature-mechanic tuning (which titans use which lives in bosses.ts).
+  rehitDelay: 0.85, // seconds between a rehit slam's two detonations
+  marchStep: 0.6, // metres between marching slam discs
+  marchDelay: 0.55, // seconds between marching detonations — the drumbeat
+  beamLockAt: 0.72, // tracking beams freeze at this charge fraction
+  patchTime: 3.5, // seconds a burning floor patch stays hot
+  patchRadius: 0.34,
+  enrageCooldownMult: 0.65, // enraged titans attack this much sooner…
+  enrageChargeMult: 0.85, // …and charge that much faster
+
+  // THE GAUNTLET RUN — all five back to back, unlocked once all are felled.
+  // The clock only counts fight time, so intros/collapses cost you nothing.
+  runIntro: { klaxon: 0.5, rise: 1.4, title: 1.3, fightCard: 0.6 },
+  runVictoryDelay: 3.2, // collapse pause between bosses mid-run
+  leaderboardSize: 5, // times kept per mode (gauntlet / hardcore)
 };
 
 /** Match format: best-of rounds, Blaston-style pacing. */

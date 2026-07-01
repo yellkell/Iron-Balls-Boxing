@@ -14,3 +14,12 @@ export const campaign = {
   /** True while the titan's core is vented open (the punish window). */
   coreOpen: false,
 };
+
+/** Gauntlet-run clock formatting: m:ss.t — shared by the HUD and the board. */
+export function fmtRunTime(seconds: number): string {
+  const s = Math.max(0, seconds);
+  const m = Math.floor(s / 60);
+  const ss = String(Math.floor(s % 60)).padStart(2, '0');
+  const tenths = Math.floor((s * 10) % 10);
+  return `${m}:${ss}.${tenths}`;
+}

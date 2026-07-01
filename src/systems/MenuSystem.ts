@@ -95,9 +95,19 @@ export class MenuSystem extends createSystem({}) {
   private run(action: MenuAction): void {
     sfx.ensureAudio();
     sfx.uiClick();
-    // ARCADE stage slots: enter the titan bout (locked slots never hit-test).
+    // Gauntlet runs — check BEFORE the numbered-stage prefix match below.
+    if (action === 'campaign-speedrun' || action === 'campaign-hardcore') {
+      app.mode = 'campaign';
+      app.campaignMode = action === 'campaign-hardcore' ? 'hardcore' : 'gauntlet';
+      app.campaignStage = 0;
+      app.state = 'playing';
+      this.applyState();
+      return;
+    }
+    // ARCADE stage cards: a single titan bout (locked cards never hit-test).
     if (action.startsWith('campaign-')) {
       app.mode = 'campaign';
+      app.campaignMode = 'single';
       app.campaignStage = Number(action.slice('campaign-'.length)) || 0;
       app.state = 'playing';
       this.applyState();

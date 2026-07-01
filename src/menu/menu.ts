@@ -18,14 +18,15 @@ import {
   PlaneGeometry,
   type Scene,
 } from 'three';
-import { app, stageUnlocked, training } from './appState.js';
+import { app, gauntletUnlocked, stageUnlocked, training } from './appState.js';
 import { GAME_TITLE } from '../config.js';
 import { BOSSES } from '../campaign/bosses.js';
+import { fmtRunTime } from '../campaign/campaignState.js';
 import { drawBossIcon } from '../campaign/icons.js';
 import { playerLevel } from '../combat/rewards.js';
 import { UI, buttonPlate, hazardStrip, plate, stencilFont } from '../ui/industrial.js';
 
-export type PanelId = 'train' | 'duel' | 'info' | 'arcade' | 'campaign';
+export type PanelId = 'train' | 'duel' | 'info' | 'arcade' | 'campaign' | 'leaderboard';
 
 export type MenuAction =
   | 'start-training'
@@ -36,6 +37,8 @@ export type MenuAction =
   | 'open-campaign'
   | 'close-campaign'
   | 'toggle-platform'
+  | 'campaign-speedrun'
+  | 'campaign-hardcore'
   | `campaign-${number}`;
 
 const PW = 512;
@@ -372,6 +375,101 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   return null;
 }
 
+/**
+ * The LEADERBOARD panel — flanks the titan line-up on the campaign page.
+ * Best gauntlet-run clocks per mode, plus the plates that start a run:
+ * SPEEDRUN opens once all five titans are felled; HARDCORE (no healing)
+ * opens once you've completed your first gauntlet run.
+ */
+
+const LW = 512;
+const LH = 560;
+const SPEEDRUN_RECT = [56, 428, LW - 112, 54] as const;
+const HARDCORE_RECT = [56, 494, LW - 112, 54] as const;
+
+function timesSection(
+  ctx: CanvasRenderingContext2D,
+  title: string,
+  times: number[],
+  lockedText: string | null,
+  y: number,
+  accent: string,
+): void {
+  ctx.textAlign = 'left';
+  ctx.font = stencilFont(28);
+  ctx.fillStyle = accent;
+  ctx.fillText(title, 56, y);
+  ctx.font = '700 24px system-ui, sans-serif';
+  if (lockedText) {
+    ctx.fillStyle = UI.steelDim;
+    ctx.fillText(lockedText, 56, y + 38);
+    return;
+  }
+  if (times.length === 0) {
+    ctx.fillStyle = UI.textDim;
+    ctx.fillText('no times on the board yet', 56, y + 38);
+    return;
+  }
+  times.slice(0, 4).forEach((t, i) => {
+    ctx.fillStyle = i === 0 ? UI.emberBright : UI.textDim;
+    ctx.fillText(`${i + 1}.`, 56, y + 38 + i * 32);
+    ctx.fillText(fmtRunTime(t), 110, y + 38 + i * 32);
+    if (i === 0) ctx.fillText('★', 240, y + 38);
+  });
+}
+
+function drawLeaderboard(ctx: CanvasRenderingContext2D, hover: boolean): void {
+  ctx.clearRect(0, 0, LW, LH);
+  plate(ctx, 8, 8, LW - 16, LH - 16, {
+    cut: 26,
+    fill: hover ? 'rgba(14,15,20,0.6)' : UI.ink,
+    stroke: hover ? UI.amber : UI.steel,
+  });
+  hazardStrip(ctx, 36, 34, 52, 16, UI.amber);
+  ctx.textAlign = 'left';
+  ctx.font = stencilFont(36);
+  ctx.fillStyle = UI.amber;
+  ctx.fillText('LEADERBOARD', 104, 44);
+  ctx.strokeStyle = UI.steelDim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(36, 72);
+  ctx.lineTo(LW - 36, 72);
+  ctx.stroke();
+
+  const gOpen = gauntletUnlocked();
+  timesSection(
+    ctx, 'GAUNTLET', app.stats.runTimesGauntlet,
+    gOpen ? null : 'fell all five titans to unlock', 108, UI.emberBright,
+  );
+  timesSection(
+    ctx, 'HARDCORE', app.stats.runTimesHardcore,
+    app.stats.hardcoreUnlocked ? null : 'complete a gauntlet run to unlock', 282, UI.danger,
+  );
+
+  ctx.textAlign = 'center';
+  buttonPlate(
+    ctx, SPEEDRUN_RECT[0], SPEEDRUN_RECT[1], SPEEDRUN_RECT[2], SPEEDRUN_RECT[3],
+    gOpen ? 'RUN THE GAUNTLET' : 'GAUNTLET SEALED',
+    gOpen ? UI.emberBright : UI.steelDim, hover && gOpen,
+  );
+  buttonPlate(
+    ctx, HARDCORE_RECT[0], HARDCORE_RECT[1], HARDCORE_RECT[2], HARDCORE_RECT[3],
+    app.stats.hardcoreUnlocked ? 'HARDCORE' : 'HARDCORE SEALED',
+    app.stats.hardcoreUnlocked ? UI.danger : UI.steelDim, hover && app.stats.hardcoreUnlocked,
+  );
+}
+
+function hitLeaderboard(u: number, v: number): MenuAction | null {
+  const x = u * LW;
+  const y = (1 - v) * LH;
+  const inRect = (r: readonly [number, number, number, number]): boolean =>
+    x >= r[0] && x <= r[0] + r[2] && y >= r[1] - 5 && y <= r[1] + r[3] + 5;
+  if (inRect(SPEEDRUN_RECT) && gauntletUnlocked()) return 'campaign-speedrun';
+  if (inRect(HARDCORE_RECT) && app.stats.hardcoreUnlocked) return 'campaign-hardcore';
+  return null;
+}
+
 /** Right — stats & how-to. Not clickable. */
 function drawInfo(ctx: CanvasRenderingContext2D): void {
   panelBg(ctx, false, UI.text, GAME_TITLE);
@@ -413,6 +511,7 @@ export function createMenu(scene: Scene): Menu {
   const info = makePanel('info', 0.78, 0.62, (ctx) => drawInfo(ctx), () => null);
   const arcade = makePanel('arcade', 0.86, 0.66, drawArcade, hitArcade);
   const campaign = makePanel('campaign', 1.56, 0.73, drawCampaign, hitCampaign, CW, CH);
+  const leaderboard = makePanel('leaderboard', 0.62, 0.68, drawLeaderboard, hitLeaderboard, LW, LH);
 
   // Shallow arc in front of the player, tilted inward toward the centre.
   const y = 1.45;
@@ -425,11 +524,15 @@ export function createMenu(scene: Scene): Menu {
   // control desk so it reads comfortably from standing height.
   arcade.mesh.position.set(0, 0.78, -1.06);
   arcade.mesh.rotation.x = -0.38;
-  // The campaign sub-menu takes centre stage on its own page.
-  campaign.mesh.position.set(0, 1.4, -1.3);
+  // The campaign page: the line-up centre-left, the leaderboard flanking
+  // right, angled inward like the info panel on the main arc.
+  campaign.mesh.position.set(-0.28, 1.4, -1.3);
+  leaderboard.mesh.position.set(0.95, 1.38, -1.04);
+  leaderboard.mesh.rotation.y = -0.5;
 
   const mainPanels: PanelId[] = ['train', 'duel', 'info', 'arcade'];
-  const panels = [train, duel, info, arcade, campaign];
+  const campaignPanels: PanelId[] = ['campaign', 'leaderboard'];
+  const panels = [train, duel, info, arcade, campaign, leaderboard];
   for (const p of panels) {
     p.redraw(false);
     group.add(p.mesh);
@@ -439,7 +542,7 @@ export function createMenu(scene: Scene): Menu {
   const syncPage = (): void => {
     const onMain = app.menuPage === 'main';
     for (const p of panels) {
-      p.mesh.visible = onMain ? mainPanels.includes(p.id) : p.id === 'campaign';
+      p.mesh.visible = (onMain ? mainPanels : campaignPanels).includes(p.id);
     }
   };
   syncPage();

@@ -27,8 +27,9 @@ in-your-face boxing feel.
   cutouts pop up across the gap; land your fire while they're up. Streaks
   multiply your score and the cadence ramps. Flip **targets shoot back** on
   and the cutouts return blue fire so you train dodging between throws. In
-  the **last 30 seconds**, gold **drones** join the mix — small strafing
-  hover-targets that demand a led shot and pay 300 a pop.
+  the **last 30 seconds**, gold **octa drones** join the mix — small spinning
+  octagon plates (pub octa-hunt style) that strafe their lane, demand a led
+  shot and pay 300 a pop.
 - **VS BOT** — spar an iron boxer that strafes, ducks, reactively dodges your
   throws and hurls fire back on a cadence.
 - **1V1 QUICK MATCH** — competitive online duels through the bundled relay
@@ -54,6 +55,20 @@ in-your-face boxing feel.
   like any bout; the **first fell of each titan pays double** — and the
   first fell of GOLIATH awards the gold **CHAMPION platform**, equippable
   from the LOADOUT row on the line-up.
+
+  **Every titan is a different fight**: RUSTHOOK's slam crater detonates
+  *twice* (patience); PISTONKAISER's slams march across the platform on a
+  three-beat drumline (rhythm); WIDOWMAKER's beam *tracks you* and only
+  locks late (dodge late, not early); JUGGERNAUT's mortars leave **burning
+  floor patches** that shrink your footing (the ground war); GOLIATH does
+  all of it and **enrages at half health**.
+
+  Fell all five and the line-up's **LEADERBOARD** panel opens **THE
+  GAUNTLET RUN**: all five titans back to back with condensed intros, your
+  health refit between bouts, on a clock that only counts fight time — beat
+  the run and your time goes on the board. Completing your first gauntlet
+  unlocks **HARDCORE**: the same run with no healing between titans, on its
+  own leaderboard.
 
 ## The rules of the platform
 
