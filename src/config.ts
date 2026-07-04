@@ -334,8 +334,14 @@ export const CAMPAIGN = {
  * judges only the strikes aimed at ITS OWN platform.
  */
 export const RAID = {
-  /** Titan growth over the solo campaign versions. */
-  scaleMult: 1.22,
+  /** Raid titans are ALL giants: every stage starts at solo GOLIATH's size and
+   *  grows this much per stage beyond it (stage 0 = GOLIATH-sized RUSTHOOK,
+   *  final-stage GOLIATH ~1.5x his solo self). */
+  scaleStageStep: 0.13,
+  /** Volley shots fly this much faster in a raid — the pit is twice as far
+   *  out (RAID_RING_RADIUS), so this keeps the flight time near the solo
+   *  ~one-second beat instead of a lazy lob. */
+  volleySpeedMult: 1.5,
   /** Boss health multiplier — "more than 4x": four raiders, and then some. */
   healthMult: 4.6,
   /**
@@ -537,8 +543,17 @@ export const TEAM_SPACING = 1.9;
 export const FFA_ARM = ARENA_GAP / 2;
 
 /** RAID arc seat bearings (radians about the boss anchor): a ~108° semicircle
- *  spread, symmetric, ~1.9 m between neighbouring platforms. */
+ *  spread, symmetric — at RAID_RING_RADIUS that puts ~3.7 m centre-to-centre
+ *  between neighbouring platforms (over a full platform's length of clear air
+ *  between pads). */
 const RAID_ARC_ANGLES = [-0.9424778, -0.31415927, 0.31415927, 0.9424778];
+
+/**
+ * RAID ring radius — every seat's distance to the titan's pit. Twice the duel
+ * gap: raids are about SCALE, so the squad spreads wide and the giant looms
+ * far across the arena instead of crowding the classic 3 m pocket.
+ */
+export const RAID_RING_RADIUS = 6.0;
 
 /** One platform's place in a mode's roster. */
 export interface FighterSlot {
@@ -574,22 +589,26 @@ export const MODE_LAYOUT: Record<ArcadeMode, FighterSlot[]> = {
     { pos: [-FFA_ARM, 0, -FFA_ARM], yaw: -Math.PI / 2, team: 3 }, // west, faces +X
   ],
   // RAID: four platforms on a semicircular arc around the titan's pit — the
-  // pit anchor sits at (0,0,-ARENA_GAP) and every seat stands ON A CIRCLE of
-  // radius ARENA_GAP around it, yawed to face it. That geometry is the whole
-  // trick: because each seat faces the anchor at the same distance, the titan
-  // lands at (0, 0, -ARENA_GAP) in EVERY player's local frame — exactly where
-  // the solo campaign puts it — so the entire boss-fight stack (telegraphs on
+  // pit anchor sits at (0,0,-RAID_RING_RADIUS) and every seat stands ON A
+  // CIRCLE of radius RAID_RING_RADIUS around it, yawed to face it. That
+  // geometry is the whole trick: because each seat faces the anchor at the
+  // same distance, the titan lands at (0, 0, -RAID_RING_RADIUS) in EVERY
+  // player's local frame — so the entire boss-fight stack (telegraphs on
   // your platform, weak-point aim, dodge geometry) runs unchanged per client,
   // and only the OTHER raiders' attacks/platforms need seat transforms.
   raid: RAID_ARC_ANGLES.map((phi) => ({
-    pos: [Math.sin(phi) * ARENA_GAP, 0, -ARENA_GAP + Math.cos(phi) * ARENA_GAP] as [number, number, number],
+    pos: [
+      Math.sin(phi) * RAID_RING_RADIUS,
+      0,
+      -RAID_RING_RADIUS + Math.cos(phi) * RAID_RING_RADIUS,
+    ] as [number, number, number],
     yaw: phi,
     team: 0, // one squad — no friendly fire
   })),
 };
 
 /** RAID canonical boss anchor — the pit the arc curls around. */
-export const RAID_BOSS_ANCHOR: [number, number, number] = [0, 0, -ARENA_GAP];
+export const RAID_BOSS_ANCHOR: [number, number, number] = [0, 0, -RAID_RING_RADIUS];
 
 /** Opponent slots for a mode (everyone but the local player at slot 0). */
 export function opponentSlots(mode: ArcadeMode): FighterSlot[] {

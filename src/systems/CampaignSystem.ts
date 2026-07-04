@@ -85,6 +85,7 @@ import {
   OCTAGON_HALF_DEPTH,
   OCTAGON_HALF_WIDTH,
   RAID,
+  RAID_RING_RADIUS,
 } from '../config.js';
 
 
@@ -983,7 +984,10 @@ export class CampaignSystem extends createSystem({
     group.add(core);
     group.position.copy(_v);
     this.scene.add(group);
-    const vel = new Vector3().copy(_head).sub(_v).normalize().multiplyScalar(CAMPAIGN.volleySpeed);
+    // Raids fire hotter: the pit is twice as far out, so the mult keeps the
+    // flight near the solo one-second beat.
+    const speed = CAMPAIGN.volleySpeed * (this.raid() ? RAID.volleySpeedMult : 1);
+    const vel = new Vector3().copy(_head).sub(_v).normalize().multiplyScalar(speed);
     this.shots.push({ pos: _v.clone(), vel, age: 0, group, trail: 0, seat });
     sfx.mortarThump();
   }
@@ -2502,7 +2506,9 @@ export class CampaignSystem extends createSystem({
   }
 
   private bossZ(): number {
-    return -ARENA_GAP - this.def.zOffset;
+    // A raid's pit sits at the wide ring radius; the solo pit keeps the
+    // classic duel gap.
+    return -(this.raid() ? RAID_RING_RADIUS : ARENA_GAP) - this.def.zOffset;
   }
 
   private playerHead(out: Vector3): void {
