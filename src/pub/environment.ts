@@ -335,7 +335,7 @@ export function buildPub(world: World): PubRefs {
   // The neon "IRON SHARPENS IRON" motto — on the SOUTH wall, above and behind
   // the booth seating (centred over the tables), hung low over the diners.
   const creed = buildSign(IRON_SHARPENS_SIGN, 1.7, 1.7, ironSharpensFallback);
-  creed.position.set(1.75, 2.05, D - 0.04);
+  creed.position.set(1.75, 1.85, D - 0.04);
   creed.rotation.y = Math.PI; // faces −z, back across the room
   root.add(creed);
 
