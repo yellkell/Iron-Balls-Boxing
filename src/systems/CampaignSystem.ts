@@ -2467,8 +2467,8 @@ export class CampaignSystem extends createSystem({
       // The raid room is spent (locked + started) — leave the mesh and land
       // back at the raid browser, win or wipe.
       mesh.cancel();
-      app.raidOpen = true;
-      app.raidView = 'browser';
+      app.lobbyMode = 'raid';
+      app.lobbyView = 'browser';
       app.state = 'menu';
       this.teardown();
       return;

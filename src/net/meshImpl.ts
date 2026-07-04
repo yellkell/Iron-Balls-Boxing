@@ -15,15 +15,11 @@ import {
   addDoc,
   collection,
   doc,
-  getDocs,
   getFirestore,
-  limit,
   onSnapshot,
-  query,
   runTransaction,
   serverTimestamp,
   updateDoc,
-  where,
   type DocumentReference,
   type Firestore,
   type Unsubscribe,
@@ -35,7 +31,6 @@ import type { ArcadeMode } from '../config.js';
 import type { PeerMessage } from './protocol.js';
 import type { MeshState } from './mesh.js';
 
-const ROOM_FRESH_MS = 3 * 60 * 1000;
 const CAPACITY: Record<ArcadeMode, number> = { '1v1': 2, '2v2': 4, ffa: 4, raid: 4 };
 
 let firebaseApp: FirebaseApp | undefined;
@@ -64,7 +59,6 @@ interface Peer {
 
 export class MeshImpl {
   private readonly clientId = Math.random().toString(36).slice(2, 10);
-  private mode: ArcadeMode = '2v2';
   private roomRef: DocumentReference | null = null;
   private peers = new Map<number, Peer>();
   /** Latest raw `seats` from the room doc (before masking dropped peers). */
@@ -83,30 +77,16 @@ export class MeshImpl {
 
   constructor(private readonly state: MeshState) {}
 
-  async queue(mode: ArcadeMode): Promise<void> {
-    this.mode = mode;
+  /** Always CREATE a fresh, visible lobby of `mode` (never auto-join) — the
+   *  room browser is the front door; hosts and joiners take different paths. */
+  async hostLobby(mode: ArcadeMode, name: string): Promise<void> {
     this.state.capacity = CAPACITY[mode];
-    this.state.onStatus('matchmaking…');
-    const rooms = collection(db(), 'arcadeRooms');
-    const seat = await this.claimSeat(rooms);
-    if (this.closed) return;
-    this.state.mySeat = seat;
-    this.state.joined = true;
-    this.state.onStatus(seat === 0 ? 'hosting — waiting for players…' : `joined (seat ${seat})`);
-    this.watchRoom();
-  }
-
-  /** RAID: always CREATE a fresh, visible lobby (never auto-join) — the room
-   *  browser is the front door; hosts and joiners take different paths. */
-  async hostRaid(name: string): Promise<void> {
-    this.mode = 'raid';
-    this.state.capacity = CAPACITY.raid;
-    this.state.onStatus('opening a raid lobby…');
+    this.state.onStatus('opening a lobby…');
     const rooms = collection(db(), 'arcadeRooms');
     const seats = Array.from({ length: this.state.capacity }, (_, i) => (i === 0 ? this.clientId : ''));
     const names = Array.from({ length: this.state.capacity }, (_, i) => (i === 0 ? name : ''));
     this.roomRef = await addDoc(rooms, {
-      mode: 'raid',
+      mode,
       capacity: this.state.capacity,
       seats,
       names,
@@ -119,16 +99,15 @@ export class MeshImpl {
     this.state.mySeat = 0;
     this.state.joined = true;
     this.state.names[0] = name;
-    this.state.onStatus('lobby open — waiting for raiders…');
+    this.state.onStatus('lobby open — waiting for players…');
     this.watchRoom();
     this.startBeat();
   }
 
-  /** RAID: claim a seat in a SPECIFIC listed lobby. False = filled/gone. */
-  async joinRaid(roomId: string, name: string): Promise<boolean> {
-    this.mode = 'raid';
-    this.state.capacity = CAPACITY.raid;
-    this.state.onStatus('joining the raid…');
+  /** Claim a seat in a SPECIFIC listed lobby of `mode`. False = filled/gone. */
+  async joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean> {
+    this.state.capacity = CAPACITY[mode];
+    this.state.onStatus('joining the lobby…');
     const ref = doc(collection(db(), 'arcadeRooms'), roomId);
     try {
       const seat = await runTransaction(db(), async (txn) => {
@@ -179,8 +158,8 @@ export class MeshImpl {
     if (this.roomRef) void updateDoc(this.roomRef, { hardcore: v }).catch(() => {});
   }
 
-  /** RAID host: lock the lobby and launch — members see `started` flip. */
-  startRaid(): void {
+  /** Host: lock the lobby and launch — members see `started` flip. */
+  startLobby(): void {
     if (this.roomRef) void updateDoc(this.roomRef, { started: true, open: false }).catch(() => {});
   }
 
@@ -198,11 +177,6 @@ export class MeshImpl {
         }
       }
     }
-  }
-
-  /** Host: close the room to new joiners so a short-handed FFA can start. */
-  lock(): void {
-    if (this.roomRef) void updateDoc(this.roomRef, { open: false }).catch(() => {});
   }
 
   close(): void {
@@ -248,44 +222,6 @@ export class MeshImpl {
     this.roomRef = null;
   }
 
-  // --- matchmaking ---------------------------------------------------------
-
-  private async claimSeat(rooms: ReturnType<typeof collection>): Promise<number> {
-    const open = await getDocs(
-      query(rooms, where('mode', '==', this.mode), where('open', '==', true), limit(10)),
-    );
-    const now = Date.now();
-    for (const snap of open.docs) {
-      const created = (snap.data().createdAt?.toMillis?.() as number | undefined) ?? 0;
-      if (now - created > ROOM_FRESH_MS) continue;
-      try {
-        const seat = await runTransaction(db(), async (txn) => {
-          const fresh = await txn.get(snap.ref);
-          if (!fresh.exists() || fresh.data()?.open !== true) throw new Error('gone');
-          const seats = (fresh.data().seats as string[]) ?? [];
-          const free = seats.findIndex((s) => !s);
-          if (free < 0) throw new Error('full');
-          seats[free] = this.clientId;
-          txn.update(snap.ref, { seats, open: !seats.every((s) => s) });
-          return free;
-        });
-        this.roomRef = snap.ref;
-        return seat;
-      } catch {
-        continue;
-      }
-    }
-    const seats = Array.from({ length: this.state.capacity }, (_, i) => (i === 0 ? this.clientId : ''));
-    this.roomRef = await addDoc(rooms, {
-      mode: this.mode,
-      capacity: this.state.capacity,
-      seats,
-      open: true,
-      createdAt: serverTimestamp(),
-    });
-    return 0;
-  }
-
   private watchRoom(): void {
     if (!this.roomRef) return;
     this.roomUnsub = onSnapshot(this.roomRef, (snap) => {
@@ -302,7 +238,7 @@ export class MeshImpl {
         });
       }
       this.state.raidHardcore = snap.data().hardcore === true;
-      this.state.raidStarted = snap.data().started === true;
+      this.state.started = snap.data().started === true;
       if (this.state.full) this.state.onStatus('all players in — fight!');
       const occ = this.state.occupants; // masked — never (re)connect a dropped seat
       for (let seat = 0; seat < occ.length; seat++) {

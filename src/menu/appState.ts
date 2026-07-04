@@ -130,12 +130,17 @@ export const app: {
    * (same run, no healing), or the four-player RAID (always a full run).
    */
   campaignMode: 'single' | 'gauntlet' | 'hardcore' | 'raid';
-  /** The RAID lobby modal is open over the lobby (like campaignOpen). */
-  raidOpen: boolean;
-  /** Which face the raid modal shows: the room browser, or a joined lobby. */
-  raidView: 'browser' | 'lobby';
-  /** Open raid rooms for the browser (live from raidWatch). */
-  raidRooms: { id: string; host: string; count: number; hardcore: boolean }[];
+  /**
+   * Which arcade LOBBY modal is open over the lobby, or null when none. One
+   * shared browser/seats/voice modal now serves every networked arcade mode:
+   * '2v2', 'ffa' (launch into a live mesh brawl) and 'raid' (launch into the
+   * co-op titan run). null = closed. Replaces the old raid-only flag.
+   */
+  lobbyMode: ArcadeMode | null;
+  /** Which face the lobby modal shows: the room browser, or a joined squad. */
+  lobbyView: 'browser' | 'lobby';
+  /** Open rooms for the browser (live from lobbyWatch, for `lobbyMode`). */
+  lobbyRooms: { id: string; host: string; count: number; cap: number; hardcore: boolean }[];
   /** The launched raid runs hardcore (host's lobby toggle, stamped at start). */
   raidHardcore: boolean;
   /** Which backdrop the arena renders — held across every mode. */
@@ -188,9 +193,9 @@ export const app: {
   campaignOpen: false,
   campaignStage: 0,
   campaignMode: 'single',
-  raidOpen: false,
-  raidView: 'browser',
-  raidRooms: [],
+  lobbyMode: null,
+  lobbyView: 'browser',
+  lobbyRooms: [],
   raidHardcore: false,
   environment: ((): AppEnvironment => {
     const e = localStorage.getItem('ff-env');

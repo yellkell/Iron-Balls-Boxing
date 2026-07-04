@@ -85,13 +85,14 @@ export class MeshSystem extends createSystem({
   private guestOverTimer = 0;
   /** Counts down to the next `iam` (callsign) broadcast while in a live bout. */
   private iamTimer = 0;
-  /** Host: seconds a short-handed FFA (3 players) has waited for a 4th. */
-  private ffaGraceTimer = 0;
   /** Seats whose spatial voice we've hooked up this bout. */
   private voiced = new Set<number>();
   /** True while a raid bout is live — the rising edge resets the per-bout
    *  clocks (see the raid branch in update). */
   private raidLive = false;
+  /** True while a live 2v2 / ffa mesh brawl is running — the rising edge
+   *  resets the per-bout clocks (see the net branch in update). */
+  private netLive = false;
 
   update(delta: number): void {
     // Track the raid bout's rising edge from EVERY path — a finished raid
@@ -101,11 +102,12 @@ export class MeshSystem extends createSystem({
       this.raidLive = false;
     }
 
-    // RAID LOBBY: the squad talks from the moment they're seated together —
-    // the WebRTC voice tracks connect while the room fills, so attach them
-    // here instead of waiting for the launch. (app.arcade only becomes 'raid'
-    // at launch, so this rides the lobby flags, ahead of the mode branches.)
-    if (app.state === 'menu' && app.raidOpen && mesh.joined) {
+    // ARCADE LOBBY (2v2 / ffa / raid): the squad talks from the moment they're
+    // seated together — the WebRTC voice tracks connect while the room fills,
+    // so attach them here instead of waiting for the launch. (app.arcade only
+    // becomes the mode at launch, so this rides the lobby flag, ahead of the
+    // mode branches.)
+    if (app.state === 'menu' && app.lobbyMode !== null && mesh.joined) {
       if (mesh.inbox.length) mesh.inbox.length = 0; // no bout yet — drop wire chatter
       this.lobbyVoice();
       return;
@@ -150,49 +152,42 @@ export class MeshSystem extends createSystem({
     if (app.state !== 'playing') {
       if (mesh.inbox.length) mesh.inbox.length = 0;
       this.clearVoice();
+      this.netLive = false;
       return;
     }
 
     if (app.mode === 'bot') {
-      // Still playing the local bot bout while the room fills. Drop any chatter
-      // so it can't pile up, and flip to the live bout once it's ready:
-      //  - 2v2 waits for a FULL room (4 humans) — until then you fight bots;
-      //  - FFA starts at FULL, or the host locks it 10 s after a 3rd arrives,
-      //    leaving that window for a 4th. The live bout is all-humans; any
-      //    unfilled FFA seat just sits empty (see applyRoster).
+      // VS BOTS / only-bots arcade brawl (2v2 / ffa): a purely local bot bout —
+      // no mesh, no chatter, no voice. (Online play now goes through an
+      // explicit lobby that launches straight to app.mode === 'net' below.)
       if (mesh.inbox.length) mesh.inbox.length = 0;
-      this.clearVoice(); // voice only plays in the live bout, not while filling
-      if (mesh.joined) {
-        const humans = mesh.occupants.filter(Boolean).length;
-        if (mesh.isHost() && app.arcade === 'ffa' && !mesh.locked && humans >= 3 && humans < mesh.capacity) {
-          this.ffaGraceTimer += delta;
-          if (this.ffaGraceTimer >= 10) mesh.lock();
-        } else {
-          this.ffaGraceTimer = 0;
-        }
-        const enough = app.arcade === '2v2' ? humans >= mesh.capacity : humans >= 3;
-        if (mesh.locked && enough) {
-          app.mode = 'net';
-          app.side = mesh.isHost() ? 0 : 1;
-          app.mySlot = mesh.mySeat;
-          this.lastReset = -1;
-          this.iamTimer = 0; // introduce myself the moment the bout goes live
-          this.lastPose = []; // fresh pose-staleness windows for this bout
-          for (const t of this.targets) t.fresh = false; // no lerping to a dead bout's poses
-          this.lastAstate = performance.now(); // grace before watching the host
-        }
-      }
+      this.clearVoice();
+      this.netLive = false;
       return;
     }
 
-    // app.mode === 'net' (a live mesh bout).
+    // app.mode === 'net' (a live mesh brawl, launched from an arcade lobby).
     if (!mesh.joined) {
       // The mesh fell out from under us — drop back to bots.
       app.mode = 'bot';
       app.side = 0;
       app.mySlot = 0;
       this.clearVoice();
+      this.netLive = false;
       return;
+    }
+    // Rising edge — the brawl just went live off the lobby launch. Fresh
+    // per-bout clocks are NOT optional: `lastPose` persists across bouts, so
+    // stale timestamps left by an earlier bout would make every peer look
+    // silent on frame one and checkStalePeers would instantly drop them.
+    if (!this.netLive) {
+      this.netLive = true;
+      app.mySlot = mesh.mySeat;
+      this.lastReset = -1;
+      this.iamTimer = 0; // introduce myself the moment the bout goes live
+      this.lastPose = []; // fresh pose-staleness windows for this bout
+      for (const t of this.targets) t.fresh = false; // no lerping to a dead bout's poses
+      this.lastAstate = performance.now(); // grace before watching the host
     }
     app.side = mesh.isHost() ? 0 : 1;
 

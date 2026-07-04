@@ -21,13 +21,11 @@ export interface MeshInbox {
 }
 
 interface MeshImplApi {
-  queue(mode: ArcadeMode): Promise<void>;
-  hostRaid(name: string): Promise<void>;
-  joinRaid(roomId: string, name: string): Promise<boolean>;
+  hostLobby(mode: ArcadeMode, name: string): Promise<void>;
+  joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean>;
   setRaidHardcore(v: boolean): void;
-  startRaid(): void;
+  startLobby(): void;
   send(msg: PeerMessage): void;
-  lock(): void;
   dropSeat(seat: number): void;
   close(): void;
 }
@@ -52,9 +50,10 @@ class Mesh {
   /** Room closed to new joiners — full, or the host locked a short-handed FFA. */
   locked = false;
   joined = false;
-  /** RAID lobby state, mirrored live from the room doc. */
+  /** Lobby state, mirrored live from the room doc. `hardcore` is raid-only
+   *  (2v2/ffa leave it false); `started` flips for every mode at launch. */
   raidHardcore = false;
-  raidStarted = false;
+  started = false;
   /** Status sink for the lobby panel. */
   onStatus: (s: string) => void = () => {};
 
@@ -80,31 +79,23 @@ class Mesh {
     return this.joined && this.lowestSeat() === this.mySeat;
   }
 
-  /** Begin matchmaking for a mode; lazily loads the Firestore/WebRTC impl. */
-  async queue(mode: ArcadeMode, onStatus?: (s: string) => void): Promise<void> {
+  /** Open a fresh visible lobby of `mode` with me as host (2v2 / ffa / raid;
+   *  never auto-joins — the browser is the front door). */
+  async hostLobby(mode: ArcadeMode, name: string, onStatus?: (s: string) => void): Promise<void> {
     this.close();
     if (onStatus) this.onStatus = onStatus;
     const { MeshImpl } = await import('./meshImpl.js');
     this.impl = new MeshImpl(this);
-    await this.impl.queue(mode);
+    await this.impl.hostLobby(mode, name);
   }
 
-  /** RAID: open a fresh visible lobby with me as host (never auto-joins). */
-  async hostRaid(name: string, onStatus?: (s: string) => void): Promise<void> {
+  /** Claim a seat in a listed lobby. False = it filled/closed first. */
+  async joinLobby(mode: ArcadeMode, roomId: string, name: string, onStatus?: (s: string) => void): Promise<boolean> {
     this.close();
     if (onStatus) this.onStatus = onStatus;
     const { MeshImpl } = await import('./meshImpl.js');
     this.impl = new MeshImpl(this);
-    await this.impl.hostRaid(name);
-  }
-
-  /** RAID: claim a seat in a listed lobby. False = it filled/closed first. */
-  async joinRaid(roomId: string, name: string, onStatus?: (s: string) => void): Promise<boolean> {
-    this.close();
-    if (onStatus) this.onStatus = onStatus;
-    const { MeshImpl } = await import('./meshImpl.js');
-    this.impl = new MeshImpl(this);
-    return this.impl.joinRaid(roomId, name);
+    return this.impl.joinLobby(mode, roomId, name);
   }
 
   /** RAID host: flip the lobby's hardcore breaker (mirrored to everyone). */
@@ -112,19 +103,14 @@ class Mesh {
     this.impl?.setRaidHardcore(v);
   }
 
-  /** RAID host: lock the lobby and launch — every member sees `raidStarted`. */
-  startRaid(): void {
-    this.impl?.startRaid();
+  /** Host: lock the lobby and launch — every member sees `started` flip. */
+  startLobby(): void {
+    this.impl?.startLobby();
   }
 
   /** Broadcast a game message to every connected peer (stamped with my seat). */
   send(msg: PeerMessage): void {
     this.impl?.send(msg);
-  }
-
-  /** Host: close the room so it goes live short-handed (FFA after the grace). */
-  lock(): void {
-    this.impl?.lock();
   }
 
   /** Declare a seat dead — its peer went silent (pose-staleness backstop). */
@@ -143,7 +129,7 @@ class Mesh {
     this.full = false;
     this.locked = false;
     this.raidHardcore = false;
-    this.raidStarted = false;
+    this.started = false;
     this.inbox.length = 0;
     this.mySeat = 0;
     this.occupants = [];
