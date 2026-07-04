@@ -22,6 +22,7 @@ export class FXSystem extends createSystem({
   update(delta: number): void {
     updateFirePools(delta);
 
+    if (this.queries.effects.entities.size === 0) return; // idle: no spread alloc
     for (const e of [...this.queries.effects.entities]) {
       const obj = e.object3D;
       if (!obj) continue;

@@ -35,6 +35,7 @@ import {
   createActionPanel,
   createMenu,
   flashProfileKeyboardHint,
+  profileHintActive,
   resetNewsScroll,
   scrollNews,
   tickCoinRollup,
@@ -57,7 +58,7 @@ import {
   setAvatarSkin,
   setPlatformSkin,
 } from '../menu/customization.js';
-import { canAfford, spendCoins } from '../menu/wallet.js';
+import { canAfford, coins, spendCoins } from '../menu/wallet.js';
 import { playCash, preloadCash } from '../audio/cash.js';
 import { setMenuMusicActive, toggleMusicMuted } from '../audio/menuMusic.js';
 import { handoffToLobby } from '../audio/battleMusic.js';
@@ -95,7 +96,7 @@ import {
   setPlayerNote,
   setProfileView,
 } from '../net/leaderboard.js';
-import { markGazetteRead, refreshGazette } from '../net/gazette.js';
+import { gazette, markGazetteRead, refreshGazette } from '../net/gazette.js';
 import { hueToColor, pubUrl } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 
@@ -151,6 +152,55 @@ export class MenuSystem extends createSystem({}) {
    *  a fresh trigger press over the track, so a trigger held from opening the
    *  panel (or clicking elsewhere) can't hijack a slider as the ray crosses it. */
   private sliderGrab: { hand: 'left' | 'right'; panel: PanelId } | null = null;
+  /** Cached raycast target list — rebuilt only when panel visibility flips
+   *  (modal open/close), not re-filtered/mapped every frame. */
+  private rayTargets: Object3D[] = [];
+  /** Reused intersect scratch so the two casts per frame allocate nothing. */
+  private hits: Intersection[] = [];
+  /** Snapshot of the live lobby data behind the freshness tick — the panels
+   *  only repaint (canvas redraw + texture upload ×8) when one of these
+   *  actually changed, not blindly twice a second. */
+  private lastLive: unknown[] = [];
+
+  /** Everything the lobby panels draw that can change WITHOUT a local click:
+   *  network watches, fetches, the mesh lobby, the profile-hint timer. Click,
+   *  hover, scroll and skin changes all repaint through their own paths. */
+  private liveDirty(): boolean {
+    const cur: unknown[] = [
+      app.searching,
+      app.netStatus,
+      app.pubCount,
+      // Fresh object every 8 s poll — stringify so identical counts don't repaint.
+      JSON.stringify(app.pubRegionCounts),
+      app.raidRooms,
+      app.rankedRooms,
+      app.privateCode, // arrives async while hosting a private match
+      leaderboard.ranked, // all boards are replaced together per fetch
+      leaderboard.status,
+      gazette.article,
+      gazette.status,
+      gazette.unread,
+      mesh.joined,
+      mesh.full,
+      mesh.names.join('|'),
+      coins.balance,
+      profileHintActive(), // flips false when the hint expires — one repaint clears it
+      app.accentHue, // sliders repaint partially while scrubbed; this settles the rest
+      app.accentLight,
+    ];
+    const last = this.lastLive;
+    let dirty = last.length !== cur.length;
+    if (!dirty) {
+      for (let i = 0; i < cur.length; i++) {
+        if (cur[i] !== last[i]) {
+          dirty = true;
+          break;
+        }
+      }
+    }
+    this.lastLive = cur;
+    return dirty;
+  }
 
   init(): void {
     this.menu = createMenu(this.scene);
@@ -207,31 +257,43 @@ export class MenuSystem extends createSystem({}) {
     const modalNews = app.gazetteOpen;
     const modalCampaign = app.campaignOpen;
     const modalRaid = app.raidOpen;
+    let visChanged = this.rayTargets.length === 0; // first frame: build the list
     for (const p of this.menu.panels) {
+      let show: boolean;
       switch (p.id) {
         case 'board':
+          show = p.mesh.visible; // always up, hanging behind you
           break;
         case 'custom': // the LOCKER
         case 'balls':
-          p.mesh.visible = modalCustom;
+          show = modalCustom;
           break;
         case 'shop':
-          p.mesh.visible = shopOpen;
+          show = shopOpen;
           break;
         case 'news':
-          p.mesh.visible = modalNews;
+          show = modalNews;
           break;
         case 'campaign':
-          p.mesh.visible = modalCampaign;
+          show = modalCampaign;
           break;
         case 'raid':
-          p.mesh.visible = modalRaid;
+          show = modalRaid;
           break;
         default:
           // The arc (train/duel/info), the paper button AND the coin readout:
           // the lobby's face, gone while any modal is open.
-          p.mesh.visible = !customization.open && !modalNews && !modalCampaign && !modalRaid;
+          show = !customization.open && !modalNews && !modalCampaign && !modalRaid;
           break;
+      }
+      if (p.mesh.visible !== show) {
+        p.mesh.visible = show;
+        visChanged = true;
+        // A panel entering the screen repaints NOW with current data — the
+        // freshness tick no longer paints unconditionally, so anything that
+        // changed while it was hidden (redrawAll skips hidden panels) would
+        // otherwise linger stale.
+        if (show) p.redraw(null);
       }
     }
     // The mirror stands beside both the customise plate AND the shop, so avatar
@@ -247,9 +309,9 @@ export class MenuSystem extends createSystem({}) {
     let newsScrollAxis = 0;
     let dragged = false;
     let clicked = false;
-    const meshes = this.menu.panels.filter((p) => p.mesh.visible).map((p) => p.mesh);
+    if (visChanged) this.rayTargets = this.menu.panels.filter((p) => p.mesh.visible).map((p) => p.mesh);
     for (const hand of ['left', 'right'] as const) {
-      const hit = this.updatePointer(hand, meshes);
+      const hit = this.updatePointer(hand, this.rayTargets);
       if (!hit) continue;
       const panel = this.menu.panels.find((p) => p.mesh === hit.object);
       if (!panel) continue;
@@ -311,7 +373,9 @@ export class MenuSystem extends createSystem({}) {
     const skinChanged = customization.version !== this.lastSkinDraw;
     if (skinChanged) this.lastSkinDraw = customization.version;
     const hoverChanged = hover !== this.hovered || hoverAction !== this.hoveredAction;
-    if (hoverChanged || boardScrolled || newsScrolled || skinChanged) {
+    // A slider scrub bumps the skin version EVERY frame — let the drag branch
+    // below repaint just the locker faces instead of all eight panels.
+    if (hoverChanged || boardScrolled || newsScrolled || (skinChanged && !dragged)) {
       this.hovered = hover;
       this.hoveredAction = hoverAction;
       this.menu.redrawAll(hover, hoverAction);
@@ -326,19 +390,28 @@ export class MenuSystem extends createSystem({}) {
     }
 
     // Live-update the accent slider; persist once the trigger is released.
+    // While the scrub is held, only the LOCKER faces repaint per frame — the
+    // board and the rest settle on the next freshness tick after release.
     if (dragged) {
       this.draggingHue = true;
-      this.menu.redrawAll(this.hovered, this.hoveredAction);
+      for (const p of this.menu.panels) {
+        if (!p.mesh.visible) continue;
+        if (p.id === 'custom' || p.id === 'balls' || p.id === 'shop' || p.id === this.sliderGrab?.panel) {
+          p.redraw(p.id === this.hovered ? this.hoveredAction : null);
+        }
+      }
     } else if (this.draggingHue) {
       this.draggingHue = false;
       saveAccentHue();
     }
 
-    // Periodic redraw so live text (queue status) stays fresh.
+    // Freshness tick for live text (queue status, pub counts, room lists…):
+    // check the live data every 0.5 s but repaint ONLY when something changed.
+    // An idle lobby uploads no panel textures at all.
     this.redrawTimer -= delta;
     if (this.redrawTimer <= 0) {
       this.redrawTimer = 0.5;
-      this.menu.redrawAll(this.hovered, this.hoveredAction);
+      if (this.liveDirty()) this.menu.redrawAll(this.hovered, this.hoveredAction);
     }
 
     // Coins banked during a bout roll up the moment you're back at the menu —
@@ -1089,8 +1162,10 @@ export class MenuSystem extends createSystem({}) {
     rayObj.getWorldPosition(_origin);
     rayObj.getWorldDirection(_dir).negate(); // ray space points down −Z
     this.ray.set(_origin, _dir);
-    const hit = this.ray.intersectObjects(targets, false)[0];
-    _end.copy(hit ? hit.point : _origin.clone().addScaledVector(_dir, 1.6));
+    this.hits.length = 0; // reuse the scratch — no per-cast array allocation
+    const hit = this.ray.intersectObjects(targets, false, this.hits)[0];
+    if (hit) _end.copy(hit.point);
+    else _end.copy(_origin).addScaledVector(_dir, 1.6);
     const pos = p.line.geometry.getAttribute('position');
     pos.setXYZ(0, _origin.x, _origin.y, _origin.z);
     pos.setXYZ(1, _end.x, _end.y, _end.z);

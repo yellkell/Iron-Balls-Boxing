@@ -47,11 +47,17 @@ export class PlayerBodySystem extends createSystem({
     const rigObj = this.playerEntity?.object3D;
     if (!rig || !headObj || !rigObj) return;
 
+    // In the lobby nothing reads the torso or the hitboxes (collision,
+    // boundary and the pose senders are all state-gated) — skip the whole
+    // solve instead of running IK on an invisible body every menu frame.
+    const active = app.state === 'playing' || app.state === 'training';
+    rig.torso.visible = active;
+    if (!active) return;
+
     headObj.getWorldPosition(_head);
     headObj.getWorldQuaternion(_headQ);
     rigObj.getWorldPosition(_rig);
 
-    rig.torso.visible = app.state === 'playing' || app.state === 'training';
     solveTorso(rig, _head, _headQ, _rig.x, _rig.z, _chest, _pelvis);
 
     for (const entity of this.queries.parts.entities) {

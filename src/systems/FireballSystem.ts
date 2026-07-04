@@ -151,6 +151,8 @@ export class FireballSystem extends createSystem({
   private trackers: [VelocityTracker, VelocityTracker] = [new VelocityTracker(), new VelocityTracker()];
   private time = 0;
   private lastReset = -1;
+  /** Out-of-bout: every ball was hidden once and the sim is asleep. */
+  private idle = false;
   private trailAcc = new Map<Entity, number>();
   private emberAcc = 0;
   /**
@@ -282,8 +284,28 @@ export class FireballSystem extends createSystem({
 
   update(delta: number): void {
     this.time += delta;
-    this.myAlive = this.slotAlive(0);
     const live = app.state === 'playing' || app.state === 'training';
+
+    // Lobby / queueing: no fire burns. Hide every ball ONCE, drop transients,
+    // then sleep — no camera reads, no command drain, no per-ball loop while
+    // the player stands at the menu. A bout's opening reset re-parks the pair.
+    if (!live) {
+      if (!this.idle) {
+        this.idle = true;
+        for (const ball of [...this.queries.balls.entities]) {
+          const obj = ball.object3D;
+          if (!obj) continue;
+          const transient = (ball.getValue(Fireball, 'transient') ?? 0) === 1;
+          const shard = (ball.getValue(Fireball, 'shard') ?? 0) === 1;
+          if (transient || shard) this.destroyBall(ball);
+          else obj.visible = false;
+        }
+      }
+      if (ballCommands.length) ballCommands.length = 0; // stray late commands
+      return;
+    }
+    this.idle = false;
+    this.myAlive = this.slotAlive(0);
 
     // Fresh round / mode change: park everything back at the fists.
     if (match.resetCount !== this.lastReset) {

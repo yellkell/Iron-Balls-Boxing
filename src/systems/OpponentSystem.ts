@@ -62,6 +62,8 @@ export class OpponentSystem extends createSystem({
   private spotlights: Mesh[] = [];
   /** Was each fighter slot alive last frame, so a death fires the red X once. */
   private wasAlive: boolean[] = [];
+  /** Out-of-bout: the rigs were hidden/parked once and we're sleeping. */
+  private parked = false;
 
   init(): void {
     for (let i = 0; i < MAX_OPPONENTS; i++) {
@@ -91,6 +93,29 @@ export class OpponentSystem extends createSystem({
     // a normal bot before CampaignSystem's begin() stands it down. RAIDS are
     // campaign-mode too but their other seats are REAL raiders — render them.
     const playing = app.state === 'playing' && !(app.mode === 'campaign' && app.arcade !== 'raid');
+
+    // Lobby / queueing / solo campaign: park everything ONCE, then sleep —
+    // re-hiding three full mech rigs (hundreds of `.visible` writes) every
+    // menu frame was pure waste.
+    if (!playing) {
+      if (!this.parked) {
+        this.parked = true;
+        for (let i = 0; i < MAX_OPPONENTS; i++) {
+          const r = this.rigs[i];
+          if (!r) continue;
+          const pose = opponents[i];
+          pose.active = false;
+          for (const piece of r.rig.all) piece.visible = false;
+          r.botSkin = undefined; // forget the bout skin so the next bout re-rolls
+          r.appliedSkins = '';
+          this.deathFx(i + 1, false, pose.headPos);
+          if (r.built) this.parkHitboxes(i);
+        }
+        this.deathFx(0, false, _localHead); // pos unused while alive
+      }
+      return;
+    }
+    this.parked = false;
     const roster = localLayout();
 
     for (let i = 0; i < MAX_OPPONENTS; i++) {

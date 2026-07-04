@@ -201,6 +201,12 @@ export function clearProfileKeyboardHint(): void {
   profileKeyboardHintUntil = 0;
 }
 
+/** Whether the "turn around to the keyboard" hint is still on screen — the
+ *  freshness tick watches this so its expiry triggers the clearing repaint. */
+export function profileHintActive(): boolean {
+  return performance.now() < profileKeyboardHintUntil;
+}
+
 export interface MenuPanel {
   id: PanelId;
   mesh: Mesh;
