@@ -13,9 +13,14 @@
  */
 
 import musicUrl from '../assets/music/start-again.m4a?url';
+import { musicVolume, onMusicVolume } from './musicVolume.js';
 
 const MUTE_KEY = 'ibb-music-muted';
-const TARGET_VOLUME = 0.5;
+const BASE_VOLUME = 0.5;
+/** The lobby track's live level: its base scaled by the master music volume. */
+function targetVol(): number {
+  return BASE_VOLUME * musicVolume();
+}
 
 let audio: HTMLAudioElement | null = null;
 let entered = false; // has the player entered VR (the autoplay-unlocking gesture)?
@@ -49,7 +54,7 @@ function ensureAudio(): HTMLAudioElement {
   if (!audio) {
     audio = new Audio(musicUrl);
     audio.loop = true;
-    audio.volume = TARGET_VOLUME;
+    audio.volume = targetVol();
   }
   return audio;
 }
@@ -60,7 +65,7 @@ function sync(): void {
   stopFade();
   if (entered && lobbyActive && !isMusicMuted()) {
     const a = ensureAudio();
-    a.volume = TARGET_VOLUME;
+    a.volume = targetVol();
     void a.play().catch(() => {
       /* autoplay blocked or decode failed — stay silent */
     });
@@ -99,10 +104,17 @@ export function fadeInMenuMusic(): void {
   let i = 0;
   fadeTimer = window.setInterval(() => {
     i += 1;
-    a.volume = Math.min(TARGET_VOLUME, (TARGET_VOLUME * i) / steps);
+    const target = targetVol();
+    a.volume = Math.min(target, (target * i) / steps);
     if (i >= steps) stopFade();
   }, 50);
 }
+
+// Live-scale the lobby track while it's playing steadily (a settings-panel
+// slider scrub) — skip mid-fade, the fade recomputes toward the new target.
+onMusicVolume(() => {
+  if (audio && !audio.paused && fadeTimer === null) audio.volume = targetVol();
+});
 
 /**
  * Start the lobby music — call once, inside the enter-VR click gesture, so the

@@ -6,7 +6,7 @@
  * decoded and the context is unlocked, so it never blocks a bout.
  */
 
-import { audioContext } from './sfx.js';
+import { audioContext, sfxOut } from './sfx.js';
 
 export type Call = '1' | '2' | '3' | 'fight';
 
@@ -62,6 +62,6 @@ export function announce(call: Call): void {
   // synth SFX (which sit under a quieter master) so the voice cuts through.
   const gain = ctx.createGain();
   gain.gain.value = 0.85;
-  src.connect(gain).connect(ctx.destination);
+  src.connect(gain).connect(sfxOut() ?? ctx.destination);
   src.start();
 }

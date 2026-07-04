@@ -10,6 +10,7 @@
  */
 
 import { isMusicMuted } from './menuMusic.js';
+import { musicVolume } from './musicVolume.js';
 import breakcoreUrl from '../assets/music/breakcore.mp3?url';
 
 const VOLUME = 0.4;
@@ -23,7 +24,7 @@ export function startTutorialMusic(): void {
     audio = new Audio(breakcoreUrl);
     audio.loop = true;
   }
-  audio.volume = VOLUME;
+  audio.volume = VOLUME * musicVolume();
   audio.currentTime = 0;
   void audio.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */

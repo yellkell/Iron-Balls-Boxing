@@ -49,6 +49,8 @@ import { gazette, type GazetteArticle } from '../net/gazette.js';
 import { mesh } from '../net/mesh.js';
 import { isMusicMuted } from '../audio/menuMusic.js';
 import { voiceEnabled } from '../audio/voicePref.js';
+import { sfxVolume } from '../audio/sfx.js';
+import { musicVolume } from '../audio/musicVolume.js';
 import { PUB_MAX_PLAYERS } from '../pub/protocol.js';
 import { PUB_REGIONS } from '../pub/config.js';
 import { UI, buttonPlate, hazardStrip, plate, segmentBar, stencilFont } from '../ui/industrial.js';
@@ -69,8 +71,10 @@ export type PanelId =
   | 'gazette'
   /** The round passthrough toggle hanging above the BATTLE panel. */
   | 'passthrough'
-  /** The music mute disc, left of the paper button. */
-  | 'mute'
+  /** The settings gear disc, left of the paper button. */
+  | 'gear'
+  /** The settings modal (audio sliders + music mute + voice toggle). */
+  | 'settings'
   /** The Gasket Gazette front page itself (opens modal over the lobby). */
   | 'news'
   /** The ARCADE campaign line-up — the titan gauntlet (modal over the lobby). */
@@ -177,8 +181,14 @@ export type MenuAction =
   /** Open / close the Gasket Gazette. */
   | 'open-gazette'
   | 'gazette-close'
-  /** Toggle the lobby music mute (the speaker button left of the paper). */
-  | 'toggle-mute';
+  /** Open / close the SETTINGS modal (the gear disc left of the paper). */
+  | 'open-settings'
+  | 'settings-close'
+  /** Toggle the lobby/battle music mute (now inside the SETTINGS modal). */
+  | 'toggle-mute'
+  /** Dragging the SFX / music volume sliders (continuous — MenuSystem reads UV). */
+  | 'sfx-vol'
+  | 'music-vol';
 
 const PW = 512;
 const PH = 400;
@@ -336,9 +346,8 @@ function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
     const kw = pw / 2 - 10;
     ctx.fillRect(on ? px + pw - kw - 6 : px + 6, py + 6, kw, ph - 12);
   };
-  breaker('targets shoot back', app.shootBack, hoverAction === 'toggle-shootback', 328, 'rgba(79,183,255,0.25)', UI.cool);
-  breaker('only play bots', app.onlyBots, hoverAction === 'toggle-onlybots', 370, 'rgba(255,176,0,0.25)', UI.amber);
-  breaker('voice chat', voiceEnabled(), hoverAction === 'toggle-voice', 412, 'rgba(57,217,138,0.28)', '#39d98a');
+  breaker('targets shoot back', app.shootBack, hoverAction === 'toggle-shootback', 348, 'rgba(79,183,255,0.25)', UI.cool);
+  breaker('only play bots', app.onlyBots, hoverAction === 'toggle-onlybots', 398, 'rgba(255,176,0,0.25)', UI.amber);
 }
 
 function hitTrain(_u: number, v: number): MenuAction | null {
@@ -348,9 +357,8 @@ function hitTrain(_u: number, v: number): MenuAction | null {
   if (y >= 140 && y <= 194) return 'open-campaign';
   if (y >= 200 && y <= 254) return 'open-raid';
   if (y >= 260 && y <= 314) return 'start-training';
-  if (y >= 326 && y <= 364) return 'toggle-shootback';
-  if (y >= 368 && y <= 406) return 'toggle-onlybots';
-  if (y >= 410 && y <= 448) return 'toggle-voice';
+  if (y >= 346 && y <= 384) return 'toggle-shootback';
+  if (y >= 396 && y <= 434) return 'toggle-onlybots';
   return null;
 }
 
@@ -1485,11 +1493,13 @@ function hitPassthroughButton(u: number, v: number): MenuAction | null {
   return dx * dx + dy * dy <= 0.41 * 0.41 ? 'toggle-passthrough' : null;
 }
 
-/** The lobby-music mute button: a steel disc with a speaker glyph, struck
- *  through in red when muted. Matches the paper button's look (NOT glowing). */
-function drawMuteButton(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+/** The settings button: a steel disc with a gear cog. Opens the SETTINGS modal
+ *  (audio sliders + music mute + voice). Matches the paper button (NOT glowing).
+ *  A small red dot sits on the cog while the music is muted, so the mute state
+ *  still reads at a glance from the closed HUD. */
+function drawSettingsButton(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   ctx.clearRect(0, 0, GZ, GZ);
-  const hot = hoverAction === 'toggle-mute';
+  const hot = hoverAction === 'open-settings';
   const muted = isMusicMuted();
   const cx = GZ / 2;
   const cy = GZ / 2;
@@ -1503,45 +1513,169 @@ function drawMuteButton(ctx: CanvasRenderingContext2D, hoverAction: MenuAction |
   ctx.strokeStyle = hot ? UI.amber : UI.steel;
   ctx.stroke();
 
-  const ink = muted ? UI.steel : hot ? UI.amber : UI.text;
+  const ink = hot ? UI.amber : UI.text;
   ctx.fillStyle = ink;
   ctx.strokeStyle = ink;
-  // Speaker body: a little square + a trapezoidal cone.
+
+  // A cog: alternate outer (tooth tip) and root radius around the circle, with
+  // each tooth held flat across a short span so it reads squared, not spiky.
+  const teeth = 8;
+  const rOuter = 27;
+  const rRoot = 20;
+  const seg = (Math.PI * 2) / teeth;
+  const tip = seg * 0.28; // half-width of a flat tooth tip
   ctx.beginPath();
-  ctx.moveTo(cx - 22, cy - 9);
-  ctx.lineTo(cx - 9, cy - 9);
-  ctx.lineTo(cx + 4, cy - 20);
-  ctx.lineTo(cx + 4, cy + 20);
-  ctx.lineTo(cx - 9, cy + 9);
-  ctx.lineTo(cx - 22, cy + 9);
+  for (let i = 0; i < teeth; i++) {
+    const a = i * seg;
+    const ring: [number, number][] = [
+      [a - tip, rOuter],
+      [a + tip, rOuter],
+      [a + seg / 2 - tip, rRoot],
+      [a + seg / 2 + tip, rRoot],
+    ];
+    for (let k = 0; k < ring.length; k++) {
+      const [ang, rad] = ring[k];
+      const x = cx + Math.cos(ang) * rad;
+      const y = cy + Math.sin(ang) * rad;
+      if (i === 0 && k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+  }
   ctx.closePath();
   ctx.fill();
-  if (!muted) {
-    // Two sound-wave arcs.
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    for (const rad of [12, 21]) {
-      ctx.beginPath();
-      ctx.arc(cx + 6, cy, rad, -Math.PI / 4, Math.PI / 4);
-      ctx.stroke();
-    }
-  } else {
-    // Red strike-through — sound off.
-    ctx.strokeStyle = UI.danger;
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
+  // Bore the centre out (punch a hole in the hub).
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  if (muted) {
+    // Muted-music tell: a small red pip on the cog's shoulder.
+    ctx.fillStyle = UI.danger;
     ctx.beginPath();
-    ctx.moveTo(cx + 26, cy - 22);
-    ctx.lineTo(cx - 14, cy + 22);
-    ctx.stroke();
+    ctx.arc(cx + 20, cy - 20, 7, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-/** Inside the disc → toggle mute. */
-function hitMuteButton(u: number, v: number): MenuAction | null {
+/** Inside the disc → open the settings modal. */
+function hitSettingsButton(u: number, v: number): MenuAction | null {
   const dx = u - 0.5;
   const dy = v - 0.5;
-  return dx * dx + dy * dy <= 0.41 * 0.41 ? 'toggle-mute' : null;
+  return dx * dx + dy * dy <= 0.41 * 0.41 ? 'open-settings' : null;
+}
+
+// ───────────────────────────── SETTINGS MODAL ───────────────────────────────
+// Audio + voice, opened from the gear disc: SOUND FX and MUSIC volume sliders,
+// a music-mute breaker and the voice-chat breaker (moved here from the ARCADE
+// panel). The sliders scrub like the LOCKER colour bars (MenuSystem reads the
+// hit UV each frame while the trigger is held — see the 'sfx-vol'/'music-vol'
+// branches there).
+
+const SET_W = 560;
+const SET_H = 500;
+const SFX_BAR = { x: 48, y: 150, w: SET_W - 96, h: 40 };
+const MUSIC_BAR = { x: 48, y: 252, w: SET_W - 96, h: 40 };
+const SET_MUTE_Y = 322;
+const SET_VOICE_Y = 378;
+const SET_CLOSE_BTN = { x: SET_W / 2 - 90, y: SET_H - 72, w: 180, h: 50 };
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+/** UV.x on the settings canvas → 0..1 SFX volume along its track. */
+export function sfxVolFromU(u: number): number {
+  return clamp01((u * SET_W - SFX_BAR.x) / SFX_BAR.w);
+}
+/** UV.x on the settings canvas → 0..1 music volume along its track. */
+export function musicVolFromU(u: number): number {
+  return clamp01((u * SET_W - MUSIC_BAR.x) / MUSIC_BAR.w);
+}
+
+function drawVolRow(ctx: CanvasRenderingContext2D, label: string, value: number, bar: { x: number; y: number; w: number; h: number }, accent: string, hot: boolean): void {
+  // Label left, live percentage right, above the track.
+  ctx.textAlign = 'left';
+  ctx.font = '700 22px system-ui, sans-serif';
+  ctx.fillStyle = hot ? accent : UI.textDim;
+  ctx.fillText(label, bar.x, bar.y - 16);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = UI.text;
+  ctx.font = '800 20px system-ui, sans-serif';
+  ctx.fillText(`${Math.round(value * 100)}%`, bar.x + bar.w, bar.y - 16);
+  ctx.textAlign = 'center';
+
+  // Track, filled portion, then the knob.
+  plate(ctx, bar.x, bar.y, bar.w, bar.h, {
+    cut: 10,
+    fill: 'rgba(150,150,170,0.10)',
+    stroke: hot ? accent : UI.steelDim,
+    rivets: false,
+  });
+  const fw = clamp01(value) * (bar.w - 12);
+  if (fw > 2) {
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(bar.x + 6, bar.y + 6, fw, bar.h - 12);
+    ctx.globalAlpha = 1;
+  }
+  const kx = bar.x + 6 + fw;
+  ctx.beginPath();
+  ctx.arc(kx, bar.y + bar.h / 2, 13, 0, Math.PI * 2);
+  ctx.fillStyle = hot ? '#ffffff' : UI.text;
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = accent;
+  ctx.stroke();
+}
+
+/** A settings toggle switch — the ARCADE breaker, at the settings canvas width. */
+function settingsBreaker(ctx: CanvasRenderingContext2D, label: string, on: boolean, hot: boolean, py: number, onFill: string, onStroke: string): void {
+  ctx.font = '700 22px system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = hot ? UI.amber : UI.textDim;
+  ctx.fillText(label, 48, py + 24);
+  const pw = 96, ph = 34, px = SET_W - 48 - pw;
+  plate(ctx, px, py, pw, ph, {
+    cut: 10,
+    fill: on ? onFill : hot ? 'rgba(255,176,0,0.16)' : 'rgba(150,150,170,0.12)',
+    stroke: hot ? UI.amber : on ? onStroke : UI.steelDim,
+    rivets: false,
+  });
+  ctx.fillStyle = on ? onStroke : UI.steelDim;
+  const kw = pw / 2 - 10;
+  ctx.fillRect(on ? px + pw - kw - 6 : px + 6, py + 6, kw, ph - 12);
+  ctx.textAlign = 'center';
+}
+
+function drawSettings(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+  panelBg(ctx, false, UI.amber, 'SETTINGS', SET_W, SET_H);
+  ctx.textAlign = 'center';
+  ctx.font = '600 20px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('audio & voice', SET_W / 2, 96);
+
+  drawVolRow(ctx, 'SOUND FX', sfxVolume(), SFX_BAR, UI.cool, hoverAction === 'sfx-vol');
+  drawVolRow(ctx, 'MUSIC', musicVolume(), MUSIC_BAR, UI.emberBright, hoverAction === 'music-vol');
+
+  settingsBreaker(ctx, 'mute music', isMusicMuted(), hoverAction === 'toggle-mute', SET_MUTE_Y, 'rgba(232,53,42,0.28)', UI.danger);
+  settingsBreaker(ctx, 'voice chat', voiceEnabled(), hoverAction === 'toggle-voice', SET_VOICE_Y, 'rgba(57,217,138,0.28)', '#39d98a');
+
+  buttonPlate(ctx, SET_CLOSE_BTN.x, SET_CLOSE_BTN.y, SET_CLOSE_BTN.w, SET_CLOSE_BTN.h, 'CLOSE', UI.steel, hoverAction === 'settings-close');
+}
+
+function hitSettings(u: number, v: number): MenuAction | null {
+  const x = u * SET_W;
+  const y = (1 - v) * SET_H;
+  const inBar = (b: { x: number; y: number; w: number; h: number }): boolean =>
+    x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 10 && y <= b.y + b.h + 10;
+  if (inBar(SFX_BAR)) return 'sfx-vol';
+  if (inBar(MUSIC_BAR)) return 'music-vol';
+  if (y >= SET_MUTE_Y - 4 && y <= SET_MUTE_Y + 40) return 'toggle-mute';
+  if (y >= SET_VOICE_Y - 4 && y <= SET_VOICE_Y + 40) return 'toggle-voice';
+  if (inBar(SET_CLOSE_BTN)) return 'settings-close';
+  return null;
 }
 
 const NEWS_INK = '#241c12'; // sepia newsprint ink
@@ -2755,8 +2889,9 @@ export function createMenu(scene: Scene): Menu {
     cw: GZ,
     ch: GZ,
   });
-  // The music mute button, a twin disc just LEFT of the paper button.
-  const muteBtn = makePanel('mute', 0.16, 0.16, drawMuteButton, hitMuteButton, {
+  // The settings gear, a twin disc just LEFT of the paper button — opens the
+  // audio/voice modal.
+  const gearBtn = makePanel('gear', 0.16, 0.16, drawSettingsButton, hitSettingsButton, {
     cw: GZ,
     ch: GZ,
   });
@@ -2783,6 +2918,8 @@ export function createMenu(scene: Scene): Menu {
     ch: COIN_HUD_H,
   });
   const shop = makePanel('shop', 0.9, 0.9 * (PAN_H / PAN_W), drawShop, hitShop, { cw: PAN_W, ch: PAN_H });
+  // The SETTINGS modal (audio sliders + music mute + voice) — centre modal slot.
+  const settings = makePanel('settings', 0.92, 0.92 * (SET_H / SET_W), drawSettings, hitSettings, { cw: SET_W, ch: SET_H });
 
   // Shallow arc in front of the player, tilted inward toward the centre.
   const y = 1.45;
@@ -2816,10 +2953,10 @@ export function createMenu(scene: Scene): Menu {
   // The paper button sits just above the right (info) panel, sharing its tilt.
   gazetteBtn.mesh.position.set(0.92, 1.86, -1.05);
   gazetteBtn.mesh.rotation.y = -0.48;
-  // The mute button mirrors the coin readout to the LEFT of the paper button,
+  // The settings gear mirrors the coin readout to the LEFT of the paper button,
   // along the same inward-tilted arc (left → a touch further away).
-  muteBtn.mesh.position.set(0.66, 1.86, -1.16);
-  muteBtn.mesh.rotation.y = -0.48;
+  gearBtn.mesh.position.set(0.66, 1.86, -1.16);
+  gearBtn.mesh.rotation.y = -0.48;
   // The passthrough disc hangs above the BATTLE panel (left arc), sharing its
   // outward tilt so it faces you the same way.
   passthroughBtn.mesh.position.set(-0.84, 1.88, -1.05);
@@ -2841,8 +2978,11 @@ export function createMenu(scene: Scene): Menu {
   // The arcade lobby shares the centre modal slot.
   lobby.mesh.position.set(0, 1.5, -1.18);
   lobby.mesh.visible = false;
+  // The settings modal shares the centre modal slot too.
+  settings.mesh.position.set(0, 1.5, -1.16);
+  settings.mesh.visible = false;
 
-  const panels = [train, duel, info, board, custom, balls, gazetteBtn, muteBtn, passthroughBtn, coinHud, shop, news, campaign, lobby];
+  const panels = [train, duel, info, board, custom, balls, gazetteBtn, gearBtn, passthroughBtn, coinHud, shop, news, campaign, lobby, settings];
   for (const p of panels) {
     p.redraw(null);
     group.add(p.mesh);

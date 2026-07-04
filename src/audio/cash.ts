@@ -7,7 +7,7 @@
  */
 
 import cashUrl from '../assets/currency/cash.mp3?url';
-import { audioContext } from './sfx.js';
+import { audioContext, sfxOut } from './sfx.js';
 
 let buffer: AudioBuffer | null = null;
 let loadStarted: Promise<void> | null = null;
@@ -43,6 +43,6 @@ export function playCash(): void {
   src.buffer = buffer;
   const gain = ctx.createGain();
   gain.gain.value = 0.8;
-  src.connect(gain).connect(ctx.destination);
+  src.connect(gain).connect(sfxOut() ?? ctx.destination);
   src.start();
 }

@@ -119,6 +119,9 @@ export const app: {
   infoView: 'root' | 'pubpick';
   /** The Gasket Gazette is open over the lobby (modal, like customisation). */
   gazetteOpen: boolean;
+  /** The SETTINGS panel (audio sliders + music mute + voice toggle) is open
+   *  over the lobby (modal, like the gazette). */
+  settingsOpen: boolean;
   /** The ARCADE campaign line-up (the titan sub-menu) is open over the lobby
    *  (modal, like customisation). Campaign bouts return here, win or lose. */
   campaignOpen: boolean;
@@ -190,6 +193,7 @@ export const app: {
   pubRegionCounts: {},
   infoView: 'root',
   gazetteOpen: false,
+  settingsOpen: false,
   campaignOpen: false,
   campaignStage: 0,
   campaignMode: 'single',

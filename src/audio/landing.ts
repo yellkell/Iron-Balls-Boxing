@@ -9,7 +9,7 @@
  * context is unlocked.
  */
 
-import { audioContext } from './sfx.js';
+import { audioContext, sfxOut } from './sfx.js';
 
 // Every landing clip, bundled by Vite (filename order keeps it stable).
 const landingUrls = Object.entries(
@@ -61,6 +61,6 @@ export function playLanding(): void {
   src.buffer = buffer;
   const gain = ctx.createGain();
   gain.gain.value = 0.85;
-  src.connect(gain).connect(ctx.destination);
+  src.connect(gain).connect(sfxOut() ?? ctx.destination);
   src.start();
 }

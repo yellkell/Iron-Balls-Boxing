@@ -10,7 +10,27 @@
  * play fine.
  */
 
-type Ctx = AudioContext & { _master?: GainNode };
+// Two gain stages: the synth SFX sit under `_master` (0.28, the quiet mix bus);
+// `_sfxOut` sits ABOVE it as the user's master SFX-volume fader, and the sampled
+// clips (cash / announcer / landing, which ride louder than the synth mix) plug
+// straight into `_sfxOut` too — so one knob scales EVERY sound while keeping the
+// relative balance.
+type Ctx = AudioContext & { _master?: GainNode; _sfxOut?: GainNode };
+
+const SFX_VOL_KEY = 'ff-sfx-vol';
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+let sfxVol = ((): number => {
+  try {
+    const n = parseFloat(localStorage.getItem(SFX_VOL_KEY) ?? '');
+    return Number.isFinite(n) ? clamp01(n) : 1;
+  } catch {
+    return 1;
+  }
+})();
 
 let ctx: Ctx | null = null;
 
@@ -20,12 +40,40 @@ function getCtx(): Ctx | null {
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return null;
     ctx = new AC() as Ctx;
+    // User master fader → speakers.
+    const sfxOut = ctx.createGain();
+    sfxOut.gain.value = sfxVol;
+    sfxOut.connect(ctx.destination);
+    ctx._sfxOut = sfxOut;
+    // Quiet synth mix bus → the fader.
     const master = ctx.createGain();
     master.gain.value = 0.28;
-    master.connect(ctx.destination);
+    master.connect(sfxOut);
     ctx._master = master;
   }
   return ctx;
+}
+
+/** The user master SFX bus — sampled clips (cash/announcer/landing) connect
+ *  here instead of the raw destination so they ride the SFX-volume fader too. */
+export function sfxOut(): GainNode | null {
+  return getCtx()?._sfxOut ?? null;
+}
+
+/** Current master SFX volume, 0..1 (1 = full). */
+export function sfxVolume(): number {
+  return sfxVol;
+}
+
+/** Set + persist the master SFX volume; live-updates the running bus. */
+export function setSfxVolume(v: number): void {
+  sfxVol = clamp01(v);
+  try {
+    localStorage.setItem(SFX_VOL_KEY, sfxVol.toFixed(3));
+  } catch {
+    /* private mode — the choice just won't persist */
+  }
+  if (ctx?._sfxOut) ctx._sfxOut.gain.value = sfxVol;
 }
 
 function unlock(): void {

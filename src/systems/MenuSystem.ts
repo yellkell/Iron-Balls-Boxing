@@ -31,6 +31,8 @@ import {
   accentBarLight,
   clearProfileKeyboardHint,
   colorBarHue,
+  musicVolFromU,
+  sfxVolFromU,
   colorBarLight,
   createActionPanel,
   createMenu,
@@ -61,6 +63,7 @@ import {
 import { canAfford, coins, spendCoins } from '../menu/wallet.js';
 import { playCash, preloadCash } from '../audio/cash.js';
 import { setMenuMusicActive, toggleMusicMuted } from '../audio/menuMusic.js';
+import { setMusicVolume } from '../audio/musicVolume.js';
 import { handoffToLobby } from '../audio/battleMusic.js';
 import { startLobbyWatch, stopLobbyWatch } from '../net/lobbyWatch.js';
 import { setVoiceEnabled, voiceEnabled } from '../audio/voicePref.js';
@@ -259,6 +262,7 @@ export class MenuSystem extends createSystem({}) {
     const modalNews = app.gazetteOpen;
     const modalCampaign = app.campaignOpen;
     const modalLobby = app.lobbyMode !== null;
+    const modalSettings = app.settingsOpen;
     let visChanged = this.rayTargets.length === 0; // first frame: build the list
     for (const p of this.menu.panels) {
       let show: boolean;
@@ -282,10 +286,13 @@ export class MenuSystem extends createSystem({}) {
         case 'lobby':
           show = modalLobby;
           break;
+        case 'settings':
+          show = modalSettings;
+          break;
         default:
           // The arc (train/duel/info), the paper button AND the coin readout:
           // the lobby's face, gone while any modal is open.
-          show = !customization.open && !modalNews && !modalCampaign && !modalLobby;
+          show = !customization.open && !modalNews && !modalCampaign && !modalLobby && !modalSettings;
           break;
       }
       if (p.mesh.visible !== show) {
@@ -362,6 +369,17 @@ export class MenuSystem extends createSystem({}) {
         if (down) this.sliderGrab = { hand, panel: panel.id };
         app.accentLight = accentBarLight(hit.uv.x);
         saveAccentLight();
+      } else if (hit.uv && action === 'sfx-vol' && (down || owns)) {
+        if (down) {
+          this.sliderGrab = { hand, panel: panel.id };
+          sfx.uiClick(); // a tick at the new level so the scrub is audible
+        }
+        sfx.setSfxVolume(sfxVolFromU(hit.uv.x)); // scrub the SFX volume live
+        dragged = true;
+      } else if (hit.uv && action === 'music-vol' && (down || owns)) {
+        if (down) this.sliderGrab = { hand, panel: panel.id };
+        setMusicVolume(musicVolFromU(hit.uv.x)); // scrub the music volume live
+        dragged = true;
       } else if (hit.uv && down) {
         if (panel.click) {
           if (panel.click(hit.uv.x, hit.uv.y)) clicked = true;
@@ -563,7 +581,9 @@ export class MenuSystem extends createSystem({}) {
         saveOnlyBots();
         break;
       case 'toggle-voice':
+        // Lives in the settings modal now — flip it and repaint that breaker.
         setVoiceEnabled(!voiceEnabled());
+        this.menu.panels.find((p) => p.id === 'settings')?.redraw(null);
         break;
       case 'ranked-match':
         if (app.onlyBots) break; // disabled — no online play in only-bots mode
@@ -733,10 +753,18 @@ export class MenuSystem extends createSystem({}) {
       case 'gazette-close':
         app.gazetteOpen = false;
         break;
+      case 'open-settings':
+        app.settingsOpen = true;
+        break;
+      case 'settings-close':
+        app.settingsOpen = false;
+        // Repaint the gear disc so its muted-pip reflects any change made inside.
+        this.menu.panels.find((p) => p.id === 'gear')?.redraw(null);
+        break;
       case 'toggle-mute':
-        // Flip the lobby music (persisted) and repaint the disc's glyph.
+        // Flip the music mute (persisted) and repaint the settings breaker.
         toggleMusicMuted();
-        this.menu.panels.find((p) => p.id === 'mute')?.redraw(null);
+        this.menu.panels.find((p) => p.id === 'settings')?.redraw(null);
         break;
       case 'open-pub':
         // Don't navigate yet — open the EU/USA region picker first.

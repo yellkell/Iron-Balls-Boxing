@@ -11,6 +11,7 @@
  */
 
 import { fadeInMenuMusic, isMusicMuted, noteInLobby } from './menuMusic.js';
+import { musicVolume } from './musicVolume.js';
 import victoryUrl from '../assets/music/victory.mp3?url';
 import brainEaterUrl from '../assets/music/brain-eater.mp3?url';
 
@@ -63,7 +64,7 @@ export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
   victory?.pause();
   if (isMusicMuted() || battleUrls.length === 0) return;
   if (battle && !battle.paused) {
-    battle.volume = volume; // already scoring this bout — just match the level
+    battle.volume = volume * musicVolume(); // already scoring — just match the level
     return;
   }
   const url = battleUrls[Math.floor(Math.random() * battleUrls.length)];
@@ -72,7 +73,7 @@ export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
     battle.loop = true;
   }
   if (battle.src !== url) battle.src = url;
-  battle.volume = volume;
+  battle.volume = volume * musicVolume();
   battle.currentTime = 0;
   void battle.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */
@@ -99,7 +100,7 @@ export function startFinaleTrack(): void {
     finale = new Audio(brainEaterUrl);
     finale.loop = true;
   }
-  finale.volume = BOSS_BATTLE_VOLUME;
+  finale.volume = BOSS_BATTLE_VOLUME * musicVolume();
   finale.currentTime = 0;
   void finale.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */
@@ -113,7 +114,7 @@ export function playVictory(): void {
   if (isMusicMuted()) return;
   if (!victory) victory = new Audio(victoryUrl);
   victory.onended = null;
-  victory.volume = VICTORY_VOLUME;
+  victory.volume = VICTORY_VOLUME * musicVolume();
   victory.currentTime = 0;
   void victory.play().catch(() => {
     /* blocked or decode failed — no sting */
@@ -148,7 +149,7 @@ export function handoffToLobby(): void {
     handoffActive = false;
     v.onended = null;
     v.pause();
-    v.volume = VICTORY_VOLUME; // reset for next time
+    v.volume = VICTORY_VOLUME * musicVolume(); // reset for next time
     timers.push(window.setTimeout(() => fadeInMenuMusic(), VICTORY_PAUSE_MS));
   };
 

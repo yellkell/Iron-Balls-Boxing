@@ -8,6 +8,7 @@
  */
 
 import { isMusicMuted } from './menuMusic.js';
+import { musicVolume } from './musicVolume.js';
 import aimUrl from '../assets/music/aim.m4a?url';
 
 const VOLUME = 0.4;
@@ -21,7 +22,7 @@ export function startTrainingMusic(): void {
     audio = new Audio(aimUrl);
     audio.loop = true;
   }
-  audio.volume = VOLUME;
+  audio.volume = VOLUME * musicVolume();
   audio.currentTime = 0;
   void audio.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */
