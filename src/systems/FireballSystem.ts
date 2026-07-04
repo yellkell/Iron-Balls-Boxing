@@ -162,11 +162,15 @@ export class FireballSystem extends createSystem({
    */
   private netBlend = new Map<Entity, Vector3>();
 
-  /** Route an outgoing net event: the classic duel uses the 1v1 client; arcade
-   *  bouts broadcast over the mesh. Both no-op outside a live net bout. */
+  /** Route an outgoing net event: the classic duel uses the 1v1 client; every
+   *  other mesh bout broadcasts over the mesh. Gating on `mesh.joined` (not
+   *  `app.mode === 'net'`) is what lets RAID throws/recalls reach teammates —
+   *  a raid runs in `app.mode === 'campaign'`, so the old check silently
+   *  dropped every squad member's fire and left their balls glued to their
+   *  fists. Both transports no-op outside a live bout. */
   private sendNet(msg: PeerMessage): void {
     if (app.arcade === '1v1') net.send(msg);
-    else if (app.mode === 'net') mesh.send(msg);
+    else if (mesh.joined) mesh.send(msg);
   }
 
   init(): void {
