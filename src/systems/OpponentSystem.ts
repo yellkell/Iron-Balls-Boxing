@@ -144,7 +144,7 @@ export class OpponentSystem extends createSystem({
       for (const hand of [0, 1] as const) {
         r.rig.gloves[hand].position.copy(pose.handPos[hand]);
         r.rig.gloves[hand].quaternion.copy(pose.handQuat[hand]).multiply(HAND_ADDUCTION[hand]);
-        const lit = !dead && (pose.orbiting[hand] || this.ballReturning(slot, hand));
+        const lit = !dead && (pose.orbiting[hand] || pose.blocking[hand] || this.ballReturning(slot, hand));
         const fisting = !dead && pose.fisting[hand];
         setGloveLit(r.rig.gloves[hand], lit, delta);
         setHandCurl(

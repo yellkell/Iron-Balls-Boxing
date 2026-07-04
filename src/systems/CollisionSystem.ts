@@ -24,6 +24,7 @@ import { Health } from '../components/Health.js';
 import { Combatant } from '../components/Combatant.js';
 import { fighterTeam } from '../combat/fighters.js';
 import { localLayout } from '../combat/layout.js';
+import { MAX_OPPONENTS, opponents } from '../combat/opponentBus.js';
 import { mesh } from '../net/mesh.js';
 import { TargetState, TrainingTarget } from '../components/TrainingTarget.js';
 import { spawnDamagePopup, spawnFireImpact } from '../fx/effects.js';
@@ -121,7 +122,9 @@ export class CollisionSystem extends createSystem({
         if (owner === 0) this.resolveLocalHit(ball, owner, ownerTeam, hitboxes, radius, damage, returning);
       } else {
         // Bot bouts (incl. arcade 2v2/FFA): one local sim is authoritative for
-        // every fighter — resolve this ball against any enemy-team body.
+        // every fighter — a raised bot GUARD can slap the ball down first,
+        // otherwise resolve it against any enemy-team body.
+        if (this.tryBotGuard(ball, ownerTeam, radius, returning)) continue;
         this.resolveLocalHit(ball, owner, ownerTeam, hitboxes, radius, damage, returning);
       }
     }
@@ -279,6 +282,34 @@ export class CollisionSystem extends createSystem({
       else this.spendBall(ball);
       return;
     }
+  }
+
+  /**
+   * A BOT's raised guard — the mirror of your parry. BotSystem sometimes
+   * answers an incoming ball by planting a lit glove on its line
+   * (pose.blocking); a ball that meets that glove is slapped down instead of
+   * landing. Bot bouts only: remote humans rule their own defence, and their
+   * poses never set `blocking`.
+   */
+  private tryBotGuard(ball: Entity, ownerTeam: number, radius: number, returning: boolean): boolean {
+    const roster = localLayout();
+    for (let i = 0; i < MAX_OPPONENTS; i++) {
+      const pose = opponents[i];
+      if (!pose.active || (!pose.blocking[0] && !pose.blocking[1])) continue;
+      if ((roster[i + 1]?.team ?? ownerTeam) === ownerTeam) continue; // same side — not their problem
+      for (const hand of [0, 1] as const) {
+        if (!pose.blocking[hand]) continue;
+        const reach = radius + FIREBALL.radius + FIREBALL.deflectBonus;
+        if (pointSegDistSq(pose.handPos[hand], _ballPrev, _ballPos) > reach * reach) continue;
+        emberBurst(_ballPos, 18, true);
+        spawnFireImpact(this.world, _ballPos, 1);
+        sfx.deflect();
+        if (returning) ball.setValue(Fireball, 'returnHit', 1);
+        else this.spendBall(ball);
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Enemy ball vs my orbiting/returning balls → slapped out of the air. */

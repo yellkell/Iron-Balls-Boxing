@@ -229,15 +229,25 @@ export const BOT = {
   padHalfWidth: 0.7, // lateral roaming range on its pad
   moveSpeed: 1.5, // m/s strafe
   duckSpeed: 2.0, // m/s vertical bob
-  reactDistance: 1.5, // dodges your ball inside this range
-  throwInterval: 2.3, // seconds between throws (alternates hands)
+  reactDistance: 1.6, // reacts to your ball inside this range (dodge OR block)
+  throwInterval: 2.05, // seconds between throws (alternates hands)
   windup: 0.7, // orbit/wind-up time before the ball leaves
-  throwSpeed: 4.4, // a touch slower than yours → readable and dodgeable
+  throwSpeed: 4.65, // a touch slower than yours → readable and dodgeable
   damage: 20, // every landed hit is 20, theirs included
-  aimError: 0.16, // metres of aim slop at the target
+  aimError: 0.13, // metres of aim slop at the target
   recallDelay: 1.4, // seconds after a throw before it recalls the ball
   headPitchMax: 0.32, // radians the head tilts up/down to track you — no owl-necking
   headTurnSpeed: 8, // how fast the head eases toward facing you
+
+  // --- defence: an incoming ball triggers ONE decision per approach ---
+  blockChance: 0.35, // odds it raises a guard instead of dodging
+  blockHold: 0.55, // seconds the guard hand stays up
+  blockReach: 0.5, // how far ahead of the head the guard hand plants
+  decideEvery: 0.7, // seconds between threat decisions (one per approach)
+
+  // --- offence: throws mix up their target ---
+  lowAimChance: 0.45, // odds a throw hunts the LOWER BODY instead of the head
+  lowAimDrop: 0.62, // metres below the head a low throw aims (the pelvis line)
 };
 
 /**

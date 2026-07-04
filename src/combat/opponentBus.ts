@@ -26,6 +26,10 @@ export interface OpponentPose {
   /** Their trigger-held flags — drives the orbit visual on their balls. */
   orbiting: [boolean, boolean];
   fisting: [boolean, boolean];
+  /** A raised GUARD per hand (bots only): the glove lights and an incoming
+   *  ball that meets it is slapped down (CollisionSystem's bot guard). Remote
+   *  humans never set this — their defence is the real parry on their sim. */
+  blocking: [boolean, boolean];
   /**
    * Their chosen avatar-accent hue (0..1), from their pose packets. -1 until a
    * packet arrives (or in bot bouts) → OpponentSystem keeps the team colour.
@@ -47,6 +51,7 @@ function makePose(): OpponentPose {
     handQuat: [new Quaternion(), new Quaternion()],
     orbiting: [false, false],
     fisting: [false, false],
+    blocking: [false, false],
     accentHue: -1,
     accentLight: 0.5,
   };

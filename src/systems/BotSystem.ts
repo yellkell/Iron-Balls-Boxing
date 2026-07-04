@@ -50,6 +50,11 @@ class Bot {
   windup = -1; // <0 idle, else counts down to release
   recallTimers: [number, number] = [-1, -1];
   guardPhase = 0;
+  // Defence: ONE dodge-or-block decision per ball approach (see move()).
+  decideTimer = 0; // cooldown between threat decisions
+  blockTimer = 0; // >0 → the guard hand is up
+  blockHand: 0 | 1 = 0;
+  blockAt = new Vector3(); // where the threatening ball was last seen
   constructor(public readonly slot: number) {
     this.throwTimer = BOT.throwInterval * (0.7 + Math.random() * 0.8); // stagger the fire
   }
@@ -83,6 +88,7 @@ export class BotSystem extends createSystem({
       // Knocked out: stop throwing/moving and go cold until the round resets.
       if (this.dead(slot)) {
         pose.orbiting[0] = pose.orbiting[1] = false;
+        pose.blocking[0] = pose.blocking[1] = false;
         continue;
       }
       const bot = (this.bots[i] ??= new Bot(slot));
@@ -146,7 +152,11 @@ export class BotSystem extends createSystem({
       bot.moveTimer = Math.random() < 0.3 ? 0.35 + Math.random() * 0.5 : 0.9 + Math.random() * 1.1;
     }
 
-    // Reactive dodge: an enemy ball flying near the bot pushes it aside.
+    // Reactive defence: an enemy ball flying in close forces ONE decision per
+    // approach — usually the old sidestep-and-duck, sometimes a raised GUARD
+    // (the glove lights and CollisionSystem slaps the ball down on contact).
+    bot.decideTimer = Math.max(0, bot.decideTimer - delta);
+    bot.blockTimer = Math.max(0, bot.blockTimer - delta);
     _botHead.set(padX + bot.x, bot.y, padZ + bot.z);
     for (const ball of this.queries.balls.entities) {
       if ((ball.getValue(Fireball, 'state') ?? 0) !== BallState.Flying) continue;
@@ -154,13 +164,27 @@ export class BotSystem extends createSystem({
       const obj = ball.object3D;
       if (!obj) continue;
       obj.getWorldPosition(_ballPos);
-      if (_ballPos.distanceTo(_botHead) < BOT.reactDistance) {
-        const away = Math.sign(bot.x - (_ballPos.x - padX)) || (Math.random() < 0.5 ? -1 : 1);
-        bot.targetX = clamp(bot.x + away * 0.6, -BOT.padHalfWidth, BOT.padHalfWidth);
-        bot.targetY = _ballPos.y > bot.y - 0.15 ? BOT.headYMin : BOT.headYMax;
-        bot.targetZ = -0.5;
-        break;
+      if (_ballPos.distanceTo(_botHead) >= BOT.reactDistance) continue;
+
+      if (bot.blockTimer > 0) {
+        bot.blockAt.copy(_ballPos); // keep the raised guard tracking the ball
+      } else if (bot.decideTimer <= 0) {
+        bot.decideTimer = BOT.decideEvery;
+        if (Math.random() < BOT.blockChance) {
+          // BLOCK: plant the free hand between head and ball, hold it up.
+          bot.blockTimer = BOT.blockHold;
+          bot.blockAt.copy(_ballPos);
+          const near: 0 | 1 = _ballPos.x - padX < bot.x ? 0 : 1;
+          bot.blockHand = bot.windup >= 0 && bot.windupHand === near ? ((1 - near) as 0 | 1) : near;
+        } else {
+          // DODGE: the old sidestep + duck/stand.
+          const away = Math.sign(bot.x - (_ballPos.x - padX)) || (Math.random() < 0.5 ? -1 : 1);
+          bot.targetX = clamp(bot.x + away * 0.6, -BOT.padHalfWidth, BOT.padHalfWidth);
+          bot.targetY = _ballPos.y > bot.y - 0.15 ? BOT.headYMin : BOT.headYMax;
+          bot.targetZ = -0.5;
+        }
       }
+      break;
     }
 
     const stepX = BOT.moveSpeed * delta;
@@ -201,14 +225,26 @@ export class BotSystem extends createSystem({
       const side = hand === 0 ? -1 : 1;
       const bob = Math.sin(bot.guardPhase * 2.4 + hand * 1.7) * 0.02;
       const winding = bot.windup >= 0 && bot.windupHand === hand;
-      const gy = bot.y - (winding ? 0.05 : 0.18) + bob;
-      _tmp
-        .set(_botHead.x, gy, _botHead.z)
-        .addScaledVector(_right, side * (winding ? 0.34 : 0.22))
-        .addScaledVector(_fwd, winding ? -0.16 : 0.18); // wind back, guard forward
-      pose.handPos[hand].lerp(_tmp, Math.min(1, delta * 9));
+      const blocking = bot.blockTimer > 0 && bot.blockHand === hand && !winding;
+      if (blocking) {
+        // The GUARD: snap this hand onto the line between head and the
+        // incoming ball, a forearm's reach out — the lit glove is the shield.
+        _tmp.copy(bot.blockAt).sub(_botHead);
+        if (_tmp.lengthSq() < 1e-6) _tmp.copy(_fwd);
+        _tmp.normalize();
+        _tmp.multiplyScalar(BOT.blockReach).add(_botHead);
+        pose.handPos[hand].lerp(_tmp, Math.min(1, delta * 16)); // snappier than the guard sway
+      } else {
+        const gy = bot.y - (winding ? 0.05 : 0.18) + bob;
+        _tmp
+          .set(_botHead.x, gy, _botHead.z)
+          .addScaledVector(_right, side * (winding ? 0.34 : 0.22))
+          .addScaledVector(_fwd, winding ? -0.16 : 0.18); // wind back, guard forward
+        pose.handPos[hand].lerp(_tmp, Math.min(1, delta * 9));
+      }
       pose.handQuat[hand].copy(pose.headQuat);
       pose.fisting[hand] = false;
+      pose.blocking[hand] = blocking;
     }
   }
 
@@ -243,7 +279,9 @@ export class BotSystem extends createSystem({
     pose.orbiting[hand] = false;
 
     _aim.copy(target);
-    _aim.y -= 0.15; // bias to the chest
+    // Mix the target: most throws hunt the HEAD (aim true at it), the rest
+    // dip for the LOWER BODY — duck the high ones, jump/step the low ones.
+    _aim.y -= Math.random() < BOT.lowAimChance ? BOT.lowAimDrop : 0;
     _aim.x += (Math.random() - 0.5) * 2 * BOT.aimError;
     _aim.y += (Math.random() - 0.5) * 2 * BOT.aimError;
 
