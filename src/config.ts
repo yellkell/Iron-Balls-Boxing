@@ -301,6 +301,10 @@ export const CAMPAIGN = {
   // reads as "under the platform" and the warning goes unseen.
   decalY: 0.05,
   slamRadius: 0.32, // tight discs — a slam threatens a spot, not half the pad
+  /** Ceiling on the slam disc no matter how big the titan grows — the last
+   *  two bosses (and every raid giant) were dropping discs that swallowed
+   *  the platform; past this size a slam stops being dodgeable. */
+  slamRadiusMax: 0.36,
   slamImpactDelay: 0.14, // a breath of extra hang before the fist lands — a fairer dodge
   beamHalfWidth: 0.22,
   sweepThickness: 0.19, // half-height of the horizontal blade slice
@@ -342,6 +346,10 @@ export const RAID = {
    *  out (RAID_RING_RADIUS), so this keeps the flight time near the solo
    *  ~one-second beat instead of a lazy lob. */
   volleySpeedMult: 1.5,
+  /** Weak-point spheres grow this much in a raid. The titan squares up to
+   *  its CURRENT target, so a side seat plays the whole fight at an angle —
+   *  the extra bulge is what keeps their hits landing past the armour. */
+  weakMult: 1.25,
   /** Boss health multiplier — "more than 4x": four raiders, and then some. */
   healthMult: 4.6,
   /**
@@ -371,7 +379,7 @@ export const RAID = {
    *  platform at once around one shared canonical bearing, so the whole squad
    *  must rotate to the same compass point together. */
   decreeWeight: 4, // vs his other attacks once it unlocks
-  decreeCharge: 2.4, // seconds — the longest windup in the game
+  decreeCharge: 2.9, // seconds — the longest windup in the game
   /** THE RESURRECTION (raid GOLIATH only) — beats in seconds:
    *  fallen still → a shake → he rises over `riseTime` while his health bar
    *  refills, timed so the fight resumes ON the drop of the bespoke track. */

@@ -1248,7 +1248,10 @@ export class CampaignSystem extends createSystem({
         markers.push(null);
       }
     } else if (kind === 'slam') {
-      const r = CAMPAIGN.slamRadius + this.def.scale * 0.02;
+      // Disc grows with the titan but CAPS at slamRadiusMax — JUGGERNAUT and
+      // GOLIATH (and every raid giant) otherwise drop discs that swallow the
+      // platform and stop being honestly dodgeable.
+      const r = Math.min(CAMPAIGN.slamRadius + this.def.scale * 0.02, CAMPAIGN.slamRadiusMax);
       // The drumline shortens as the target list grows — four platforms of
       // three-disc marches each would read as noise, not rhythm.
       const count =
@@ -1395,8 +1398,12 @@ export class CampaignSystem extends createSystem({
   private makeHammerMarker(x: number, z: number, seat: number): Group {
     const s = this.def.scale;
     const g = new Group();
+    // The ghost box is CAPPED like the disc it marks — a raid giant would
+    // otherwise hang a near-metre block over the pad, reading as a wall you
+    // can't possibly step clear of when the true kill zone is far tighter.
+    const side = Math.min(0.24 * s, 0.62);
     const block = new Mesh(
-      new BoxGeometry(0.24 * s, 0.2 * s, 0.24 * s),
+      new BoxGeometry(side, side * 0.83, side),
       new MeshBasicMaterial({
         color: this.def.accent,
         transparent: true,
@@ -1406,7 +1413,7 @@ export class CampaignSystem extends createSystem({
       }),
     );
     g.add(block);
-    const halo = glowSprite(this.def.accent, 0.5 * s);
+    const halo = glowSprite(this.def.accent, Math.min(0.5 * s, 1.3));
     halo.position.y = -0.05 * s;
     g.add(halo);
     this.seatPoint(seat, x, 0, z, _v);
@@ -2025,17 +2032,23 @@ export class CampaignSystem extends createSystem({
 
   private sizeHitboxes(): void {
     const s = this.def.scale;
-    // Armour spheres hug the VISIBLE chassis (the trunk is only ~0.3·s
+    // The armour sphere hugs the VISIBLE chassis (the trunk is only ~0.3·s
     // wide) — an inflated armour sphere used to eat balls out of the air
     // before they could ever reach the core, which made the "hit the core"
-    // prompt a lie. Weak points sit proud of the plate.
+    // prompt a lie. The WEAK POINTS are the opposite: fat, BULBOUS spheres
+    // that stand proud of the plate from any bearing, not just dead ahead.
+    // CollisionSystem awards the best overlapping hitbox by damageScale, so
+    // a lit weak point always beats the armour it bulges out of. Raids grow
+    // them further still (weakMult): the titan squares up to its current
+    // target, so a side seat plays the whole fight at an angle.
+    const w = this.raid() ? RAID.weakMult : 1;
     this.boxes.body?.setValue(Hitbox, 'radius', 0.32 * s);
-    this.boxes.pelvis?.setValue(Hitbox, 'radius', 0.2 * s);
-    this.boxes.head?.setValue(Hitbox, 'radius', 0.24 * s);
-    this.boxes.core?.setValue(Hitbox, 'radius', 0.22 * s);
-    this.boxes.shoulderL?.setValue(Hitbox, 'radius', 0.18 * s);
-    this.boxes.shoulderR?.setValue(Hitbox, 'radius', 0.18 * s);
-    for (const pod of this.boxes.pods) pod.setValue(Hitbox, 'radius', 0.15 * s);
+    this.boxes.pelvis?.setValue(Hitbox, 'radius', 0.25 * s * w);
+    this.boxes.head?.setValue(Hitbox, 'radius', 0.28 * s * w);
+    this.boxes.core?.setValue(Hitbox, 'radius', 0.28 * s * w);
+    this.boxes.shoulderL?.setValue(Hitbox, 'radius', 0.23 * s * w);
+    this.boxes.shoulderR?.setValue(Hitbox, 'radius', 0.23 * s * w);
+    for (const pod of this.boxes.pods) pod.setValue(Hitbox, 'radius', 0.19 * s * w);
   }
 
   /** Glue the spheres to the rig and apply the head↔core cycle every frame. */

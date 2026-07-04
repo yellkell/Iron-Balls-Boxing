@@ -203,7 +203,9 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.8,
     cooldownMin: 1.35,
     cooldownMax: 2.1,
-    charge: { slam: 1.15, sweep: 1.35, beam: 1.2, volley: 1.8, nova: 2.1 },
+    // nova carries an extra half-second of windup — rotating a whole squad
+    // to one safe wedge needs more read time than a single dodge.
+    charge: { slam: 1.15, sweep: 1.35, beam: 1.2, volley: 1.8, nova: 2.6 },
     weights: { slam: 3, sweep: 3, beam: 3, volley: 3, nova: 4 },
     volleyCount: 4,
     beams: 2,
