@@ -37,6 +37,7 @@ import { app, saveStats, training } from '../menu/appState.js';
 import { reportTraining } from '../net/leaderboard.js';
 import { emberBurst } from '../fx/fire.js';
 import * as sfx from '../audio/sfx.js';
+import { startTrainingMusic, stopTrainingMusic } from '../audio/trainingMusic.js';
 import { ARENA_GAP, FIREBALL, PALETTE, TRAINING } from '../config.js';
 
 const _pos = new Vector3();
@@ -203,11 +204,13 @@ export class TrainingSystem extends createSystem({
     match.resetCount += 1; // park the fireballs at your fists
     match.message = '';
     sfx.roundBell();
+    startTrainingMusic(); // loops for the whole session
   }
 
   private teardown(finished: boolean): void {
     this.wasTraining = false;
     training.active = false;
+    stopTrainingMusic(); // the lobby music fades back up on the way out
     for (const t of [...this.queries.targets.entities]) this.despawn(t);
     if (finished) {
       training.lastScore = training.score;
