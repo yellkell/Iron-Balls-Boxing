@@ -203,6 +203,13 @@ export class CollisionSystem extends createSystem({
     let bestScale = -1;
     for (const hitbox of hitboxes) {
       if ((hitbox.getValue(Hitbox, 'team') ?? 0) === ownerTeam) continue; // same team — no friendly fire
+      const scale = hitbox.getValue(Hitbox, 'damageScale') ?? 1;
+      // PASS-THROUGH: a negative scale means "not solid right now" — the titan's
+      // armour and its UNLIT weak-point spheres go negative while some OTHER
+      // weak point is flashing, so a throw aimed at the lit spot sails through
+      // the chest cluster instead of being eaten by it. The ball is neither
+      // consumed nor sparked; it flies on toward the live target (or past).
+      if (scale < 0) continue;
       const hbObj = hitbox.object3D;
       if (!hbObj) continue;
       hbObj.getWorldPosition(_otherPos);
@@ -210,7 +217,6 @@ export class CollisionSystem extends createSystem({
       if (_ballPos.distanceToSquared(_otherPos) > reach * reach) continue;
       const victim = (hitbox.getValue(Hitbox, 'owner') as Entity | null) ?? hitbox;
       if ((victim.getValue(Health, 'current') ?? 1) <= 0) continue; // already down
-      const scale = hitbox.getValue(Hitbox, 'damageScale') ?? 1;
       if (scale > bestScale) {
         bestScale = scale;
         best = hitbox;

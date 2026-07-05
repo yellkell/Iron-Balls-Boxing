@@ -2062,38 +2062,47 @@ export class CampaignSystem extends createSystem({
     const s = this.def.scale;
     const root = rig.root.position;
     const lit = this.litPoints();
+    const volleying = this.attack?.kind === 'volley' && this.def.weakPattern !== 'crown';
+
+    // While ANYTHING is flashing, the armour + every UNLIT sphere go PASS-THROUGH
+    // (−1, ignored by CollisionSystem) instead of solid armour (0). Otherwise the
+    // cluster of scale-0 spheres around the chest ate throws aimed at the lit
+    // spot above them — you'd throw at the flashing head and the chest plate
+    // would eat the ball. With NOTHING lit they stay solid (0), so a mistimed
+    // throw at an invulnerable titan still clanks off and is spent.
+    const anyLit = lit.length > 0 || volleying;
+    const off = anyLit ? -1 : 0;
 
     rig.head.getWorldPosition(_v);
     this.boxes.head?.object3D?.position.copy(_v);
-    this.boxes.head?.setValue(Hitbox, 'damageScale', lit.includes('head') ? CAMPAIGN.headScale : 0);
+    this.boxes.head?.setValue(Hitbox, 'damageScale', lit.includes('head') ? CAMPAIGN.headScale : off);
 
     rig.core.getWorldPosition(_v);
     this.boxes.core?.object3D?.position.copy(_v);
-    this.boxes.core?.setValue(Hitbox, 'damageScale', lit.includes('core') ? CAMPAIGN.coreScale : 0);
+    this.boxes.core?.setValue(Hitbox, 'damageScale', lit.includes('core') ? CAMPAIGN.coreScale : off);
 
     this.boxes.body?.object3D?.position.set(root.x, root.y + 1.05 * s, root.z);
-    this.boxes.body?.setValue(Hitbox, 'damageScale', 0);
+    this.boxes.body?.setValue(Hitbox, 'damageScale', off);
     // The pelvis sphere doubles as the LOW-BLOW target when the pattern
     // calls it; otherwise it's armour like the trunk.
     rig.low.getWorldPosition(_v);
     this.boxes.pelvis?.object3D?.position.copy(_v);
-    this.boxes.pelvis?.setValue(Hitbox, 'damageScale', lit.includes('low') ? CAMPAIGN.lowScale : 0);
+    this.boxes.pelvis?.setValue(Hitbox, 'damageScale', lit.includes('low') ? CAMPAIGN.lowScale : off);
 
     // Shoulder emblems — the crown circuit's ring stops.
     rig.shoulders[0].getWorldPosition(_v);
     this.boxes.shoulderL?.object3D?.position.copy(_v);
-    this.boxes.shoulderL?.setValue(Hitbox, 'damageScale', lit.includes('shoulderL') ? CAMPAIGN.podScale : 0);
+    this.boxes.shoulderL?.setValue(Hitbox, 'damageScale', lit.includes('shoulderL') ? CAMPAIGN.podScale : off);
     rig.shoulders[1].getWorldPosition(_v);
     this.boxes.shoulderR?.object3D?.position.copy(_v);
-    this.boxes.shoulderR?.setValue(Hitbox, 'damageScale', lit.includes('shoulderR') ? CAMPAIGN.podScale : 0);
+    this.boxes.shoulderR?.setValue(Hitbox, 'damageScale', lit.includes('shoulderR') ? CAMPAIGN.podScale : off);
 
     // Pods pay bonus during a volley — except on the crown, where stray pod
     // hits would skip ring stops out of order.
-    const volleying = this.attack?.kind === 'volley' && this.def.weakPattern !== 'crown';
     this.boxes.pods.forEach((pod, i) => {
       const side = i === 0 ? -1 : 1;
       pod.object3D?.position.set(root.x + side * 0.37 * s, root.y + 1.44 * s, root.z);
-      pod.setValue(Hitbox, 'damageScale', volleying ? CAMPAIGN.podScale : 0);
+      pod.setValue(Hitbox, 'damageScale', volleying ? CAMPAIGN.podScale : off);
     });
 
     // Aim assist rides the live point (crown: whichever ring stop blinks).
