@@ -25,6 +25,9 @@ for (const [path, url] of Object.entries(modules)) {
 function keyFor(message: string): string | null {
   if (message === '1' || message === '2' || message === '3') return message;
   if (message === 'FIGHT') return 'fight';
+  // The pub fight hall reuses this set and adds an OPEN plate (open.png) for a
+  // ring that's waiting for challengers — the main game never asks for it.
+  if (message === 'OPEN') return 'open';
   return null;
 }
 

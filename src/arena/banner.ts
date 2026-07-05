@@ -6,6 +6,7 @@
 
 import {
   CanvasTexture,
+  Group,
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
@@ -15,6 +16,7 @@ import {
   type Scene,
 } from 'three';
 import { ARENA_GAP } from '../config.js';
+import { glowTexture } from '../materials/glow.js';
 import { UI, hazardStrip, plate, stencilFont } from '../ui/industrial.js';
 
 const W = 1024;
@@ -65,6 +67,28 @@ export function createTitleBanner(scene: Scene): Mesh {
   banner.name = 'title-banner';
   banner.position.set(0, 3.2, -ARENA_GAP - 1.2);
   scene.add(banner);
+
+  // An ACTIVE red glow behind the neon sign — a soft translucent red field that
+  // breathes (MenuSystem pulses its opacity/scale while the banner is up). Two
+  // stacked radials: a wide haze + a hotter core. Normal (not additive) blend so
+  // it READS on any backdrop — a bright desert sunset OR a dark AR room — as a
+  // pool of red the neon script sits in (the banner PNG is mostly transparent).
+  const glow = new Group();
+  glow.name = 'title-banner-glow';
+  glow.position.set(0, 3.2, -ARENA_GAP - 1.32); // just behind the banner
+  const haze = new Mesh(
+    new PlaneGeometry(4.6, 4.6),
+    new MeshBasicMaterial({ map: glowTexture(), color: 0xc41208, transparent: true, depthWrite: false, opacity: 0.5 }),
+  );
+  haze.renderOrder = -2;
+  const core = new Mesh(
+    new PlaneGeometry(2.9, 2.9),
+    new MeshBasicMaterial({ map: glowTexture(), color: 0xff2a10, transparent: true, depthWrite: false, opacity: 0.7 }),
+  );
+  core.position.z = 0.02;
+  core.renderOrder = -1;
+  glow.add(haze, core);
+  scene.add(glow);
 
   // Prefer the hand-made sign art if it's been committed to public/signs/;
   // the stencil canvas above is the fallback until then.

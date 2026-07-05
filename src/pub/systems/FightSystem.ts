@@ -69,7 +69,10 @@ import { pubSendEvent, pubSendRaw } from '../net.js';
 import type { FightNet, FireballNet } from '../protocol.js';
 import { bus, pub } from '../state.js';
 import { Panel } from '../panel.js';
-import { UI, fitStencilText, metalText, plate, solidBar, stencilFont } from '../../ui/industrial.js';
+import { UI, fitStencilText, metalText, solidBar, stencilFont } from '../../ui/industrial.js';
+import { countdownArt } from '../../ui/countdownArt.js';
+import { verdictArt } from '../../ui/verdictArt.js';
+import { drawContentPlate } from '../../ui/plateArt.js';
 import { teleportPlayer } from './TeleportSystem.js';
 
 const HANDS = ['left', 'right'] as const;
@@ -1806,41 +1809,53 @@ export class FightSystem extends createSystem({}) {
     board.drawBare((ctx, w, h) => {
       ctx.textBaseline = 'middle';
 
-      // The two flanking fighter boards: name + chamfered round pips + a
-      // segmented health bar, each on its own chamfered plate (the arena's pair).
+      // The two flanking fighter readouts — NO backing plate now: just the
+      // name + round pips + a segmented health bar, with a dark shadow so they
+      // stay legible floating over the pit.
       const boardW = w * 0.36;
       const boardY = h * 0.2;
-      const boardH = h * 0.66;
-      const cols: [number, string, string, number, number, 'left' | 'right'][] = [
-        [w * 0.02, myName, UI.emberBright, myHp, f.score[side], 'left'],
-        [w * 0.62, oppName, UI.cool, oppHp, f.score[opp], 'right'],
+      const cols: [number, string, string, number, number][] = [
+        [w * 0.02, myName, UI.emberBright, myHp, f.score[side]],
+        [w * 0.62, oppName, UI.cool, oppHp, f.score[opp]],
       ];
       for (const [x, name, colour, hp, pips] of cols) {
-        plate(ctx, x, boardY, boardW, boardH, { cut: 26, fill: UI.ink, stroke: UI.steel, rivets: false });
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 10;
         ctx.textAlign = 'left';
         ctx.font = stencilFont(44);
         ctx.fillStyle = colour;
         ctx.fillText(name.toUpperCase().slice(0, 12), x + 28, boardY + 56);
+        ctx.restore();
         this.drawPips(ctx, x + boardW - 26, boardY + 52, pips, colour);
         // Health bar goes red in the danger zone (below a quarter), matching
         // the arena HUD, so spectators can read who's on the ropes.
         solidBar(ctx, x + 28, boardY + 92, boardW - 56, 58, hp, hp < 0.25 ? UI.danger : colour);
       }
 
-      // Centre column: the verdict headline above a big round clock on its own
-      // plate, tinted to the moment.
+      // Centre column. During the 3-2-1 it's the NEON COUNTDOWN PLATE (matching
+      // the rest of the game); otherwise the verdict headline over the round
+      // clock — both bare (no plate), shadowed for legibility.
       const cx = w * 0.5;
-      ctx.textAlign = 'center';
-      const headlinePx = fitStencilText(ctx, headline, w * 0.22, 64, 40);
-      metalText(ctx, headline, cx, h * 0.22, headlinePx, headlineColour, 'center');
-      const tW = w * 0.2;
-      const tH = h * 0.42;
-      const tX = cx - tW / 2;
-      const tY = h * 0.44;
-      plate(ctx, tX, tY, tW, tH, { cut: 20, fill: UI.ink, stroke: headlineColour, rivets: false });
-      ctx.font = stencilFont(64);
-      ctx.fillStyle = UI.text;
-      ctx.fillText(clk, cx, tY + tH / 2);
+      const art = counting ? countdownArt(secs > 0 ? `${secs}` : 'FIGHT') : null;
+      if (art) {
+        const bandW = w * 0.36;
+        ctx.save();
+        ctx.translate((w - bandW) / 2, 0);
+        drawContentPlate(ctx, art, bandW, h, h * 0.74, 8);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 12;
+        const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
+        metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
+        ctx.font = stencilFont(76);
+        ctx.fillStyle = UI.text;
+        ctx.fillText(clk, cx, h * 0.68);
+        ctx.restore();
+      }
     });
   }
 
@@ -1881,67 +1896,106 @@ export class FightSystem extends createSystem({}) {
 
   private drawBoard(panel: import('../panel.js').Panel): void {
     const f = pub.fight;
-    panel.draw((ctx, w, h) => {
+    // drawBare: NO steel backplate — the score panels float bare on the wall,
+    // just names, health bars and the neon status plate (a dark shadow keeps
+    // the light text/bars legible against the pit).
+    panel.drawBare((ctx, w, h) => {
       const names = [this.nameOf(f.sides[0]), this.nameOf(f.sides[1])];
       const colours = ['#ff7a18', '#4fb7ff'];
       const barW = w * 0.4;
-      const nameY = h * 0.28;
-      const barY = h * 0.38;
-      const barH = h * 0.2;
+      const nameY = h * 0.18;
+      const barY = h * 0.26;
+      const barH = h * 0.15;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 8;
       for (const side of [0, 1] as const) {
         const x = side === 0 ? w * 0.05 : w * 0.55;
+        const claimed = f.sides[side] !== null;
         ctx.textAlign = side === 0 ? 'left' : 'right';
-        ctx.font = `900 ${Math.round(h * 0.14)}px "Arial Black", system-ui, sans-serif`;
+        const nameX = side === 0 ? x : x + barW;
+        // While the hall is idle a seat with nobody in it shows no floating
+        // health bar — just a faint "OPEN SEAT" cue — so the wall doesn't read
+        // as a live bout before anyone has claimed a corner.
+        if (f.phase === 'idle' && !claimed) {
+          ctx.font = `700 ${Math.round(h * 0.08)}px "Arial Narrow", system-ui, sans-serif`;
+          ctx.fillStyle = 'rgba(154,163,178,0.75)';
+          ctx.fillText('OPEN SEAT', nameX, nameY);
+          continue;
+        }
+        ctx.font = `900 ${Math.round(h * 0.12)}px "Arial Black", system-ui, sans-serif`;
         ctx.fillStyle = colours[side];
-        ctx.fillText(names[side].toUpperCase().slice(0, 12), side === 0 ? x : x + barW, nameY);
-        ctx.fillStyle = 'rgba(172,182,198,0.25)';
+        ctx.fillText(names[side].toUpperCase().slice(0, 12), nameX, nameY);
+        // A faint dark trough behind the bar so it reads without a plate.
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(8,10,14,0.6)';
         ctx.fillRect(x, barY, barW, barH);
         const hp = Math.max(0, f.hp[side]) / FIGHT.hpMax;
-        ctx.fillStyle = colours[side];
+        ctx.fillStyle = hp < 0.25 ? UI.danger : colours[side];
         const fillW = barW * hp;
         ctx.fillRect(side === 0 ? x : x + barW - fillW, barY, fillW, barH);
-        ctx.strokeStyle = 'rgba(232,236,242,0.6)';
+        ctx.strokeStyle = 'rgba(232,236,242,0.7)';
         ctx.lineWidth = 3;
         ctx.strokeRect(x, barY, barW, barH);
+        ctx.shadowBlur = 8;
       }
 
-      // Round/score line between the bars (best of 5, first to FIGHT.winTarget).
+      // Round/score line between the bars.
       if (f.phase !== 'idle') {
         ctx.textAlign = 'center';
         ctx.font = `800 ${Math.round(h * 0.12)}px "Arial Black", system-ui, sans-serif`;
         ctx.fillStyle = '#e8ecf2';
-        ctx.fillText(`${f.score[0]}–${f.score[1]}`, w / 2, nameY + h * 0.02);
-        ctx.font = `700 ${Math.round(h * 0.07)}px "Arial Narrow", system-ui, sans-serif`;
+        ctx.fillText(`${f.score[0]}–${f.score[1]}`, w / 2, nameY);
+        ctx.font = `700 ${Math.round(h * 0.06)}px "Arial Narrow", system-ui, sans-serif`;
         ctx.fillStyle = '#9aa3b2';
-        ctx.fillText(`ROUND ${f.round} · BEST OF ${FIGHT.winTarget * 2 - 1}`, w / 2, barY + barH + h * 0.1);
+        ctx.fillText(`ROUND ${f.round} · BEST OF ${FIGHT.winTarget * 2 - 1}`, w / 2, barY + barH + h * 0.08);
+      }
+      ctx.restore();
+
+      // The status is always a NEON PLATE — the same shared art the rest of the
+      // game uses: OPEN / 3 / 2 / 1 / FIGHT for the run-up, then the KO / WIN /
+      // DRAW verdict plates. No fighter names on any of them, so every round's
+      // verdict reads identically (metal text is only the last-ditch fallback
+      // before a plate has decoded).
+      const winnerSide = f.sides[1] === f.winner ? 1 : 0;
+      const count = Math.max(0, Math.ceil(f.roundTimer)); // the pre-round 3-2-1
+      let art: HTMLImageElement | null = null;
+      let status: string;
+      let accent: string;
+      if (f.phase === 'idle') {
+        art = countdownArt('OPEN');
+        status = 'OPEN';
+        accent = UI.coolBright;
+      } else if (f.phase === 'starting') {
+        status = count > 0 ? `${count}` : 'FIGHT';
+        art = countdownArt(status);
+        accent = count > 0 ? UI.cool : UI.danger;
+      } else if (f.phase === 'fighting') {
+        art = countdownArt('FIGHT');
+        status = 'FIGHT';
+        accent = UI.danger;
+      } else if (f.phase === 'roundOver') {
+        art = verdictArt(f.winner ? 'KO' : 'DRAW');
+        status = f.winner ? 'KO' : 'DRAW';
+        accent = !f.winner ? UI.amber : colours[winnerSide];
+      } else {
+        art = verdictArt(f.winner ? 'WIN' : 'DRAW');
+        status = f.winner ? 'WIN' : 'DRAW';
+        accent = colours[winnerSide];
       }
 
-      ctx.textAlign = 'center';
-      const winnerSide = f.sides[1] === f.winner ? 1 : 0;
-      const winnerName = this.nameOf(f.winner).toUpperCase().slice(0, 10);
-      const count = Math.max(0, Math.ceil(f.roundTimer)); // the pre-round 3-2-1
-      const status =
-        f.phase === 'idle'
-          ? 'OPEN'
-          : f.phase === 'starting'
-            ? count > 0
-              ? `${count}`
-              : 'FIGHT'
-            : f.phase === 'fighting'
-              ? 'FIGHT'
-              : f.phase === 'roundOver'
-                ? f.winner
-                  ? `${winnerName} KO`
-                  : 'DRAW'
-                : `${winnerName} WINS`;
-      const statusAccent =
-        f.phase === 'fighting' ? UI.danger
-        : f.phase === 'starting' ? UI.cool // 3-2-1 countdown in neon blue
-        : f.phase === 'idle' ? UI.coolBright
-        : !f.winner ? UI.amber
-        : colours[winnerSide];
-      const statusPx = fitStencilText(ctx, status, w * 0.9, Math.round(h * 0.2), 28);
-      metalText(ctx, status, w / 2, h * 0.82, statusPx, statusAccent);
+      if (art) {
+        // Neon plate in the lower band, sized by its visible glyph.
+        const bandH = h * 0.5;
+        ctx.save();
+        ctx.translate(0, h * 0.5);
+        drawContentPlate(ctx, art, w, bandH, bandH * 0.92, 6);
+        ctx.restore();
+      } else {
+        ctx.textAlign = 'center';
+        const statusPx = fitStencilText(ctx, status, w * 0.9, Math.round(h * 0.2), 28);
+        metalText(ctx, status, w / 2, h * 0.78, statusPx, accent);
+      }
     });
   }
 }

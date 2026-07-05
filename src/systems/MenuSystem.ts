@@ -151,6 +151,8 @@ export class MenuSystem extends createSystem({}) {
   private draggingHue = false;
   private accentHue = Number.NaN;
   private accentLight = Number.NaN;
+  /** Cached red glow group behind the FIRE FIGHT banner (pulsed in the lobby). */
+  private bannerGlow?: Group;
   /** Which hand+panel currently owns a slider scrub. A scrub may only START on
    *  a fresh trigger press over the track, so a trigger held from opening the
    *  panel (or clicking elsewhere) can't hijack a slider as the ray crosses it. */
@@ -219,6 +221,7 @@ export class MenuSystem extends createSystem({}) {
   update(delta: number): void {
     if (app.state !== this.lastState) this.applyState();
     this.applyOwnSkins();
+    this.pulseBannerGlow();
 
     if (app.state === 'training' || app.state === 'playing') {
       this.updateActionPanel();
@@ -1239,6 +1242,22 @@ export class MenuSystem extends createSystem({}) {
     return hit;
   }
 
+  /** Breathe the red glow behind the FIRE FIGHT banner — a slow live pulse in
+   *  opacity + scale while the banner is up. No-op out of the lobby (hidden). */
+  private pulseBannerGlow(): void {
+    const g = (this.bannerGlow ??= this.scene.getObjectByName('title-banner-glow') as Group | undefined);
+    if (!g || !g.visible) return;
+    const pulse = 0.5 + 0.5 * Math.sin((performance.now() / 1000) * 1.6); // ~0.25 Hz
+    const s = 0.93 + pulse * 0.14; // 0.93 … 1.07
+    g.scale.set(s, s, 1);
+    // Breathe each layer's translucency around its base (haze 0.5, core 0.7).
+    const base = [0.5, 0.7];
+    g.children.forEach((child, i) => {
+      const mat = (child as Mesh).material as MeshBasicMaterial;
+      if (mat && base[i] !== undefined) mat.opacity = base[i] * (0.72 + pulse * 0.5); // ~0.72×…1.22×
+    });
+  }
+
   private hidePointers(): void {
     for (const hand of ['left', 'right'] as const) {
       this.pointers[hand].line.visible = false;
@@ -1318,9 +1337,11 @@ export class MenuSystem extends createSystem({}) {
       if (this.mirror) this.mirror.group.visible = false;
     }
 
-    // The title banner shows only in the lobby.
+    // The title banner (and its live red glow) show only in the lobby.
     const banner = this.scene.getObjectByName('title-banner');
     if (banner) banner.visible = inLobby;
+    const bannerGlow = this.scene.getObjectByName('title-banner-glow');
+    if (bannerGlow) bannerGlow.visible = inLobby;
     // Outside a live bout, fall back to the classic duel layout so the lobby
     // and Aim Training show one opponent pad, not a leftover arcade cross,
     // and leave any arcade mesh room we were in. EXCEPT while a lobby modal
