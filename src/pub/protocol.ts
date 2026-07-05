@@ -70,6 +70,12 @@ export interface SnakeHi {
   score: number;
 }
 
+/** One row of the Octa Hunt all-time board — a player's personal best. */
+export interface SnakeScore {
+  name: string;
+  score: number;
+}
+
 /** One Discord chat line relayed from the pub server for the bar TV. The bot
  *  token stays server-side; clients only ever see this rendered text. */
 export interface DiscordMsg {
@@ -205,6 +211,8 @@ export type PubServerMsg =
       props: PropNet[];
       board: BoardRow[];
       snakeHi: SnakeHi;
+      /** Octa Hunt all-time top 15 (one row per player, highest first). */
+      snakeBoard: SnakeScore[];
       snakePlayer: string | null;
       fight: FightNet;
       /** Jukebox station the room is currently on (−1 = off). */
@@ -229,6 +237,8 @@ export type PubServerMsg =
   | { t: 'board'; rows: BoardRow[] }
   | { t: 'snake-player'; id: string | null }
   | { t: 'snake-hi'; hi: SnakeHi }
+  /** The Octa Hunt all-time board changed (someone set a new personal best). */
+  | { t: 'snake-board'; board: SnakeScore[] }
   /** Full fight state — sent on every lifecycle change and hp update. */
   | { t: 'fight'; fight: FightNet }
   /** The barkeep is bringing glass `id` out — it lands on the bar shortly. */

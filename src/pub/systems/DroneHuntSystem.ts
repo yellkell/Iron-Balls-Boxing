@@ -122,6 +122,9 @@ export class DroneHuntSystem extends createSystem({}) {
       bus.on('snakeHi', () => {
         if (this.phase === 'attract') this.drawAttract();
       }),
+      // The wall poster beside the cabinet repaints whenever the all-time
+      // board changes (a new personal best anywhere in the room).
+      bus.on('snakeBoard', () => this.renderBoard()),
       // A coin fed into the cabinet buys one game (slot id is still 'snake').
       bus.on('coinInserted', (target) => {
         if (target === 'snake') this.insertCoin();
@@ -144,6 +147,7 @@ export class DroneHuntSystem extends createSystem({}) {
     );
 
     this.drawAttract();
+    this.renderBoard();
   }
 
   update(delta: number): void {
@@ -348,7 +352,59 @@ export class DroneHuntSystem extends createSystem({}) {
     } else if (this.score > this.localHi().score) {
       localStorage.setItem('ibb-pub-snake-hi', JSON.stringify({ name: pub.myName || 'YOU', score: this.score }));
       pub.snakeHi = this.localHi();
+      // Offline there's no server board — mirror the local best onto the poster
+      // as a single row so a solo session still shows a score on the wall.
+      pub.snakeBoard = [{ name: pub.snakeHi.name, score: pub.snakeHi.score }];
+      bus.emit('snakeBoard', pub.snakeBoard);
     }
+  }
+
+  /** Repaint the wall poster: OCTA HUNT — all-time top 15, one row per player. */
+  private renderBoard(): void {
+    const panel = pub.refs?.octaBoard;
+    if (!panel) return;
+    const rows = pub.snakeBoard.slice(0, 15);
+    panel.draw((ctx, w, h) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#ff8c1a';
+      ctx.font = '900 40px "Courier New", monospace';
+      ctx.fillText('OCTA HUNT', w / 2, 52);
+      ctx.font = 'bold 20px "Courier New", monospace';
+      ctx.fillStyle = '#9fc4d6';
+      ctx.fillText('ALL-TIME TOP 15', w / 2, 82);
+      ctx.strokeStyle = 'rgba(255,140,26,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(28, 98);
+      ctx.lineTo(w - 28, 98);
+      ctx.stroke();
+
+      if (!rows.length) {
+        ctx.fillStyle = 'rgba(232,236,242,0.5)';
+        ctx.font = 'bold 22px "Courier New", monospace';
+        ctx.fillText('NO SCORES YET', w / 2, h / 2 - 6);
+        ctx.fillStyle = '#ff8c1a';
+        ctx.fillText('BE THE FIRST', w / 2, h / 2 + 30);
+        return;
+      }
+
+      const top = 122;
+      const rowH = (h - top - 24) / 15;
+      ctx.font = '24px "Courier New", monospace';
+      ctx.textBaseline = 'middle';
+      rows.forEach((r, i) => {
+        const y = top + i * rowH + rowH / 2;
+        // Gold for the champ, warm for the podium, cool steel for the rest.
+        ctx.fillStyle = i === 0 ? '#ffcf6a' : i < 3 ? '#ffb37a' : '#cfe0ea';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${i + 1}`.padStart(2, ' '), 26, y);
+        ctx.fillText((r.name || '—').slice(0, 10).toUpperCase(), 82, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${r.score}`, w - 28, y);
+      });
+      ctx.textBaseline = 'alphabetic';
+    });
   }
 
   private streamState(dead: boolean): void {

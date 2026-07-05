@@ -607,6 +607,13 @@ export function buildPub(world: World): PubRefs {
   cabinet.rotation.y = Math.PI / 4;
   root.add(cabinet);
 
+  // OCTA HUNT all-time high-score poster — on the north wall (z = -D) in the
+  // clear stretch just EAST of the cabinet, west of the bar's bottle shelf. A
+  // canvas Panel so DroneHuntSystem can repaint it live as the board updates.
+  const octaBoard = new Panel(0.82, 1.18);
+  octaBoard.mesh.position.set(-3.55, 1.55, -D + 0.04); // proud of the wall, facing +z
+  root.add(octaBoard.mesh);
+
   // --- pint glass home slots on the bar -------------------------------------------
   const glassSlots: [number, number, number][] = [];
   // One row along the counter front — all 8 start under the bar and the
@@ -663,6 +670,7 @@ export function buildPub(world: World): PubRefs {
     arcadePos,
     arcadeCabinet: cabinet,
     snakeStick: stick,
+    octaBoard,
     consolePanels,
     fightDisplay,
     fightDisplay2,

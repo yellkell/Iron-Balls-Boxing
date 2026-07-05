@@ -46,8 +46,14 @@ function loadData() {
   try {
     return JSON.parse(readFileSync(DATA_FILE, 'utf8'));
   } catch {
-    return { snakeHi: { name: '—', score: 0 } };
+    return { snakeHi: { name: '—', score: 0 }, snakeBoard: [] };
   }
+}
+
+/** The Octa Hunt all-time board sent to clients — one row per player (their
+ *  personal best), highest first, top 15, WITHOUT the private device id. */
+function snakeBoardRows() {
+  return data.snakeBoard.map(({ name, score }) => ({ name, score }));
 }
 
 // --- moderation -----------------------------------------------------------------
@@ -79,6 +85,7 @@ function saveData() {
 }
 const data = loadData();
 if (!data.bans) data.bans = { ips: [], cids: [] };
+if (!data.snakeBoard) data.snakeBoard = []; // Octa Hunt all-time top 15 (per player)
 
 // --- room state ---------------------------------------------------------------
 /** id → { ws, name, accent, head, left, right } */
@@ -331,9 +338,25 @@ function handleEvent(senderId, ev) {
       break;
     }
     case 'SNAKE_OVER': {
-      if (ev.score > data.snakeHi.score) {
-        data.snakeHi = { name: players.get(senderId)?.name ?? '???', score: ev.score };
+      const me = players.get(senderId);
+      const name = me?.name ?? '???';
+      // Key the all-time board by the STABLE device id (cid), so one player's
+      // many runs only ever hold ONE row — their personal best — and can't fill
+      // the board. Fall back to the session id if a client sent no cid.
+      const cid = me?.cid || senderId;
+      if (typeof ev.score === 'number' && ev.score > 0) {
+        const prev = data.snakeBoard.find((e) => e.cid === cid);
+        if (prev) {
+          if (ev.score > prev.score) { prev.score = ev.score; prev.name = name; }
+        } else {
+          data.snakeBoard.push({ cid, name, score: ev.score });
+        }
+        data.snakeBoard.sort((a, b) => b.score - a.score);
+        data.snakeBoard = data.snakeBoard.slice(0, 15);
+        // The single house record is just the top of the board now.
+        data.snakeHi = { name: data.snakeBoard[0].name, score: data.snakeBoard[0].score };
         saveData();
+        broadcast({ t: 'snake-board', board: snakeBoardRows() });
         broadcast({ t: 'snake-hi', hi: data.snakeHi });
       }
       releaseSnake(senderId);
@@ -614,6 +637,7 @@ wss.on('connection', (ws, req) => {
         props: [...props.values()],
         board: boardRows(),
         snakeHi: data.snakeHi,
+        snakeBoard: snakeBoardRows(),
         snakePlayer,
         fight: fightNet(),
         music,

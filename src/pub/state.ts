@@ -6,7 +6,7 @@
 
 import type { Group, Mesh, MeshStandardMaterial, Object3D } from 'three';
 import type { BoxerRig } from '../avatar/boxer.js';
-import type { BoardRow, DiscordMsg, FightNet, PoseTuple, PropNet, PubEvent, SnakeHi } from './protocol.js';
+import type { BoardRow, DiscordMsg, FightNet, PoseTuple, PropNet, PubEvent, SnakeHi, SnakeScore } from './protocol.js';
 import type { Panel } from './panel.js';
 
 export interface RemotePunter {
@@ -47,6 +47,8 @@ export interface PubRefs {
   /** The cabinet root + its joystick stick (pivot at the deck). */
   arcadeCabinet: Group;
   snakeStick: Group;
+  /** The Octa Hunt all-time high-score poster on the wall beside the cabinet. */
+  octaBoard: Panel;
   /** Fight hall: each platform's glowing rim — re-skinned per claimant. */
   fightRims: [Mesh, Mesh];
   /** Fight hall: each platform's slab — its underglow follows the claimant's
@@ -80,6 +82,8 @@ interface Events {
   propSettled: { id: number; pos: [number, number, number]; quat: [number, number, number, number] };
   snakePlayer: string | null;
   snakeHi: SnakeHi;
+  /** The Octa Hunt all-time top-15 board changed (per-player personal bests). */
+  snakeBoard: SnakeScore[];
   gameEvent: { from: string; ev: PubEvent };
   /** Local dart stuck in the board — DartsSystem scores it. */
   dartScored: { segment: string; score: number };
@@ -169,6 +173,7 @@ export const pub = {
   props: new Map<number, PropNet>(),
   board: [] as BoardRow[],
   snakeHi: { name: '—', score: 0 } as SnakeHi,
+  snakeBoard: [] as SnakeScore[],
   snakePlayer: null as string | null,
   fight: defaultFight(),
   /** Selected jukebox station, −1 = off (server-synced; whole room shares it). */

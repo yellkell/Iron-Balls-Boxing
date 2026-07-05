@@ -95,6 +95,7 @@ function handle(msg: PubServerMsg): void {
       pub.online = true;
       pub.board = msg.board;
       pub.snakeHi = msg.snakeHi;
+      pub.snakeBoard = msg.snakeBoard ?? [];
       pub.snakePlayer = msg.snakePlayer;
       pub.fight = normalizeFight(msg.fight);
       pub.music = msg.music ?? -1;
@@ -104,6 +105,7 @@ function handle(msg: PubServerMsg): void {
       bus.emit('connected', undefined);
       bus.emit('board', msg.board);
       bus.emit('snakeHi', msg.snakeHi);
+      bus.emit('snakeBoard', pub.snakeBoard);
       bus.emit('fight', pub.fight);
       bus.emit('music', pub.music);
       bus.emit('discord', pub.discord);
@@ -167,6 +169,10 @@ function handle(msg: PubServerMsg): void {
     case 'snake-hi':
       pub.snakeHi = msg.hi;
       bus.emit('snakeHi', msg.hi);
+      break;
+    case 'snake-board':
+      pub.snakeBoard = msg.board;
+      bus.emit('snakeBoard', msg.board);
       break;
     case 'fight':
       pub.fight = normalizeFight(msg.fight);
