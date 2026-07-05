@@ -63,9 +63,9 @@ export function createTitleBanner(scene: Scene): Mesh {
   const material = new MeshBasicMaterial({ map: texture, transparent: true });
   // Square plane sized to the procedural fallback; the real sign art (any
   // aspect) is letterbox-fitted onto it once it loads (see below).
-  const banner = new Mesh(new PlaneGeometry(2.2, 2.2), material);
+  const banner = new Mesh(new PlaneGeometry(4.4, 4.4), material);
   banner.name = 'title-banner';
-  banner.position.set(0, 3.2, -ARENA_GAP - 1.2);
+  banner.position.set(0, 3.4, -ARENA_GAP - 1.2);
   scene.add(banner);
 
   // An ACTIVE red glow behind the neon sign — a soft translucent red field that
@@ -75,14 +75,14 @@ export function createTitleBanner(scene: Scene): Mesh {
   // pool of red the neon script sits in (the banner PNG is mostly transparent).
   const glow = new Group();
   glow.name = 'title-banner-glow';
-  glow.position.set(0, 3.2, -ARENA_GAP - 1.32); // just behind the banner
+  glow.position.set(0, 3.4, -ARENA_GAP - 1.32); // just behind the banner
   const haze = new Mesh(
-    new PlaneGeometry(4.6, 4.6),
+    new PlaneGeometry(9.0, 9.0),
     new MeshBasicMaterial({ map: glowTexture(), color: 0xc41208, transparent: true, depthWrite: false, opacity: 0.5 }),
   );
   haze.renderOrder = -2;
   const core = new Mesh(
-    new PlaneGeometry(2.9, 2.9),
+    new PlaneGeometry(5.6, 5.6),
     new MeshBasicMaterial({ map: glowTexture(), color: 0xff2a10, transparent: true, depthWrite: false, opacity: 0.7 }),
   );
   core.position.z = 0.02;
