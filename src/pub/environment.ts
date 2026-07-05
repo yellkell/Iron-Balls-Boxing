@@ -643,11 +643,11 @@ export function buildPub(world: World): PubRefs {
   const RY_W = Math.PI / 2;
   // East wall (long + clear) — spaced down its length, a couple hung wonky.
   placePoster('posters/split.png', EAST, 1.5, -2.3, RY_E, 0.06);
-  placePoster('posters/shrink.jpg', EAST, 1.58, -0.6, RY_E, 0);
+  placePoster('posters/balls.png', EAST, 1.58, -0.6, RY_E, 0);
   placePoster('posters/grow.png', EAST, 1.5, 1.1, RY_E, -0.07);
   placePoster('posters/shrink.jpg', EAST, 1.55, 2.6, RY_E, 0.03);
   // West wall, either side of the doorway.
-  placePoster('posters/grow.png', WEST, 1.5, -1.5, RY_W, 0.05);
+  placePoster('posters/balls.png', WEST, 1.5, -1.5, RY_W, 0.05);
   placePoster('posters/split.png', WEST, 1.55, 2.7, RY_W, -0.04);
 
   // --- the fight hall through the west door ---------------------------------
@@ -1097,7 +1097,7 @@ function buildFightHall(root: Group): {
   hallPoster('posters/split.png', cx + 2.8, 2.2, NZ, 0, 0.05);
   hallPoster('posters/grow.png', cx - 3.2, 2.3, NZ, 0, -0.04);
   hallPoster('posters/shrink.jpg', cx - 2.6, 2.2, SZ, Math.PI, 0.06);
-  hallPoster('posters/split.png', cx + 3.4, 2.1, SZ, Math.PI, -0.03);
+  hallPoster('posters/balls.png', cx + 3.4, 2.1, SZ, Math.PI, -0.03);
   hallPoster('posters/grow.png', WX, 2.25, -3.4, Math.PI / 2, 0.04);
   hallPoster('posters/shrink.jpg', WX, 2.15, 3.8, Math.PI / 2, -0.05);
 
