@@ -3,7 +3,7 @@
  * integrates the shared fire particle pools (embers + comet trails).
  */
 
-import { createSystem, Quaternion } from '@iwsdk/core';
+import { createSystem, Quaternion, type Object3D } from '@iwsdk/core';
 import { Effect, EffectKind } from '../components/Effect.js';
 import { initFirePools, updateFirePools } from '../fx/fire.js';
 
@@ -11,6 +11,16 @@ const GRAVITY = 4.5;
 const _camQ = new Quaternion();
 
 type Fadable = { opacity: number; transparent: boolean };
+type DisposableMat = { dispose?: () => void };
+
+/** Free an effect's per-instance material(s) — NOT its geometry or textures,
+ *  which are shared module singletons (SHARD_GEO / POPUP_GEO / the glow +
+ *  popup texture caches) that every later effect still points at. */
+function disposeMaterial(obj: Object3D): void {
+  const m = (obj as unknown as { material?: DisposableMat | DisposableMat[] }).material;
+  if (Array.isArray(m)) for (const mm of m) mm?.dispose?.();
+  else m?.dispose?.();
+}
 
 export class FXSystem extends createSystem({
   effects: { required: [Effect] },
@@ -30,6 +40,14 @@ export class FXSystem extends createSystem({
       const age = (e.getValue(Effect, 'age') ?? 0) + delta;
       const life = e.getValue(Effect, 'life') ?? 0.3;
       if (age >= life) {
+        // Every effect owns a UNIQUE material (glowSprite / shard / popup) over
+        // SHARED geometry + textures. destroy() only unhooks the Object3D — the
+        // GPU material + its compiled program leak unless we dispose it here.
+        // Combat spawns these by the thousand (impacts, novas, volleys), so
+        // over a long session the orphaned materials starve the GPU and the
+        // headset starts missing vsync (lag + tearing). Dispose the material
+        // ONLY — the geometry/textures are shared and must survive.
+        disposeMaterial(obj);
         e.destroy();
         continue;
       }
