@@ -2496,7 +2496,9 @@ function panelItems(locker: boolean): { items: DisplayItem[]; soon: PanRect | nu
       ? AVATAR_SKINS.filter((s) => !s.locked && avatarOwned(s.id) === locker).length + (locker ? 0 : 1)
       : PLATFORM_SKINS.filter((s) => platformOwned(s.id) === locker).length;
   const rows = Math.max(1, Math.ceil(count / GRID_COLS));
-  const rowStep = Math.min(ROW_STEP, Math.floor((FOOT_SWAP.y - 12 - GRID_TOP) / rows));
+  // Up to 3 rows fit at full height (the classic layout, untouched); more
+  // than that shares the same vertical span between the rows.
+  const rowStep = rows <= 3 ? ROW_STEP : Math.floor((FOOT_SWAP.y - 12 - GRID_TOP) / rows);
   const itemH = rowStep - (ROW_STEP - ITEM_H);
   let idx = 0;
   const next = (): PanRect => {
