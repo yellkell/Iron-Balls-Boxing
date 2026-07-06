@@ -27,6 +27,8 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
+  Shape,
+  ShapeGeometry,
   SRGBColorSpace,
   type Object3D,
 } from 'three';
@@ -140,7 +142,7 @@ function makeCornerBolts(): Group {
  * at floor level (your real floor IS the platform top), hazard banding and
  * corner bolts around the rim, and a thin team-colour glow line on the edge.
  */
-function makePlatform(color: number): Group {
+export function makePlatform(color: number): Group {
   const group = new Group();
 
   plateMaps ??= diamondPlateTextures();
@@ -159,9 +161,12 @@ function makePlatform(color: number): Group {
   });
   slabMat.userData.role = 'slab';
   const slab = new Mesh(octagonSlab(OCTAGON_VERTICES, PLATFORM.thickness), slabMat);
-  // Top face at y=0 (the real floor), body glowing faintly below.
+  // Top face at the floor line, body glowing faintly below. NB the extrude
+  // BEVEL overhangs both ends, so the actual top face sits at +bevel (0.015)
+  // — anything painted on the deck must clear that, not y=0.
   slab.position.y = -PLATFORM.thickness;
   group.add(slab);
+  const DECK_TOP = 0.02; // just proud of the bevelled top face
 
   group.add(makeHazardBand());
   group.add(makeCornerBolts());
@@ -184,26 +189,48 @@ function makePlatform(color: number): Group {
   group.add(fins);
 
   // XD: a white grin painted on the deck (X eyes + a capital-D mouth), shown
-  // only for the 'xdface' skin. A flat decal just above the slab's top face.
+  // only for the 'xdface' skin. A flat decal just above the slab's top face —
+  // which is at +bevel, NOT y=0: at its old 0.004 it sat INSIDE the steel and
+  // never rendered at all.
   const face = new Mesh(
     new PlaneGeometry(1.18, 1.18),
     new MeshBasicMaterial({ map: xdFaceTexture(), transparent: true, depthWrite: false }),
   );
   face.rotation.x = -Math.PI / 2; // lay it flat, texture-up pointing -Z (at the foe)
-  face.position.y = 0.004;
+  face.position.y = DECK_TOP;
   face.renderOrder = 2;
   face.userData.skinTag = 'xdface';
   face.visible = false;
   group.add(face);
 
   // VOLT: a big lightning bolt struck across the deck, shown only for 'volt'.
-  const bolt = new Mesh(
-    new PlaneGeometry(1.18, 1.18),
-    new MeshBasicMaterial({ map: voltBoltTexture(), transparent: true, depthWrite: false }),
-  );
-  bolt.rotation.x = -Math.PI / 2;
-  bolt.position.y = 0.004;
-  bolt.renderOrder = 2;
+  // A real raised neon mesh (the transparent-decal approach vanished against
+  // the dark slab) — flat ShapeGeometry a hair above the deck, painted in the
+  // same unlit neon-core white-lerp the INFERNO fins use, so it team-tints on
+  // opponent pads too.
+  const boltShape = new Shape();
+  const boltRot = 0.35; // struck across the deck on a diagonal
+  const boltScale = 1.35;
+  (
+    [
+      [0.1, 0.42],
+      [-0.14, -0.02],
+      [0.015, -0.02],
+      [-0.1, -0.42],
+      [0.14, 0.06],
+      [-0.015, 0.06],
+    ] as [number, number][]
+  ).forEach(([px, py], i) => {
+    const bx = (px * Math.cos(boltRot) - py * Math.sin(boltRot)) * boltScale;
+    const by = (px * Math.sin(boltRot) + py * Math.cos(boltRot)) * boltScale;
+    if (i === 0) boltShape.moveTo(bx, by);
+    else boltShape.lineTo(bx, by);
+  });
+  const boltMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  boltMat.userData.role = 'neon-core';
+  const bolt = new Mesh(new ShapeGeometry(boltShape), boltMat);
+  bolt.rotation.x = -Math.PI / 2; // lay it flat; shape +y points -Z (at the foe)
+  bolt.position.y = DECK_TOP + 0.001; // clear of the (never co-shown) grin plane too
   bolt.userData.skinTag = 'volt';
   bolt.visible = false;
   group.add(bolt);
@@ -212,8 +239,10 @@ function makePlatform(color: number): Group {
   return group;
 }
 
-/** A white "XD" grin (X eyes, D mouth) on transparent — painted on the deck of
- *  the black premium platform. Built once and shared by every pedestal. */
+/** A white "XD" on transparent — painted huge across the deck of the black
+ *  premium platform: ONE big X and a bigger D, the whole thing centred and
+ *  laid on its side, so it reads as the laughing face. Built once and shared
+ *  by every pedestal. */
 let xdFaceTex: CanvasTexture | undefined;
 function xdFaceTexture(): CanvasTexture {
   if (xdFaceTex) return xdFaceTex;
@@ -224,53 +253,15 @@ function xdFaceTexture(): CanvasTexture {
   ctx.fillStyle = '#f6f8ff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '900 190px system-ui, sans-serif';
-  // X eyes.
-  ctx.fillText('X', s * 0.31, s * 0.36);
-  ctx.fillText('X', s * 0.69, s * 0.36);
-  // D mouth — the letter laid on its back so the flat edge tops a big grin.
-  ctx.save();
-  ctx.translate(s * 0.5, s * 0.66);
-  ctx.rotate(Math.PI / 2);
-  ctx.font = '900 250px system-ui, sans-serif';
-  ctx.fillText('D', 0, 0);
-  ctx.restore();
+  ctx.translate(s * 0.5, s * 0.5);
+  ctx.rotate(Math.PI / 2); // on its side
+  ctx.font = '900 320px system-ui, sans-serif';
+  ctx.fillText('X', -s * 0.22, 0);
+  ctx.fillText('D', s * 0.22, 0);
   xdFaceTex = new CanvasTexture(canvas);
   xdFaceTex.colorSpace = SRGBColorSpace;
   xdFaceTex.minFilter = LinearFilter;
   return xdFaceTex;
-}
-
-/** A jagged electric-yellow lightning bolt on transparent — painted diagonally
- *  across the VOLT pad's deck. Built once and shared by every pedestal. */
-let voltBoltTex: CanvasTexture | undefined;
-function voltBoltTexture(): CanvasTexture {
-  if (voltBoltTex) return voltBoltTex;
-  const s = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = s;
-  const ctx = canvas.getContext('2d')!;
-  // The classic two-kink flash, drawn tall then rotated onto the diagonal.
-  ctx.translate(s * 0.5, s * 0.5);
-  ctx.rotate(0.35);
-  const x = (u: number): number => u * s;
-  const y = (v: number): number => v * s;
-  ctx.beginPath();
-  ctx.moveTo(x(0.1), y(-0.42));
-  ctx.lineTo(x(-0.14), y(0.02));
-  ctx.lineTo(x(0.015), y(0.02));
-  ctx.lineTo(x(-0.1), y(0.42));
-  ctx.lineTo(x(0.14), y(-0.06));
-  ctx.lineTo(x(-0.015), y(-0.06));
-  ctx.closePath();
-  ctx.fillStyle = '#ffe94a';
-  ctx.shadowColor = '#ffe94a';
-  ctx.shadowBlur = s * 0.05;
-  ctx.fill();
-  voltBoltTex = new CanvasTexture(canvas);
-  voltBoltTex.colorSpace = SRGBColorSpace;
-  voltBoltTex.minFilter = LinearFilter;
-  return voltBoltTex;
 }
 
 /** Recolour a platform's neon rim + slab emissive to a team tint. */

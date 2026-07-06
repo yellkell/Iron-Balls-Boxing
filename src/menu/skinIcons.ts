@@ -28,11 +28,8 @@ export function drawAvatarIcon(ctx: CanvasRenderingContext2D, id: string, cx: nu
     case 'knight':
       drawShield(ctx, cx, cy, r);
       break;
-    case 'viper':
-      drawCobra(ctx, cx, cy, r);
-      break;
-    case 'rhino':
-      drawRhino(ctx, cx, cy, r);
+    case 'stallion':
+      drawStallion(ctx, cx, cy, r);
       break;
     case 'crimson':
     default:
@@ -137,90 +134,47 @@ function drawShield(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
   ctx.restore();
 }
 
-/** Cobra: the flared hood silhouette — a broad teardrop hood swelling around
- *  a narrow raised head, tapering to the coiled base. One filled shape. */
-function drawCobra(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+/** Stallion: the classic horse-head PROFILE — arched neck, long muzzle,
+ *  pricked ears and a notched mane down the back. One filled shape. */
+function drawStallion(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const x = (u: number): number => cx + u * r;
   const y = (v: number): number => cy + v * r;
   ctx.beginPath();
-  // Crown of the head…
-  ctx.moveTo(x(0), y(-1.0));
-  // …right side of the hood flaring wide at the cheeks…
-  ctx.quadraticCurveTo(x(0.9), y(-0.85), x(0.92), y(0.05));
-  // …sweeping back in to the narrow neck…
-  ctx.quadraticCurveTo(x(0.94), y(0.6), x(0.3), y(0.78));
-  // …the coiled base…
-  ctx.quadraticCurveTo(x(0), y(0.98), x(-0.3), y(0.78));
-  // …and mirrored back up the left side.
-  ctx.quadraticCurveTo(x(-0.94), y(0.6), x(-0.92), y(0.05));
-  ctx.quadraticCurveTo(x(-0.9), y(-0.85), x(0), y(-1.0));
+  // Muzzle tip (facing left), up over the nose bridge…
+  ctx.moveTo(x(-0.95), y(0.02));
+  ctx.quadraticCurveTo(x(-0.98), y(-0.28), x(-0.72), y(-0.4));
+  // …up the face to the brow and the front ear.
+  ctx.quadraticCurveTo(x(-0.4), y(-0.52), x(-0.22), y(-0.7));
+  ctx.lineTo(x(-0.18), y(-1.0));
+  ctx.lineTo(x(0.02), y(-0.72));
+  // Back ear.
+  ctx.lineTo(x(0.2), y(-0.98));
+  ctx.lineTo(x(0.26), y(-0.62));
+  // The mane: notched crest down the back of the arched neck.
+  ctx.quadraticCurveTo(x(0.42), y(-0.5), x(0.4), y(-0.28));
+  ctx.lineTo(x(0.56), y(-0.18));
+  ctx.lineTo(x(0.5), y(0.06));
+  ctx.lineTo(x(0.66), y(0.18));
+  ctx.lineTo(x(0.58), y(0.42));
+  ctx.lineTo(x(0.72), y(0.56));
+  // Base of the neck, wide at the chest…
+  ctx.quadraticCurveTo(x(0.72), y(0.9), x(0.4), y(0.95));
+  ctx.lineTo(x(-0.25), y(0.95));
+  // …up the throat and jaw, into the underside of the muzzle.
+  ctx.quadraticCurveTo(x(-0.3), y(0.5), x(-0.55), y(0.28));
+  ctx.quadraticCurveTo(x(-0.85), y(0.22), x(-0.95), y(0.02));
   ctx.closePath();
   ctx.fill();
-  // Slit eyes knocked out darker so the face reads inside the hood.
+  // Eye + nostril knocked out darker.
   ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = '#06070b';
-  for (const s of [-1, 1]) {
-    ctx.save();
-    ctx.translate(x(s * 0.26), y(-0.32));
-    ctx.rotate(s * 0.5);
-    ctx.fillRect(-r * 0.17, -r * 0.045, r * 0.34, r * 0.09);
-    ctx.restore();
-  }
-  // A forked tongue notch at the chin.
   ctx.beginPath();
-  ctx.moveTo(x(0), y(0.28));
-  ctx.lineTo(x(-0.07), y(0.62));
-  ctx.lineTo(x(0), y(0.52));
-  ctx.lineTo(x(0.07), y(0.62));
-  ctx.closePath();
+  ctx.ellipse(x(-0.32), y(-0.32), r * 0.09, r * 0.07, -0.3, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-}
-
-/** Rhino: a head-on skull silhouette with a tall nose horn — broad jowls,
- *  ear stubs, the horn rising off the snout. */
-function drawRhino(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  const x = (u: number): number => cx + u * r;
-  const y = (v: number): number => cy + v * r;
-  // The horn: a tall tapering spike up the middle.
   ctx.beginPath();
-  ctx.moveTo(x(-0.16), y(0.1));
-  ctx.lineTo(x(0), y(-1.02));
-  ctx.lineTo(x(0.16), y(0.1));
-  ctx.closePath();
+  ctx.ellipse(x(-0.78), y(-0.08), r * 0.05, r * 0.07, 0.3, 0, Math.PI * 2);
   ctx.fill();
-  // Broad skull: wide brow, jowls bulging, tapering to a blunt muzzle.
-  ctx.beginPath();
-  ctx.moveTo(x(-0.72), y(-0.28));
-  ctx.quadraticCurveTo(x(0), y(-0.5), x(0.72), y(-0.28));
-  ctx.quadraticCurveTo(x(0.98), y(0.1), x(0.62), y(0.55));
-  ctx.quadraticCurveTo(x(0.32), y(0.92), x(0), y(0.92));
-  ctx.quadraticCurveTo(x(-0.32), y(0.92), x(-0.62), y(0.55));
-  ctx.quadraticCurveTo(x(-0.98), y(0.1), x(-0.72), y(-0.28));
-  ctx.closePath();
-  ctx.fill();
-  // Ear stubs riding the brow corners.
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(x(s * 0.62), y(-0.42), r * 0.18, r * 0.24, s * 0.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Eyes knocked out darker, set wide and low under the brow.
-  ctx.save();
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = '#06070b';
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(x(s * 0.42), y(0.05), r * 0.1, r * 0.07, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Nostril slits framing the muzzle.
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(x(s * 0.18), y(0.68), r * 0.06, r * 0.09, s * -0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
   ctx.restore();
 }
 

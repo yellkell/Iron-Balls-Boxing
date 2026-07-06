@@ -75,12 +75,9 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   { id: 'valkyrie', name: 'FLY GUY', chassis: 0x261b33, trim: 0x120d1a, accent: 0xff9ad5 },
   // Polished steel knight in heraldic gold — a shop unlock.
   { id: 'knight', name: 'KNIGHT', chassis: 0x2d333d, trim: 0x14181f, accent: 0xffcf6e, price: 100 },
-  // Hooded cobra in blackened green steel with venom-slit eyes — the slim
-  // silhouette (same deal as SHADOW: visual only, hitboxes untouched).
-  { id: 'viper', name: 'VIPER', chassis: 0x16281b, trim: 0x0b140e, accent: 0x54ff6e, slim: true, price: 250 },
-  // The siege engine: twin-horned battering-ram skull, slab pauldrons,
-  // riveted barrel chest. Top-shelf avatar flex.
-  { id: 'rhino', name: 'RHINO', chassis: 0x38342d, trim: 0x181612, accent: 0xff9d2e, price: 500 },
+  // The stallion: long sculpted muzzle, pricked ears, a swept mane crest and
+  // tack-strap cuirass. Derby-green steel with a minted glow.
+  { id: 'stallion', name: 'STALLION', chassis: 0x1c2a21, trim: 0x0e1611, accent: 0x53ffa0, price: 500 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
