@@ -23,6 +23,7 @@ import {
   Quaternion,
   RepeatWrapping,
   SphereGeometry,
+  TorusGeometry,
   Vector3,
 } from 'three';
 import { BODY_IK, PALETTE, teamColor } from '../config.js';
@@ -916,331 +917,359 @@ function buildKnightPelvis(accent: number): Group {
   return g;
 }
 
-/** VIPER → COBRA: a low wedge skull under a flared hood, slit eyes, pit
- *  sensors and a forked glow tongue. Menacing, streamlined. */
-function buildViperHead(accent: number): Group {
+
+/** RAM → the battering ram: a broad boss-plated skull wrapped in BIG
+ *  spiral-curled horns — a thick ¾-torus coiling round each ear, ridged,
+ *  ending in a down-swept tip. Heavy brow, blunt muzzle, headbutt-ready. */
+function buildRamHead(accent: number): Group {
   const r = BODY_IK.headRadius;
-  const g = taggedHead('viper');
+  const g = taggedHead('ram');
 
-  // Low, flat wedge skull — broad at the jaw, tapering forward.
-  const skull = new Mesh(new SphereGeometry(r * 0.84, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(1.0, 0.74, 1.3);
-  skull.position.y = r * 0.08;
-  g.add(skull);
-  // Crown scale ridge running back over the dome.
-  const ridge = new Mesh(new BoxGeometry(r * 0.14, r * 0.1, r * 1.1), chassisMat(accent, 0.06));
-  ridge.position.set(0, r * 0.42, -r * 0.1);
-  ridge.rotation.x = -0.1;
-  g.add(ridge);
-
-  // The HOOD: a fan of angled plates flaring up and out behind the skull —
-  // the cobra's signature silhouette. Glow vanes seam the gaps.
-  for (let i = -3; i <= 3; i++) {
-    const a = Math.abs(i);
-    const len = r * (1.5 - a * 0.18);
-    const plate = new Mesh(new BoxGeometry(r * 0.34, len, r * 0.09), chassisMat(accent, 0.04));
-    plate.position.set(i * r * 0.3, r * (0.52 - a * 0.06), r * (0.5 + a * 0.1));
-    plate.rotation.set(0.34 + a * 0.06, i * 0.12, i * -0.22);
-    g.add(plate);
-    const vane = new Mesh(new BoxGeometry(r * 0.1, len * 0.86, r * 0.1), glowMat(accent, 0.55 + (3 - a) * 0.14));
-    vane.position.set(i * r * 0.3, r * (0.56 - a * 0.06), r * (0.56 + a * 0.1));
-    vane.rotation.copy(plate.rotation);
-    g.add(vane);
-  }
-
-  // Heavy brow scales + venom-slit eyes, slanted hard.
-  for (const side of [-1, 1]) {
-    const brow = new Mesh(new BoxGeometry(r * 0.46, r * 0.1, r * 0.36), darkMat());
-    brow.position.set(side * r * 0.3, r * 0.22, -r * 0.72);
-    brow.rotation.z = side * 0.4;
-    g.add(brow);
-    const eye = new Mesh(new BoxGeometry(r * 0.3, r * 0.06, r * 0.08), glowMat(accent, 2.6));
-    eye.position.set(side * r * 0.33, r * 0.08, -r * 0.82);
-    eye.rotation.z = side * 0.5;
-    g.add(eye);
-    // Heat-pit sensor dot under each eye.
-    const pit = new Mesh(new CylinderGeometry(r * 0.05, r * 0.05, r * 0.05, 6), darkMat());
-    pit.rotation.x = Math.PI / 2;
-    pit.position.set(side * r * 0.28, -r * 0.12, -r * 0.95);
-    g.add(pit);
-  }
-
-  // Blunt snout with a dark upper lip and two down-swept fangs.
-  const snout = new Mesh(new BoxGeometry(r * 0.52, r * 0.34, r * 0.66), chassisMat(accent, 0.04));
-  snout.position.set(0, -r * 0.22, -r * 1.0);
-  g.add(snout);
-  const lip = new Mesh(new BoxGeometry(r * 0.54, r * 0.08, r * 0.68), darkMat());
-  lip.position.set(0, -r * 0.4, -r * 1.0);
-  g.add(lip);
-  for (const side of [-1, 1]) {
-    const fang = new Mesh(new ConeGeometry(r * 0.05, r * 0.26, 5), darkMat());
-    fang.rotation.x = Math.PI;
-    fang.position.set(side * r * 0.16, -r * 0.54, -r * 1.16);
-    g.add(fang);
-  }
-  // Forked tongue — two thin glow prongs flicked out under the snout.
-  for (const side of [-1, 1]) {
-    const prong = new Mesh(new CylinderGeometry(r * 0.015, r * 0.005, r * 0.42, 4), glowMat(accent, 1.2));
-    prong.rotation.set(Math.PI / 2 - 0.12, 0, side * 0.1);
-    prong.position.set(side * r * 0.05, -r * 0.42, -r * 1.5);
-    g.add(prong);
-  }
-  return g;
-}
-
-/** VIPER cuirass: coiled-scale armour — overlapping chevron scale rows down
- *  the trunk, a hood-base collar, slim shoulders. Sinuous, not bulky. */
-function buildViperChest(accent: number): Group {
-  const g = taggedHead('viper');
-  // Wide hood-base collar plate.
-  const collar = new Mesh(new BoxGeometry(0.42, 0.09, 0.2), chassisMat(accent, 0.05));
-  collar.position.y = 0.11;
-  g.add(collar);
-  const collarGlow = new Mesh(new BoxGeometry(0.425, 0.018, 0.205), glowMat(accent, 0.5));
-  collarGlow.position.y = 0.155;
-  g.add(collarGlow);
-  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.1, 8), darkMat());
-  neck.position.y = 0.17;
-  g.add(neck);
-  // Slim swept shoulder scales, twin-layered.
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 2; i++) {
-      const scale = new Mesh(new BoxGeometry(0.17 - i * 0.03, 0.06, 0.24 - i * 0.04), chassisMat(accent, 0.05));
-      scale.position.set(side * (0.26 + i * 0.05), 0.12 - i * 0.05, 0);
-      scale.rotation.z = side * -(0.3 + i * 0.12);
-      g.add(scale);
-    }
-    const tip = new Mesh(new ConeGeometry(0.028, 0.14, 4), darkMat());
-    tip.position.set(side * 0.36, 0.05, 0);
-    tip.rotation.z = side * -1.9;
-    g.add(tip);
-  }
-  const trunk = new Mesh(new CylinderGeometry(0.15, 0.08, 0.42, 8), darkMat());
-  trunk.scale.z = 0.72;
-  trunk.position.y = -0.13;
-  g.add(trunk);
-  // Overlapping chevron belly scales stepping down the front, glow-seamed —
-  // the coiled underbelly.
-  for (let i = 0; i < 4; i++) {
-    const w = 0.24 - i * 0.035;
-    const scale = new Mesh(new BoxGeometry(w, 0.07, 0.07), chassisMat(accent, 0.04));
-    scale.position.set(0, 0.02 - i * 0.085, -0.12);
-    scale.rotation.x = -0.16;
-    g.add(scale);
-    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.014, 0.072), glowMat(accent, 0.4));
-    seam.position.set(0, -0.015 - i * 0.085, -0.118);
-    seam.rotation.x = -0.16;
-    g.add(seam);
-  }
-  // Venom-core: a narrow diamond glow set in the sternum.
-  const core = new Mesh(new BoxGeometry(0.05, 0.05, 0.04), glowMat(accent, 1.5));
-  core.rotation.z = Math.PI / 4;
-  core.position.set(0, 0.05, -0.15);
-  g.add(core);
-  for (const side of [-1, 1]) {
-    const flank = new Mesh(new BoxGeometry(0.045, 0.26, 0.2), chassisMat(accent, 0.04));
-    flank.position.set(side * 0.14, -0.08, 0);
-    flank.rotation.z = side * 0.14;
-    g.add(flank);
-  }
-  return g;
-}
-
-/** VIPER hips: a slim scale belt, pointed guard and swept scale tassets. */
-function buildViperPelvis(accent: number): Group {
-  const g = taggedHead('viper');
-  const belt = new Mesh(new BoxGeometry(0.19, 0.05, 0.15), chassisMat(accent, 0.04));
-  belt.position.y = 0.05;
-  g.add(belt);
-  // Diamond buckle to match the sternum core.
-  const buckle = new Mesh(new BoxGeometry(0.04, 0.04, 0.03), glowMat(accent, 1.1));
-  buckle.rotation.z = Math.PI / 4;
-  buckle.position.set(0, 0.05, -0.08);
-  g.add(buckle);
-  const guard = new Mesh(new ConeGeometry(0.075, 0.17, 4), chassisMat(accent, 0.03));
-  guard.rotation.x = Math.PI;
-  guard.position.set(0, -0.06, -0.03);
-  g.add(guard);
-  for (const side of [-1, 1]) {
-    const tasset = new Mesh(new BoxGeometry(0.05, 0.16, 0.12), chassisMat(accent, 0.04));
-    tasset.position.set(side * 0.1, -0.05, 0);
-    tasset.rotation.z = side * 0.38;
-    g.add(tasset);
-    const edge = new Mesh(new BoxGeometry(0.055, 0.013, 0.125), glowMat(accent, 0.4));
-    edge.position.set(side * 0.125, -0.125, 0);
-    edge.rotation.z = side * 0.38;
-    g.add(edge);
-  }
-  return g;
-}
-
-/** RHINO → a battering-ram skull: massive brow, twin nose horns, armoured
- *  jaw and riveted crown plates. Built like a siege engine. */
-function buildRhinoHead(accent: number): Group {
-  const r = BODY_IK.headRadius;
-  const g = taggedHead('rhino');
-
-  const skull = new Mesh(new SphereGeometry(r * 0.94, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(1.1, 0.94, 1.16);
+  const skull = new Mesh(new SphereGeometry(r * 0.9, 16, 12), chassisMat(accent, 0.06));
+  skull.scale.set(1.04, 0.96, 1.06);
   skull.position.y = r * 0.14;
   g.add(skull);
-  // Riveted crown plate.
-  const crown = new Mesh(new BoxGeometry(r * 1.2, r * 0.24, r * 1.0), chassisMat(accent, 0.05));
-  crown.position.set(0, r * 0.68, -r * 0.1);
-  crown.rotation.x = -0.12;
-  g.add(crown);
+
+  // The headbutt boss: a thick riveted plate across the forehead with a
+  // glowing centre seam — the bit that does the arguing.
+  const boss = new Mesh(new BoxGeometry(r * 1.05, r * 0.42, r * 0.5), chassisMat(accent, 0.05));
+  boss.position.set(0, r * 0.42, -r * 0.6);
+  boss.rotation.x = 0.36;
+  g.add(boss);
+  const seam = new Mesh(new BoxGeometry(r * 0.1, r * 0.44, r * 0.06), glowMat(accent, 0.7));
+  seam.position.set(0, r * 0.43, -r * 0.85);
+  seam.rotation.x = 0.36;
+  g.add(seam);
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 2; i++) {
-      const stud = new Mesh(new SphereGeometry(r * 0.06, 6, 5), chassisMat(accent, 0.07));
-      stud.position.set(side * r * 0.42, r * 0.82, -r * 0.4 + i * r * 0.55);
-      g.add(stud);
-    }
+    const stud = new Mesh(new SphereGeometry(r * 0.05, 6, 5), chassisMat(accent, 0.07));
+    stud.position.set(side * r * 0.34, r * 0.5, -r * 0.72);
+    g.add(stud);
   }
-  // Heavy single brow bar shading both eyes.
-  const brow = new Mesh(new BoxGeometry(r * 1.15, r * 0.2, r * 0.36), darkMat());
-  brow.position.set(0, r * 0.28, -r * 0.76);
-  g.add(brow);
+
+  // THE HORNS — the whole point of the skin. Each is a FAT ¾ torus stood
+  // vertically beside the head (arc gap at the back-bottom), coiling up over
+  // the ear, back, down and forward again — big enough to frame the whole
+  // face. A glowing spiral ridge traces the coil so it separates from the
+  // skull steel at a glance, and a down-swept cone tip finishes it.
   for (const side of [-1, 1]) {
-    const eye = new Mesh(new BoxGeometry(r * 0.2, r * 0.12, r * 0.1), glowMat(accent, 2.2));
-    eye.position.set(side * r * 0.4, r * 0.12, -r * 0.88);
-    g.add(eye);
-    // Stubby fan ears set high and back.
-    const ear = new Mesh(new CylinderGeometry(r * 0.16, r * 0.1, r * 0.14, 6), chassisMat(accent, 0.05));
-    ear.position.set(side * r * 0.72, r * 0.62, r * 0.3);
-    ear.rotation.z = side * 0.7;
+    const horn = new Mesh(new TorusGeometry(r * 0.62, r * 0.21, 10, 24, Math.PI * 1.6), chassisMat(accent, 0.05));
+    horn.position.set(side * r * 0.66, r * 0.2, r * 0.15);
+    horn.rotation.set(0, side * (Math.PI / 2), Math.PI * 0.62);
+    g.add(horn);
+    // The glow ridge rides the OUTER face of the coil.
+    const ridge = new Mesh(new TorusGeometry(r * 0.62, r * 0.05, 8, 24, Math.PI * 1.6), glowMat(accent, 0.7));
+    ridge.position.set(side * r * 0.88, r * 0.2, r * 0.15);
+    ridge.rotation.copy(horn.rotation);
+    g.add(ridge);
+    // Tip: where the spiral lets go — swept forward-down by the cheek.
+    const tip = new Mesh(new ConeGeometry(r * 0.18, r * 0.5, 8), chassisMat(accent, 0.06));
+    tip.position.set(side * r * 0.66, -r * 0.38, -r * 0.18);
+    tip.rotation.x = -Math.PI * 0.6;
+    g.add(tip);
+    // A little drooped ear tucked under the coil.
+    const ear = new Mesh(new BoxGeometry(r * 0.14, r * 0.3, r * 0.18), darkMat());
+    ear.position.set(side * r * 0.5, -r * 0.08, r * 0.34);
+    ear.rotation.z = side * 0.8;
     g.add(ear);
   }
-  // The great snout ramp carrying the horns.
-  const snout = new Mesh(new BoxGeometry(r * 0.7, r * 0.5, r * 0.9), chassisMat(accent, 0.05));
-  snout.position.set(0, -r * 0.22, -r * 0.95);
-  snout.rotation.x = 0.14;
-  g.add(snout);
-  // MAIN horn: a tall forward-raked cone off the nose; a second stub behind.
-  const horn = new Mesh(new ConeGeometry(r * 0.2, r * 1.05, 8), chassisMat(accent, 0.06));
-  horn.position.set(0, r * 0.18, -r * 1.28);
-  horn.rotation.x = 0.42;
-  g.add(horn);
-  const stub = new Mesh(new ConeGeometry(r * 0.13, r * 0.5, 8), chassisMat(accent, 0.06));
-  stub.position.set(0, r * 0.34, -r * 0.82);
-  stub.rotation.x = 0.3;
-  g.add(stub);
-  // Glow ring collaring the main horn's base — the powered ram.
-  const ringGlow = new Mesh(new CylinderGeometry(r * 0.22, r * 0.22, r * 0.06, 10), glowMat(accent, 1.2));
-  ringGlow.position.set(0, -r * 0.24, -r * 1.12);
-  ringGlow.rotation.x = 0.42;
-  g.add(ringGlow);
-  // Armoured jaw slab + nostril vents.
-  const jaw = new Mesh(new BoxGeometry(r * 0.8, r * 0.26, r * 0.7), darkMat());
-  jaw.position.set(0, -r * 0.56, -r * 0.7);
-  g.add(jaw);
+
+  // Heavy single brow bar + calm horizontal glow eyes (rams stare sideways).
+  const brow = new Mesh(new BoxGeometry(r * 1.05, r * 0.16, r * 0.34), darkMat());
+  brow.position.set(0, r * 0.16, -r * 0.78);
+  g.add(brow);
   for (const side of [-1, 1]) {
-    const vent = new Mesh(new CylinderGeometry(r * 0.07, r * 0.07, r * 0.06, 6), darkMat());
-    vent.rotation.x = Math.PI / 2;
-    vent.position.set(side * r * 0.22, -r * 0.34, -r * 1.38);
-    g.add(vent);
-    // Cheek guard plates.
-    const cheek = new Mesh(new BoxGeometry(r * 0.08, r * 0.4, r * 0.6), chassisMat(accent, 0.05));
-    cheek.position.set(side * r * 0.66, -r * 0.12, -r * 0.4);
-    cheek.rotation.y = side * 0.3;
-    g.add(cheek);
+    const eye = new Mesh(new BoxGeometry(r * 0.3, r * 0.11, r * 0.09), glowMat(accent, 2.6));
+    eye.position.set(side * r * 0.4, r * 0.02, -r * 0.86);
+    g.add(eye);
+  }
+
+  // Blunt muzzle dropping from the boss, dark nose band and nostril pits.
+  const muzzle = new Mesh(new BoxGeometry(r * 0.56, r * 0.5, r * 0.62), chassisMat(accent, 0.04));
+  muzzle.position.set(0, -r * 0.32, -r * 0.86);
+  muzzle.rotation.x = 0.12;
+  g.add(muzzle);
+  const nose = new Mesh(new BoxGeometry(r * 0.58, r * 0.16, r * 0.3), darkMat());
+  nose.position.set(0, -r * 0.5, -r * 1.02);
+  g.add(nose);
+  for (const side of [-1, 1]) {
+    const nostril = new Mesh(new CylinderGeometry(r * 0.05, r * 0.05, r * 0.05, 6), darkMat());
+    nostril.rotation.x = Math.PI / 2;
+    nostril.position.set(side * r * 0.15, -r * 0.36, -r * 1.18);
+    g.add(nostril);
   }
   return g;
 }
 
-/** RHINO cuirass: the heaviest silhouette — slabbed pauldrons with rim
- *  plates, a riveted barrel chest, vented power core, girder abs. */
-function buildRhinoChest(accent: number): Group {
-  const g = taggedHead('rhino');
-  const collar = new Mesh(new BoxGeometry(0.48, 0.12, 0.23), chassisMat(accent, 0.05));
+/** RAM cuirass: fleece in steel — mounded, overlapping wool bumps across the
+ *  shoulders and chest over a heavy trunk, with a furnace core glowing
+ *  through the parting. Built like something you bounce off. */
+function buildRamChest(accent: number): Group {
+  const g = taggedHead('ram');
+  const collar = new Mesh(new BoxGeometry(0.44, 0.11, 0.22), chassisMat(accent, 0.05));
   collar.position.y = 0.1;
   g.add(collar);
-  const neck = new Mesh(new CylinderGeometry(0.085, 0.105, 0.1, 8), darkMat());
+  const neck = new Mesh(new CylinderGeometry(0.08, 0.1, 0.1, 8), darkMat());
   neck.position.y = 0.16;
   g.add(neck);
-  // Slab pauldrons: a thick top plate + angled outer skirt + rivets.
+
+  // Woolly pauldrons: a tight mound of big overlapping flattened domes per
+  // shoulder — the fleece — over a tucked dark under-plate. The domes overlap
+  // hard so they read as one woolly mass, not separate bubbles.
   for (const side of [-1, 1]) {
-    const top = new Mesh(new BoxGeometry(0.26, 0.13, 0.32), chassisMat(accent, 0.05));
-    top.position.set(side * 0.31, 0.13, 0);
-    top.rotation.z = side * -0.16;
-    g.add(top);
-    const skirt = new Mesh(new BoxGeometry(0.2, 0.1, 0.3), darkMat());
-    skirt.position.set(side * 0.36, 0.01, 0);
-    skirt.rotation.z = side * -0.3;
-    g.add(skirt);
+    const under = new Mesh(new BoxGeometry(0.18, 0.09, 0.24), darkMat());
+    under.position.set(side * 0.28, 0.05, 0);
+    under.rotation.z = side * -0.22;
+    g.add(under);
     for (let i = 0; i < 3; i++) {
-      const stud = new Mesh(new SphereGeometry(0.013, 6, 5), chassisMat(accent, 0.07));
-      stud.position.set(side * (0.26 + i * 0.035), 0.2 - i * 0.01, -0.1 + i * 0.1);
-      g.add(stud);
+      const wool = new Mesh(new SphereGeometry(0.1 - i * 0.014, 10, 8), chassisMat(accent, 0.05));
+      wool.scale.set(1.1, 0.6, 1.05);
+      wool.position.set(side * (0.21 + i * 0.065), 0.15 - i * 0.045, 0);
+      wool.rotation.z = side * -0.2;
+      g.add(wool);
     }
-    // A blunt tusk stud jutting from each shoulder face.
-    const tusk = new Mesh(new ConeGeometry(0.035, 0.11, 6), chassisMat(accent, 0.06));
-    tusk.position.set(side * 0.33, 0.13, -0.17);
-    tusk.rotation.x = -Math.PI / 2;
-    g.add(tusk);
   }
-  const trunk = new Mesh(new CylinderGeometry(0.21, 0.13, 0.42, 8), darkMat());
-  trunk.scale.z = 0.8;
+
+  const trunk = new Mesh(new CylinderGeometry(0.19, 0.11, 0.42, 8), darkMat());
+  trunk.scale.z = 0.78;
   trunk.position.y = -0.12;
   g.add(trunk);
-  // Riveted barrel chest slab.
-  const slab = new Mesh(new BoxGeometry(0.34, 0.28, 0.09), chassisMat(accent, 0.05));
-  slab.position.set(0, -0.01, -0.14);
+
+  // A fleece fringe under the collar — one row of wool peeking over the top
+  // of the chest slab, tying the front to the shoulders.
+  for (let i = -1; i <= 1; i++) {
+    const wool = new Mesh(new SphereGeometry(0.055, 10, 8), chassisMat(accent, 0.05));
+    wool.scale.set(1.25, 0.7, 0.7);
+    wool.position.set(i * 0.11, 0.07, -0.12);
+    g.add(wool);
+  }
+  // Heavy riveted chest slab under it, split by the furnace core.
+  const slab = new Mesh(new BoxGeometry(0.32, 0.26, 0.08), chassisMat(accent, 0.05));
+  slab.position.set(0, -0.05, -0.13);
   g.add(slab);
   for (const side of [-1, 1]) {
     for (let j = 0; j < 2; j++) {
-      const stud = new Mesh(new SphereGeometry(0.013, 6, 5), chassisMat(accent, 0.07));
-      stud.position.set(side * 0.14, 0.1 - j * 0.2, -0.185);
+      const stud = new Mesh(new SphereGeometry(0.012, 6, 5), chassisMat(accent, 0.07));
+      stud.position.set(side * 0.13, 0.03 - j * 0.16, -0.175);
       g.add(stud);
     }
   }
-  // Vented power core: a wide glow bar behind three dark grill fins.
-  const core = new Mesh(new BoxGeometry(0.16, 0.05, 0.04), glowMat(accent, 1.4));
-  core.position.set(0, 0.0, -0.185);
+  const core = new Mesh(new CylinderGeometry(0.045, 0.045, 0.03, 12), glowMat(accent, 1.4));
+  core.rotation.x = Math.PI / 2;
+  core.position.set(0, -0.04, -0.175);
   g.add(core);
-  for (let i = -1; i <= 1; i++) {
-    const fin = new Mesh(new BoxGeometry(0.02, 0.06, 0.05), darkMat());
-    fin.position.set(i * 0.055, 0.0, -0.19);
-    g.add(fin);
-  }
-  // Girder abs — two thick cross-plates with glow seams.
+
+  // Chunky lower plates + flanks.
   for (let i = 0; i < 2; i++) {
-    const w = 0.28 - i * 0.05;
-    const ab = new Mesh(new BoxGeometry(w, 0.09, 0.08), chassisMat(accent, 0.04));
-    ab.position.set(0, -0.15 - i * 0.11, -0.1);
+    const w = 0.24 - i * 0.045;
+    const ab = new Mesh(new BoxGeometry(w, 0.08, 0.08), chassisMat(accent, 0.04));
+    ab.position.set(0, -0.22 - i * 0.09, -0.1);
     g.add(ab);
-    const seam = new Mesh(new BoxGeometry(w * 0.92, 0.014, 0.082), glowMat(accent, 0.3));
-    seam.position.set(0, -0.2 - i * 0.11, -0.1);
+    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.012, 0.082), glowMat(accent, 0.3));
+    seam.position.set(0, -0.265 - i * 0.09, -0.1);
     g.add(seam);
   }
   for (const side of [-1, 1]) {
-    const flank = new Mesh(new BoxGeometry(0.07, 0.28, 0.24), chassisMat(accent, 0.04));
-    flank.position.set(side * 0.18, -0.06, 0);
-    flank.rotation.z = side * 0.08;
+    const flank = new Mesh(new BoxGeometry(0.06, 0.27, 0.22), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.16, -0.07, 0);
+    flank.rotation.z = side * 0.1;
     g.add(flank);
   }
   return g;
 }
 
-/** RHINO hips: a girder belt with a riveted ram plate and broad tassets. */
-function buildRhinoPelvis(accent: number): Group {
-  const g = taggedHead('rhino');
-  const belt = new Mesh(new BoxGeometry(0.26, 0.08, 0.19), chassisMat(accent, 0.04));
+/** RAM hips: a broad belt under a fleece skirt — rounded wool tassets and a
+ *  ring buckle glowing like the furnace core. */
+function buildRamPelvis(accent: number): Group {
+  const g = taggedHead('ram');
+  const belt = new Mesh(new BoxGeometry(0.24, 0.07, 0.18), chassisMat(accent, 0.04));
   belt.position.y = 0.05;
   g.add(belt);
-  const buckle = new Mesh(new BoxGeometry(0.08, 0.06, 0.03), glowMat(accent, 1.0));
-  buckle.position.set(0, 0.05, -0.1);
+  const buckle = new Mesh(new TorusGeometry(0.032, 0.012, 6, 14), glowMat(accent, 1.0));
+  buckle.position.set(0, 0.05, -0.095);
   g.add(buckle);
-  const guard = new Mesh(new CylinderGeometry(0.13, 0.06, 0.16, 6), chassisMat(accent, 0.03));
+  const guard = new Mesh(new CylinderGeometry(0.11, 0.05, 0.15, 6), chassisMat(accent, 0.03));
   guard.position.set(0, -0.05, -0.02);
   g.add(guard);
   for (const side of [-1, 1]) {
-    const tasset = new Mesh(new BoxGeometry(0.11, 0.17, 0.16), chassisMat(accent, 0.04));
-    tasset.position.set(side * 0.13, -0.04, 0);
-    tasset.rotation.z = side * 0.24;
+    const tasset = new Mesh(new SphereGeometry(0.075, 10, 8), chassisMat(accent, 0.04));
+    tasset.scale.set(1.0, 1.3, 0.85);
+    tasset.position.set(side * 0.12, -0.05, 0);
+    tasset.rotation.z = side * 0.3;
     g.add(tasset);
-    const stud = new Mesh(new SphereGeometry(0.012, 6, 5), chassisMat(accent, 0.07));
-    stud.position.set(side * 0.15, -0.02, -0.09);
-    g.add(stud);
+  }
+  return g;
+}
+
+/** STALLION → the iron horse: a long sculpted muzzle with a glowing face
+ *  blaze, pinned ears, side-set eyes and a swept mane crest running back off
+ *  the crown. Proud, upright, unmistakably horse. */
+function buildStallionHead(accent: number): Group {
+  const r = BODY_IK.headRadius;
+  const g = taggedHead('stallion');
+
+  const skull = new Mesh(new SphereGeometry(r * 0.8, 16, 12), chassisMat(accent, 0.06));
+  skull.scale.set(0.92, 1.0, 1.08);
+  skull.position.y = r * 0.22;
+  g.add(skull);
+
+  // The long face: a tapering muzzle beam sloping down and forward, ending
+  // in a squared nose block with flared dark nostrils and a lower jaw.
+  const face = new Mesh(new BoxGeometry(r * 0.46, r * 0.44, r * 1.05), chassisMat(accent, 0.05));
+  face.position.set(0, -r * 0.08, -r * 0.78);
+  face.rotation.x = 0.3;
+  g.add(face);
+  const nose = new Mesh(new BoxGeometry(r * 0.42, r * 0.36, r * 0.34), chassisMat(accent, 0.05));
+  nose.position.set(0, -r * 0.42, -r * 1.28);
+  nose.rotation.x = 0.18;
+  g.add(nose);
+  for (const side of [-1, 1]) {
+    const nostril = new Mesh(new CylinderGeometry(r * 0.06, r * 0.06, r * 0.05, 6), darkMat());
+    nostril.rotation.set(Math.PI / 2 - 0.2, 0, side * 0.3);
+    nostril.position.set(side * r * 0.13, -r * 0.36, -r * 1.42);
+    g.add(nostril);
+  }
+  const jaw = new Mesh(new BoxGeometry(r * 0.4, r * 0.18, r * 0.6), darkMat());
+  jaw.position.set(0, -r * 0.42, -r * 0.72);
+  jaw.rotation.x = 0.24;
+  g.add(jaw);
+
+  // The BLAZE: a glowing stripe from the forelock straight down the face.
+  const blaze = new Mesh(new BoxGeometry(r * 0.09, r * 0.05, r * 1.15), glowMat(accent, 1.3));
+  blaze.position.set(0, r * 0.18, -r * 0.74);
+  blaze.rotation.x = 0.3;
+  g.add(blaze);
+
+  // Side-set eyes — big, calm, glowing, wide on the skull like a real horse,
+  // angled just far enough forward to still burn head-on across the arena.
+  for (const side of [-1, 1]) {
+    const socket = new Mesh(new BoxGeometry(r * 0.14, r * 0.24, r * 0.32), darkMat());
+    socket.position.set(side * r * 0.4, r * 0.16, -r * 0.42);
+    socket.rotation.y = side * 0.5;
+    g.add(socket);
+    const eye = new Mesh(new BoxGeometry(r * 0.1, r * 0.16, r * 0.24), glowMat(accent, 3.0));
+    eye.position.set(side * r * 0.44, r * 0.16, -r * 0.44);
+    eye.rotation.y = side * 0.5;
+    g.add(eye);
+  }
+
+  // Pricked ears: TALL cones set wide, dark inners facing forward — with the
+  // long face, the thing that says "horse" across the arena.
+  for (const side of [-1, 1]) {
+    const ear = new Mesh(new ConeGeometry(r * 0.18, r * 0.66, 5), chassisMat(accent, 0.05));
+    ear.position.set(side * r * 0.38, r * 1.02, r * 0.12);
+    ear.rotation.set(-0.22, 0, side * -0.3);
+    g.add(ear);
+    const inner = new Mesh(new ConeGeometry(r * 0.09, r * 0.42, 5), darkMat());
+    inner.position.set(side * r * 0.38, r * 1.0, r * 0.08);
+    inner.rotation.set(-0.22, 0, side * -0.3);
+    g.add(inner);
+  }
+
+  // The MANE: a tall crest of swept plates rising between the ears and
+  // running back down the nape, each with a glow vane — the stallion's
+  // silhouette from every angle.
+  for (let i = 0; i < 5; i++) {
+    const len = r * (0.85 - i * 0.09);
+    const plate = new Mesh(new BoxGeometry(r * 0.14, len, r * 0.22), chassisMat(accent, 0.04));
+    plate.position.set(0, r * (1.08 - i * 0.16), r * (0.28 + i * 0.22));
+    plate.rotation.x = 0.5 + i * 0.13;
+    g.add(plate);
+    const vane = new Mesh(new BoxGeometry(r * 0.06, len * 0.92, r * 0.23), glowMat(accent, 0.55 + (4 - i) * 0.12));
+    vane.position.set(0, r * (1.12 - i * 0.16), r * (0.3 + i * 0.22));
+    vane.rotation.x = 0.5 + i * 0.13;
+    g.add(vane);
+  }
+  return g;
+}
+
+/** STALLION cuirass: parade tack — crossed breast-straps meeting at a glowing
+ *  chest medallion, sleek shoulder plates, a girth-banded trunk. */
+function buildStallionChest(accent: number): Group {
+  const g = taggedHead('stallion');
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
+  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.1, 8), darkMat());
+  neck.position.y = 0.17;
+  g.add(neck);
+
+  // Sleek swept shoulder plates with a glow lip.
+  for (const side of [-1, 1]) {
+    const pad = new Mesh(new BoxGeometry(0.2, 0.08, 0.27), chassisMat(accent, 0.05));
+    pad.position.set(side * 0.27, 0.12, 0);
+    pad.rotation.z = side * -0.24;
+    g.add(pad);
+    const lip = new Mesh(new BoxGeometry(0.205, 0.015, 0.275), glowMat(accent, 0.5));
+    lip.position.set(side * 0.27, 0.165, 0);
+    lip.rotation.z = side * -0.24;
+    g.add(lip);
+  }
+
+  const trunk = new Mesh(new CylinderGeometry(0.155, 0.085, 0.42, 8), darkMat());
+  trunk.scale.z = 0.74;
+  trunk.position.y = -0.13;
+  g.add(trunk);
+
+  // The tack: two breast-straps crossing from the shoulders down to the
+  // sternum, meeting at a glowing medallion — parade harness in steel.
+  for (const side of [-1, 1]) {
+    const strap = new Mesh(new BoxGeometry(0.05, 0.3, 0.03), chassisMat(accent, 0.05));
+    strap.position.set(side * 0.09, 0.05, -0.145);
+    strap.rotation.z = side * 0.55;
+    g.add(strap);
+    for (let i = 0; i < 2; i++) {
+      const stud = new Mesh(new SphereGeometry(0.011, 6, 5), chassisMat(accent, 0.07));
+      stud.position.set(side * (0.05 + i * 0.09), 0.11 - i * 0.1, -0.165);
+      g.add(stud);
+    }
+  }
+  const medallion = new Mesh(new CylinderGeometry(0.032, 0.032, 0.03, 12), glowMat(accent, 1.4));
+  medallion.rotation.x = Math.PI / 2;
+  medallion.position.set(0, -0.02, -0.16);
+  g.add(medallion);
+
+  // Girth bands ringing the lower trunk.
+  for (let i = 0; i < 2; i++) {
+    const w = 0.2 - i * 0.04;
+    const band = new Mesh(new BoxGeometry(w, 0.05, 0.08), chassisMat(accent, 0.04));
+    band.position.set(0, -0.17 - i * 0.09, -0.1);
+    g.add(band);
+    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.01, 0.082), glowMat(accent, 0.35));
+    seam.position.set(0, -0.195 - i * 0.09, -0.1);
+    g.add(seam);
+  }
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.26, 0.2), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.13;
+    g.add(flank);
+  }
+  return g;
+}
+
+/** STALLION hips: a tack belt with a medallion buckle, tapered guard and
+ *  swept glow-edged tassets. */
+function buildStallionPelvis(accent: number): Group {
+  const g = taggedHead('stallion');
+  const belt = new Mesh(new BoxGeometry(0.2, 0.05, 0.16), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const buckle = new Mesh(new CylinderGeometry(0.026, 0.026, 0.03, 10), glowMat(accent, 1.1));
+  buckle.rotation.x = Math.PI / 2;
+  buckle.position.set(0, 0.05, -0.085);
+  g.add(buckle);
+  const guard = new Mesh(new CylinderGeometry(0.08, 0.03, 0.14, 6), chassisMat(accent, 0.03));
+  guard.position.set(0, -0.05, -0.02);
+  g.add(guard);
+  for (const side of [-1, 1]) {
+    const tasset = new Mesh(new BoxGeometry(0.055, 0.17, 0.12), chassisMat(accent, 0.04));
+    tasset.position.set(side * 0.1, -0.05, 0);
+    tasset.rotation.z = side * 0.3;
+    g.add(tasset);
+    const edge = new Mesh(new BoxGeometry(0.06, 0.013, 0.125), glowMat(accent, 0.4));
+    edge.position.set(side * 0.12, -0.125, 0);
+    edge.rotation.z = side * 0.3;
+    g.add(edge);
   }
   return g;
 }
@@ -1252,26 +1281,26 @@ const HEAD_BUILDERS: Record<string, (accent: number) => Group> = {
   crimson: buildPantherHead,
   valkyrie: buildEagleHead,
   knight: buildKnightHead,
-  viper: buildViperHead,
-  rhino: buildRhinoHead,
+  ram: buildRamHead,
+  stallion: buildStallionHead,
 };
 const CHEST_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearChest,
   crimson: buildPantherChest,
   valkyrie: buildEagleChest,
   knight: buildKnightChest,
-  viper: buildViperChest,
-  rhino: buildRhinoChest,
+  ram: buildRamChest,
+  stallion: buildStallionChest,
 };
 const PELVIS_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearPelvis,
   crimson: buildPantherPelvis,
   valkyrie: buildEaglePelvis,
   knight: buildKnightPelvis,
-  viper: buildViperPelvis,
-  rhino: buildRhinoPelvis,
+  ram: buildRamPelvis,
+  stallion: buildStallionPelvis,
 };
-const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'viper', 'rhino'];
+const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'ram', 'stallion'];
 
 /**
  * Build the full opponent rig. Pieces start hidden; add them to the scene.
