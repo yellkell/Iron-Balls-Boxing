@@ -1,17 +1,19 @@
 /**
- * SALT FLATS — an open, mirror-flat dusk backdrop, deliberately built to be
- * even LIGHTER than the papercraft desert. The whole sense of scale comes from
- * a cheap gradient sky and a flat vertex-coloured pan that fades into the
- * horizon, so there's almost no geometry and near-zero overdraw (the opposite
- * of the enclosed OLD FACTORY, which paid for a double-sided shell + a fistful
- * of point lights).
+ * SALT FLATS — an open dusk backdrop, deliberately built LIGHT. The sense of
+ * scale is a cheap gradient sky + a flat pan fogging into the horizon, so there
+ * is almost no geometry and near-zero overdraw (the opposite of the enclosed
+ * OLD FACTORY, which paid for a double-sided shell + a fistful of point lights).
+ *
+ * Perf note: the pan fills half the view, so its PER-PIXEL shader is the whole
+ * scene's biggest fragment cost. It's a MeshLambertMaterial (cheap diffuse +
+ * shadow + fog), NOT MeshStandardMaterial — no per-pixel image-based lighting
+ * or specular across the whole floor, which is what made it heavy on Quest.
  *
  * Cost budget, roughly one draw call each:
  *   - a gradient sky dome (one ShaderMaterial, like the desert),
- *   - one big flat ground plane (vertex-coloured salt→horizon, one crack map),
- *   - a stretched sun-glare streak (one additive quad),
+ *   - one ground plane (Lambert, vertex-coloured, fogged into the horizon),
  *   - a sun disc + halo (paper discs),
- *   - a ring of distant mountain silhouettes, MERGED to one batch,
+ *   - a single-ribbon mountain silhouette (one unlit, fog-exempt draw call),
  *   - 3 lights total (sun + ambient + hemi), no point lights.
  *
  * Same render-switch trick as the desert: the opaque dome paints out AR
@@ -31,7 +33,7 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
+  MeshLambertMaterial,
   PlaneGeometry,
   ShaderMaterial,
   SphereGeometry,
@@ -150,15 +152,15 @@ function buildGround(parent: Group): void {
   pos.needsUpdate = true;
   geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const mat = new MeshStandardMaterial({
-    vertexColors: true,
-    color: 0xffffff, // vertex colours carry the (muted) tone
-    roughness: 0.9, // matte salt — no blown-out sheen
-    metalness: 0.0,
-    envMapIntensity: 0.25,
-  });
+  // Lambert, not Standard: this plane fills half the view, so cheap per-pixel
+  // diffuse (no IBL/specular) is the single biggest saving on Quest. Still lit
+  // by the sun (relief on the swells), still takes the platforms' shadow, still
+  // fogs into the horizon, still wears the muted vertex tone.
+  const mat = new MeshLambertMaterial({ vertexColors: true, color: 0xffffff });
   const ground = new Mesh(geo, mat);
-  ground.receiveShadow = true;
+  // No receiveShadow: nothing in the salt flats casts a shadow (the platforms
+  // and fighters don't castShadow — only the desert's props do), so sampling
+  // the shadow map for every floor pixel would be pure waste on Quest.
   parent.add(ground);
 }
 
@@ -221,20 +223,13 @@ export function buildSaltFlats(): SaltFlats {
 
   root.add(makeSkyDome());
 
-  // A low warm sun keying the whole scene from over the far platform.
+  // A low warm sun keying the whole scene from over the far platform. It casts
+  // NO shadow (nothing here casts one) — so no shadow-map pass for this
+  // backdrop, and the floor never pays for shadow sampling.
   const e = SUN_ELEV * (Math.PI / 2);
   const sunDir = new Vector3(SUN_AZ.x * Math.cos(e), Math.sin(e), SUN_AZ.z * Math.cos(e)).normalize();
   const sun = new DirectionalLight(new Color('#ffcf9a'), 1.7);
   sun.position.copy(sunDir).multiplyScalar(60);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.bias = -0.0004;
-  const cam = sun.shadow.camera;
-  cam.near = 8;
-  cam.far = 150;
-  cam.left = cam.bottom = -42;
-  cam.right = cam.top = 42;
-  cam.updateProjectionMatrix();
   root.add(sun, sun.target); // target at origin → sun points at the platforms
 
   root.add(new AmbientLight(new Color('#4a4668'), 0.4)); // cool dusk fill
