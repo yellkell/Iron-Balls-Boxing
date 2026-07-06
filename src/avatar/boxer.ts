@@ -12,10 +12,12 @@
 
 import {
   BoxGeometry,
+  BufferGeometry,
   CanvasTexture,
   Color,
   ConeGeometry,
   CylinderGeometry,
+  Float32BufferAttribute,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -917,84 +919,228 @@ function buildKnightPelvis(accent: number): Group {
 }
 
 
-/** STALLION → the iron horse: a long sculpted muzzle with a glowing face
- *  blaze, pinned ears, side-set eyes and a swept mane crest running back off
- *  the crown. Proud, upright, unmistakably horse. */
+/** One cross-section of the lofted horse skull: the topline point (forehead /
+ *  nasal bridge) and underline point (throat / jaw / chin) in the sagittal
+ *  plane as [y, z] (in headRadius units), the half-width at that station, and
+ *  a superellipse exponent (2 = ellipse, higher = flatter-sided). */
+interface HeadStation {
+  top: [number, number];
+  bot: [number, number];
+  w: number;
+  n: number;
+}
+
+/** Loft a smooth, capped skin over a run of head stations. Each station
+ *  becomes a ring of `seg` vertices: a superellipse stretched between its
+ *  topline and underline points — so the section PLANES tilt with the face
+ *  (a horse's face plane leans forward-down) and the width/roundness vary
+ *  station to station. Rings are stitched into quads and both ends fan-capped. */
+function loftGeometry(stations: HeadStation[], scale: number, seg = 22): BufferGeometry {
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (const st of stations) {
+    const midY = (st.top[0] + st.bot[0]) / 2;
+    const midZ = (st.top[1] + st.bot[1]) / 2;
+    const hy = (st.top[0] - st.bot[0]) / 2;
+    const hz = (st.top[1] - st.bot[1]) / 2;
+    const e = 2 / st.n;
+    for (let j = 0; j < seg; j++) {
+      const a = (j / seg) * Math.PI * 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const u = Math.sign(c) * Math.abs(c) ** e;
+      const v = Math.sign(s) * Math.abs(s) ** e;
+      pos.push(st.w * u * scale, (midY + hy * v) * scale, (midZ + hz * v) * scale);
+    }
+  }
+  for (let i = 0; i < stations.length - 1; i++) {
+    for (let j = 0; j < seg; j++) {
+      const j2 = (j + 1) % seg;
+      const a = i * seg + j;
+      const b = i * seg + j2;
+      const c = (i + 1) * seg + j;
+      const d = (i + 1) * seg + j2;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  // Fan caps over the first (back of skull) and last (nose tip) rings.
+  const backCentre = pos.length / 3;
+  const s0 = stations[0];
+  pos.push(0, ((s0.top[0] + s0.bot[0]) / 2) * scale, ((s0.top[1] + s0.bot[1]) / 2) * scale);
+  const noseCentre = pos.length / 3;
+  const sn = stations[stations.length - 1];
+  pos.push(0, ((sn.top[0] + sn.bot[0]) / 2) * scale, ((sn.top[1] + sn.bot[1]) / 2) * scale);
+  const last = (stations.length - 1) * seg;
+  for (let j = 0; j < seg; j++) {
+    const j2 = (j + 1) % seg;
+    idx.push(backCentre, j, j2);
+    idx.push(noseCentre, last + j2, last + j);
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** STALLION → the iron horse, built for anatomical accuracy: one smooth
+ *  lofted skull that is genuinely horse-shaped — a broad flat forehead
+ *  between high side-set eyes, a long straight nasal bridge tapering to a
+ *  narrow soft muzzle with flared nostrils and a round chin, big jowl discs
+ *  at the back of the jaw (the widest part of the head), close-set curved
+ *  ears on the poll, a forelock and a swept mane crest down the nape. */
 function buildStallionHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('stallion');
 
-  const skull = new Mesh(new SphereGeometry(r * 0.8, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(0.92, 1.0, 1.08);
-  skull.position.y = r * 0.22;
+  // The skull loft, back of head → nose tip. Stations traced from a real
+  // head: the wedge is widest at the brow/jowls and tapers steadily down the
+  // (slightly convex) nasal bridge; the underline sweeps from the round
+  // throat forward along the jaw to the chin; a gentle re-flare at the
+  // nostril station before the nose rounds off.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.88, 0.42], bot: [0.1, 0.52], w: 0.26, n: 2.0 }, // occiput
+        { top: [1.02, 0.22], bot: [-0.05, 0.4], w: 0.36, n: 2.0 }, // poll
+        { top: [0.98, -0.02], bot: [-0.22, 0.26], w: 0.44, n: 2.1 }, // temples
+        { top: [0.74, -0.3], bot: [-0.34, 0.1], w: 0.47, n: 2.2 }, // brow (widest)
+        { top: [0.52, -0.5], bot: [-0.42, -0.05], w: 0.42, n: 2.2 }, // orbits
+        { top: [0.22, -0.76], bot: [-0.52, -0.32], w: 0.33, n: 2.1 }, // cheekbone
+        { top: [-0.06, -0.97], bot: [-0.62, -0.62], w: 0.27, n: 2.0 }, // mid face
+        { top: [-0.3, -1.15], bot: [-0.72, -0.92], w: 0.225, n: 1.9 }, // upper muzzle
+        { top: [-0.45, -1.27], bot: [-0.79, -1.1], w: 0.235, n: 1.85 }, // nostril flare
+        { top: [-0.58, -1.37], bot: [-0.85, -1.24], w: 0.185, n: 1.8 }, // nose
+        { top: [-0.68, -1.41], bot: [-0.84, -1.33], w: 0.1, n: 1.7 }, // tip
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
   g.add(skull);
 
-  // The long face: a tapering muzzle beam sloping down and forward, ending
-  // in a squared nose block with flared dark nostrils and a lower jaw.
-  const face = new Mesh(new BoxGeometry(r * 0.46, r * 0.44, r * 1.05), chassisMat(accent, 0.05));
-  face.position.set(0, -r * 0.08, -r * 0.78);
-  face.rotation.x = 0.3;
-  g.add(face);
-  const nose = new Mesh(new BoxGeometry(r * 0.42, r * 0.36, r * 0.34), chassisMat(accent, 0.05));
-  nose.position.set(0, -r * 0.42, -r * 1.28);
-  nose.rotation.x = 0.18;
-  g.add(nose);
+  // Jowls: the big round masseter discs at the back of the jaw — in a real
+  // head these are the widest thing below the eyes. Flattened and tucked into
+  // the skull sides so they read as cheek muscle, not add-on bubbles.
   for (const side of [-1, 1]) {
-    const nostril = new Mesh(new CylinderGeometry(r * 0.06, r * 0.06, r * 0.05, 6), darkMat());
-    nostril.rotation.set(Math.PI / 2 - 0.2, 0, side * 0.3);
-    nostril.position.set(side * r * 0.13, -r * 0.36, -r * 1.42);
-    g.add(nostril);
+    const jowl = new Mesh(new SphereGeometry(r * 0.36, 18, 14), chassisMat(accent, 0.05));
+    jowl.scale.set(0.38, 1.0, 0.92);
+    jowl.position.set(side * r * 0.27, r * 0.0, r * 0.02);
+    jowl.rotation.x = 0.35; // long axis leaning with the jawline
+    g.add(jowl);
   }
-  const jaw = new Mesh(new BoxGeometry(r * 0.4, r * 0.18, r * 0.6), darkMat());
-  jaw.position.set(0, -r * 0.42, -r * 0.72);
-  jaw.rotation.x = 0.24;
-  g.add(jaw);
 
-  // The BLAZE: a glowing stripe from the forelock straight down the face.
-  const blaze = new Mesh(new BoxGeometry(r * 0.09, r * 0.05, r * 1.15), glowMat(accent, 1.3));
-  blaze.position.set(0, r * 0.18, -r * 0.74);
-  blaze.rotation.x = 0.3;
-  g.add(blaze);
-
-  // Eyes — big glowing almond lenses sitting PROUD of the skull's front-sides
-  // (the old ones sat at r*0.44, inside the r*0.64 skull surface, so they were
-  // buried and never showed). A dark socket bezel rings each so it reads.
+  // Eyes: set HIGH and WIDE at the brow corners, looking out to the sides —
+  // a dark socket ring with the eye itself bulging just proud of the skull
+  // like a real horse's. The lofted brow corner plays the bone above them.
   for (const side of [-1, 1]) {
-    const socket = new Mesh(new SphereGeometry(r * 0.19, 12, 10), darkMat());
-    socket.scale.set(0.8, 1.05, 0.7);
-    socket.position.set(side * r * 0.52, r * 0.24, -r * 0.6);
+    const socket = new Mesh(new SphereGeometry(r * 0.15, 14, 12), darkMat());
+    socket.scale.set(0.5, 1.0, 0.9);
+    socket.position.set(side * r * 0.43, r * 0.34, -r * 0.42);
+    socket.rotation.y = side * -0.45;
     g.add(socket);
-    const eye = new Mesh(new SphereGeometry(r * 0.13, 12, 10), glowMat(accent, 3.2));
-    eye.scale.set(0.85, 1.15, 0.7);
-    eye.position.set(side * r * 0.58, r * 0.24, -r * 0.68);
+    const eye = new Mesh(new SphereGeometry(r * 0.11, 14, 12), glowMat(accent, 2.6));
+    eye.scale.set(0.6, 1.0, 0.85);
+    eye.position.set(side * r * 0.465, r * 0.335, -r * 0.44);
+    eye.rotation.y = side * -0.45;
     g.add(eye);
   }
 
-  // Pricked ears: TALL cones set wide, dark inners facing forward — with the
-  // long face, the thing that says "horse" across the arena.
+  // Ears: close-set on the poll, tall and alert, elliptical in section with
+  // a dark inner scoop facing forward — set as a shadow inside the rim, not
+  // a black slab. Bases sink into the poll so they grow from the head.
   for (const side of [-1, 1]) {
-    const ear = new Mesh(new ConeGeometry(r * 0.18, r * 0.66, 5), chassisMat(accent, 0.05));
-    ear.position.set(side * r * 0.38, r * 1.02, r * 0.12);
-    ear.rotation.set(-0.22, 0, side * -0.3);
+    const ear = new Mesh(new ConeGeometry(r * 0.17, r * 0.62, 10), chassisMat(accent, 0.05));
+    ear.scale.z = 0.75;
+    ear.position.set(side * r * 0.24, r * 1.14, r * 0.1);
+    ear.rotation.set(0.12, 0, side * -0.12);
     g.add(ear);
-    const inner = new Mesh(new ConeGeometry(r * 0.09, r * 0.42, 5), darkMat());
-    inner.position.set(side * r * 0.38, r * 1.0, r * 0.08);
-    inner.rotation.set(-0.22, 0, side * -0.3);
+    const inner = new Mesh(new ConeGeometry(r * 0.08, r * 0.4, 10), darkMat());
+    inner.scale.z = 0.55;
+    inner.position.set(side * r * 0.245, r * 1.1, r * 0.055);
+    inner.rotation.set(0.12, 0, side * -0.12);
     g.add(inner);
   }
 
-  // The MANE: a tall crest of swept plates rising between the ears and
-  // running back down the nape, each with a glow vane — the stallion's
-  // silhouette from every angle.
-  for (let i = 0; i < 5; i++) {
-    const len = r * (0.85 - i * 0.09);
-    const plate = new Mesh(new BoxGeometry(r * 0.14, len, r * 0.22), chassisMat(accent, 0.04));
-    plate.position.set(0, r * (1.08 - i * 0.16), r * (0.28 + i * 0.22));
-    plate.rotation.x = 0.5 + i * 0.13;
+  // Nostrils: large comma-shaped dark openings set into the SIDES of the
+  // muzzle, each with a raised outer rim so the flare reads in silhouette.
+  for (const side of [-1, 1]) {
+    const rim = new Mesh(new SphereGeometry(r * 0.13, 12, 10), chassisMat(accent, 0.05));
+    rim.scale.set(0.45, 1.2, 0.8);
+    rim.position.set(side * r * 0.215, -r * 0.53, -r * 1.26);
+    rim.rotation.set(0.55, side * -0.35, side * 0.25);
+    g.add(rim);
+    const nostril = new Mesh(new SphereGeometry(r * 0.115, 12, 10), darkMat());
+    nostril.scale.set(0.5, 1.15, 0.75);
+    nostril.position.set(side * r * 0.185, -r * 0.53, -r * 1.3);
+    nostril.rotation.set(0.55, side * -0.35, side * 0.25);
+    g.add(nostril);
+  }
+
+  // The soft chin knob under the lower lip, and the mouth seam above it.
+  const chin = new Mesh(new SphereGeometry(r * 0.15, 12, 10), chassisMat(accent, 0.05));
+  chin.scale.set(0.85, 0.7, 0.9);
+  chin.position.set(0, -r * 0.86, -r * 1.13);
+  g.add(chin);
+  const mouth = new Mesh(new BoxGeometry(r * 0.3, r * 0.035, r * 0.22), darkMat());
+  mouth.position.set(0, -r * 0.79, -r * 1.27);
+  mouth.rotation.x = 0.5;
+  g.add(mouth);
+
+  // The BLAZE: the white face-marking as a soft glow strip — a star on the
+  // forehead, narrowing between the eyes, widest mid-face and fading out
+  // above the nostrils, hugging the slope of the nasal bridge.
+  const star = new Mesh(new BoxGeometry(r * 0.11, r * 0.11, r * 0.02), glowMat(accent, 0.7));
+  star.position.set(0, r * 0.66, -r * 0.4);
+  star.rotation.set(0.75, 0, Math.PI / 4);
+  g.add(star);
+  const blazeSegs: Array<[[number, number], [number, number], number]> = [
+    [[0.6, -0.42], [0.1, -0.85], 0.065], // brow → cheek line
+    [[0.1, -0.85], [-0.34, -1.18], 0.095], // widest, mid-face
+    [[-0.34, -1.18], [-0.5, -1.31], 0.07], // fading above the nostrils
+  ];
+  for (const [hi, lo, w] of blazeSegs) {
+    const dy = hi[0] - lo[0];
+    const dz = hi[1] - lo[1];
+    const len = Math.hypot(dy, dz);
+    const theta = Math.atan2(dz, dy); // +Y of the plate runs up the bridge
+    const strip = new Mesh(new BoxGeometry(r * w, r * len, r * 0.02), glowMat(accent, 0.7));
+    // Centre on the topline, nudged out along the face normal so it sits
+    // proud of the lofted bridge instead of sinking into it.
+    strip.position.set(
+      0,
+      ((hi[0] + lo[0]) / 2 + Math.sin(theta) * 0.012) * r,
+      ((hi[1] + lo[1]) / 2 - Math.cos(theta) * 0.012) * r,
+    );
+    strip.rotation.x = theta;
+    g.add(strip);
+  }
+
+  // Forelock: narrow dark wisps spilling from between the ears down over the
+  // flat of the forehead, each turned a touch so none reads as a flat mirror.
+  for (const [dx, rotY, len] of [
+    [0, 0.18, 0.46],
+    [-0.11, -0.3, 0.4],
+    [0.12, 0.35, 0.38],
+  ]) {
+    const wisp = new Mesh(new BoxGeometry(r * 0.09, r * len, r * 0.05), darkMat());
+    wisp.position.set(dx * r, r * 0.92, -r * 0.22);
+    wisp.rotation.set(0.72, rotY, dx * -1.2);
+    g.add(wisp);
+  }
+
+  // The MANE: overlapping dark plates cresting the poll and sweeping down
+  // the nape, each carrying a thin accent filament so the crest still reads
+  // across the arena.
+  for (let i = 0; i < 6; i++) {
+    const len = r * (0.62 - i * 0.04);
+    const plate = new Mesh(new BoxGeometry(r * 0.1, len, r * 0.24), darkMat());
+    plate.position.set(0, r * (1.1 - i * 0.15), r * (0.26 + i * 0.15));
+    plate.rotation.x = 0.55 + i * 0.12;
     g.add(plate);
-    const vane = new Mesh(new BoxGeometry(r * 0.06, len * 0.92, r * 0.23), glowMat(accent, 0.55 + (4 - i) * 0.12));
-    vane.position.set(0, r * (1.12 - i * 0.16), r * (0.3 + i * 0.22));
-    vane.rotation.x = 0.5 + i * 0.13;
+    const vane = new Mesh(new BoxGeometry(r * 0.035, len * 0.85, r * 0.25), glowMat(accent, 0.5));
+    vane.position.set(0, r * (1.115 - i * 0.15), r * (0.26 + i * 0.15));
+    vane.rotation.x = 0.55 + i * 0.12;
     g.add(vane);
   }
   return g;

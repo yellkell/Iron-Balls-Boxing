@@ -134,46 +134,54 @@ function drawShield(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
   ctx.restore();
 }
 
-/** Stallion: the classic horse-head PROFILE — arched neck, long muzzle,
- *  pricked ears and a notched mane down the back. One filled shape. */
+/** Stallion: the horse-head PROFILE drawn to real proportions — a LONG
+ *  straight nasal bridge (the head is ~2.5x longer than it is deep), a soft
+ *  rounded muzzle with a chin, the big round jowl at the back of the jaw,
+ *  small close-set pricked ears and a notched mane crest down the nape. */
 function drawStallion(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const x = (u: number): number => cx + u * r;
   const y = (v: number): number => cy + v * r;
   ctx.beginPath();
-  // Muzzle tip (facing left), up over the nose bridge…
-  ctx.moveTo(x(-0.95), y(0.02));
-  ctx.quadraticCurveTo(x(-0.98), y(-0.28), x(-0.72), y(-0.4));
-  // …up the face to the brow and the front ear.
-  ctx.quadraticCurveTo(x(-0.4), y(-0.52), x(-0.22), y(-0.7));
-  ctx.lineTo(x(-0.18), y(-1.0));
-  ctx.lineTo(x(0.02), y(-0.72));
-  // Back ear.
-  ctx.lineTo(x(0.2), y(-0.98));
-  ctx.lineTo(x(0.26), y(-0.62));
-  // The mane: notched crest down the back of the arched neck.
-  ctx.quadraticCurveTo(x(0.42), y(-0.5), x(0.4), y(-0.28));
-  ctx.lineTo(x(0.56), y(-0.18));
-  ctx.lineTo(x(0.5), y(0.06));
-  ctx.lineTo(x(0.66), y(0.18));
-  ctx.lineTo(x(0.58), y(0.42));
-  ctx.lineTo(x(0.72), y(0.56));
-  // Base of the neck, wide at the chest…
-  ctx.quadraticCurveTo(x(0.72), y(0.9), x(0.4), y(0.95));
-  ctx.lineTo(x(-0.25), y(0.95));
-  // …up the throat and jaw, into the underside of the muzzle.
-  ctx.quadraticCurveTo(x(-0.3), y(0.5), x(-0.55), y(0.28));
-  ctx.quadraticCurveTo(x(-0.85), y(0.22), x(-0.95), y(0.02));
+  // Nose tip (facing left): a soft roundover onto the nasal bridge…
+  ctx.moveTo(x(-1.0), y(-0.08));
+  ctx.quadraticCurveTo(x(-0.99), y(-0.24), x(-0.86), y(-0.32));
+  // …then the LONG straight bridge up to the brow.
+  ctx.lineTo(x(-0.14), y(-0.7));
+  // Front ear, small and pricked, the valley, and the back ear.
+  ctx.lineTo(x(-0.07), y(-0.72));
+  ctx.lineTo(x(-0.02), y(-1.0));
+  ctx.lineTo(x(0.11), y(-0.74));
+  ctx.lineTo(x(0.23), y(-0.97));
+  ctx.lineTo(x(0.3), y(-0.66));
+  // The mane: a notched crest falling down the back of the neck.
+  ctx.quadraticCurveTo(x(0.4), y(-0.56), x(0.42), y(-0.44));
+  ctx.lineTo(x(0.55), y(-0.32));
+  ctx.lineTo(x(0.5), y(-0.14));
+  ctx.lineTo(x(0.66), y(-0.02));
+  ctx.lineTo(x(0.6), y(0.2));
+  ctx.lineTo(x(0.78), y(0.34));
+  ctx.quadraticCurveTo(x(0.88), y(0.6), x(0.82), y(0.95));
+  // Base of the neck.
+  ctx.lineTo(x(-0.02), y(0.95));
+  // Up the throatlatch, round the JOWL (the big cheek disc), then the lean
+  // jaw underline running forward to the chin.
+  ctx.quadraticCurveTo(x(-0.08), y(0.66), x(-0.18), y(0.56));
+  ctx.quadraticCurveTo(x(-0.5), y(0.55), x(-0.48), y(0.26));
+  ctx.lineTo(x(-0.8), y(0.16));
+  // Chin knob, lip notch, and the rounded nose closing to the tip.
+  ctx.quadraticCurveTo(x(-0.9), y(0.16), x(-0.93), y(0.08));
+  ctx.quadraticCurveTo(x(-1.03), y(0.02), x(-1.0), y(-0.08));
   ctx.closePath();
   ctx.fill();
-  // Eye + nostril knocked out darker.
+  // Eye high under the brow + comma nostril knocked out darker.
   ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = '#06070b';
   ctx.beginPath();
-  ctx.ellipse(x(-0.32), y(-0.32), r * 0.09, r * 0.07, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(x(-0.22), y(-0.5), r * 0.08, r * 0.065, -0.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(x(-0.78), y(-0.08), r * 0.05, r * 0.07, 0.3, 0, Math.PI * 2);
+  ctx.ellipse(x(-0.87), y(-0.05), r * 0.045, r * 0.075, 0.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
