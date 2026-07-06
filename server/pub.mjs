@@ -82,10 +82,90 @@ function saveData() {
   } catch (err) {
     console.warn('[iron-balls-pub] could not persist data:', err.message);
   }
+  // …and mirror the all-time board to durable cloud storage (see below).
+  void saveToCloud();
 }
 const data = loadData();
 if (!data.bans) data.bans = { ips: [], cids: [] };
 if (!data.snakeBoard) data.snakeBoard = []; // Octa Hunt all-time top 15 (per player)
+
+// --- durable cloud store for the OCTA HUNT all-time board --------------------
+// pub-data.json lives on Render's EPHEMERAL disk, so it's wiped on every
+// redeploy / cold-start — which was silently resetting the all-time board
+// overnight (the local file only survives an in-container restart). Mirror the
+// board to Firestore — the SAME public project the arena leaderboards use; the
+// web API key is a public identifier, access is governed by security rules —
+// so it survives restarts like every other board. All of this is best-effort:
+// any failure (package missing, offline, denied) logs and falls back to the
+// local file, and never disrupts the pub.
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA0NYO_w6uU0Fcc6nuVPitRQaGW3B6518E',
+  authDomain: 'arfi-b68f9.firebaseapp.com',
+  projectId: 'arfi-b68f9',
+  storageBucket: 'arfi-b68f9.firebasestorage.app',
+  messagingSenderId: '188374608574',
+  appId: '1:188374608574:web:108250406138b5a5988cef',
+};
+let cloudFs = null; // the firebase/firestore module, once loaded
+let cloudDocRef = null; // doc(db, 'pub', 'octaHunt')
+
+async function initCloud() {
+  try {
+    const appMod = await import('firebase/app');
+    const fs = await import('firebase/firestore');
+    const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(FIREBASE_CONFIG);
+    cloudFs = fs;
+    cloudDocRef = fs.doc(fs.getFirestore(app), 'pub', 'octaHunt');
+    return true;
+  } catch (err) {
+    console.warn('[iron-balls-pub] Firestore unavailable — Octa Hunt board is local-file only:', err.message);
+    return false;
+  }
+}
+
+async function loadFromCloud() {
+  if (!cloudDocRef || !cloudFs) return null;
+  try {
+    const snap = await cloudFs.getDoc(cloudDocRef);
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    if (!Array.isArray(d.snakeBoard)) return null;
+    return { snakeBoard: d.snakeBoard, snakeHi: d.snakeHi ?? { name: '—', score: 0 } };
+  } catch (err) {
+    console.warn('[iron-balls-pub] Firestore load failed:', err.message);
+    return null;
+  }
+}
+
+async function saveToCloud() {
+  if (!cloudDocRef || !cloudFs) return;
+  try {
+    await cloudFs.setDoc(cloudDocRef, { snakeBoard: data.snakeBoard, snakeHi: data.snakeHi });
+  } catch (err) {
+    console.warn('[iron-balls-pub] Firestore save failed:', err.message);
+  }
+}
+
+// On boot, restore the board from the cloud over the (ephemeral) file copy.
+// If the cloud is empty but we have a local board, seed the cloud from it.
+(async () => {
+  if (!(await initCloud())) return;
+  const cloud = await loadFromCloud();
+  if (cloud) {
+    data.snakeBoard = cloud.snakeBoard;
+    data.snakeHi = cloud.snakeHi;
+    console.log(
+      `[iron-balls-pub] Octa Hunt board restored from cloud: ${data.snakeBoard.length} entries` +
+        `, house record ${data.snakeHi?.score ?? 0} (${data.snakeHi?.name ?? '—'})`,
+    );
+    // A client that connected during the ~sub-second boot window got the empty
+    // file copy in its welcome payload — push the restored board to everyone.
+    broadcast({ t: 'snake-board', board: snakeBoardRows() });
+    broadcast({ t: 'snake-hi', hi: data.snakeHi });
+  } else if (data.snakeBoard.length) {
+    await saveToCloud();
+  }
+})();
 
 // --- room state ---------------------------------------------------------------
 /** id → { ws, name, accent, head, left, right } */
