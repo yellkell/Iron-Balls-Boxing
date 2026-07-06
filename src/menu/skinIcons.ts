@@ -28,9 +28,6 @@ export function drawAvatarIcon(ctx: CanvasRenderingContext2D, id: string, cx: nu
     case 'knight':
       drawShield(ctx, cx, cy, r);
       break;
-    case 'ram':
-      drawRam(ctx, cx, cy, r);
-      break;
     case 'stallion':
       drawStallion(ctx, cx, cy, r);
       break;
@@ -134,53 +131,6 @@ function drawShield(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
   const bar = r * 0.2;
   ctx.fillRect(cx - bar / 2, top + h * 0.14, bar, h * 0.64);
   ctx.fillRect(cx - w * 0.6, top + h * 0.3, w * 1.2, bar);
-  ctx.restore();
-}
-
-/** Ram: a head-on skull between two BIG spiral-curled horns — each horn a
- *  thick arc sweeping up, out, down and curling back in on itself. */
-function drawRam(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  const x = (u: number): number => cx + u * r;
-  const y = (v: number): number => cy + v * r;
-  // The horns first, so the skull overlaps their roots. Each is a thick
-  // stroked spiral: a big outer sweep plus a tighter inner curl.
-  ctx.lineCap = 'round';
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.lineWidth = r * 0.3;
-    // Outer sweep: from the crown, up and over, down the outside.
-    ctx.arc(x(s * 0.52), y(-0.18), r * 0.46, s === 1 ? -Math.PI * 0.85 : -Math.PI * 0.15, s === 1 ? Math.PI * 0.5 : Math.PI * 0.5, s === -1);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.lineWidth = r * 0.22;
-    // Inner curl: a tighter arc tucking forward under the sweep.
-    ctx.arc(x(s * 0.6), y(0.18), r * 0.22, Math.PI * 0.5, s === 1 ? Math.PI * 1.7 : -Math.PI * 0.7, s === -1);
-    ctx.stroke();
-  }
-  // Skull: broad dome tapering to a blunt muzzle.
-  ctx.beginPath();
-  ctx.moveTo(x(-0.5), y(-0.62));
-  ctx.quadraticCurveTo(x(0), y(-0.88), x(0.5), y(-0.62));
-  ctx.quadraticCurveTo(x(0.62), y(-0.1), x(0.34), y(0.52));
-  ctx.quadraticCurveTo(x(0.18), y(0.92), x(0), y(0.92));
-  ctx.quadraticCurveTo(x(-0.18), y(0.92), x(-0.34), y(0.52));
-  ctx.quadraticCurveTo(x(-0.62), y(-0.1), x(-0.5), y(-0.62));
-  ctx.closePath();
-  ctx.fill();
-  // Eyes + nostrils knocked out darker.
-  ctx.save();
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = '#06070b';
-  for (const s of [-1, 1]) {
-    ctx.save();
-    ctx.translate(x(s * 0.26), y(-0.08));
-    ctx.rotate(s * 0.25);
-    ctx.fillRect(-r * 0.14, -r * 0.05, r * 0.28, r * 0.1);
-    ctx.restore();
-    ctx.beginPath();
-    ctx.ellipse(x(s * 0.1), y(0.66), r * 0.045, r * 0.09, s * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-  }
   ctx.restore();
 }
 

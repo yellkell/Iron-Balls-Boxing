@@ -255,10 +255,9 @@ function xdFaceTexture(): CanvasTexture {
   ctx.textBaseline = 'middle';
   ctx.translate(s * 0.5, s * 0.5);
   ctx.rotate(Math.PI / 2); // on its side
-  ctx.font = '900 300px system-ui, sans-serif';
+  ctx.font = '900 320px system-ui, sans-serif';
   ctx.fillText('X', -s * 0.22, 0);
-  ctx.font = '900 380px system-ui, sans-serif';
-  ctx.fillText('D', s * 0.21, 0);
+  ctx.fillText('D', s * 0.22, 0);
   xdFaceTex = new CanvasTexture(canvas);
   xdFaceTex.colorSpace = SRGBColorSpace;
   xdFaceTex.minFilter = LinearFilter;

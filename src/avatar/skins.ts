@@ -75,9 +75,6 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   { id: 'valkyrie', name: 'FLY GUY', chassis: 0x261b33, trim: 0x120d1a, accent: 0xff9ad5 },
   // Polished steel knight in heraldic gold — a shop unlock.
   { id: 'knight', name: 'KNIGHT', chassis: 0x2d333d, trim: 0x14181f, accent: 0xffcf6e, price: 100 },
-  // The battering ram: big spiral-curled horns wrapping the ears, fleece-
-  // plated shoulders. Charcoal wool steel with a furnace-orange glow.
-  { id: 'ram', name: 'RAM', chassis: 0x2b2520, trim: 0x141210, accent: 0xff8a3d, price: 250 },
   // The stallion: long sculpted muzzle, pricked ears, a swept mane crest and
   // tack-strap cuirass. Derby-green steel with a minted glow.
   { id: 'stallion', name: 'STALLION', chassis: 0x1c2a21, trim: 0x0e1611, accent: 0x53ffa0, price: 500 },
