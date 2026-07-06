@@ -1772,15 +1772,14 @@ export class FightSystem extends createSystem({}) {
         lines.push({ text: 'SERVER OFFLINE', size: 28, colour: '#e8352a' });
       } else if (!holder) {
         if (f.phase === 'idle') {
-          // Stand dead-centre of your real playspace and face your duel
-          // direction BEFORE claiming — taking the corner recenters + aims your
-          // playspace, so where you're standing/facing now is where you fight.
-          lines.push({ text: 'GET YOURSELF IN THE PERFECT', size: 19, colour: '#aeb6c2' });
-          lines.push({ text: 'CENTRE OF YOUR PLAYSPACE IRL', size: 19, colour: '#aeb6c2' });
-          lines.push({ text: 'AND FACE THE DIRECTION', size: 19, colour: '#aeb6c2' });
-          lines.push({ text: 'YOU WANT TO DUEL', size: 19, colour: '#aeb6c2' });
-          lines.push({ text: 'ONLY THEN PRESS TRIGGER TO', size: 20, colour: '#ffb000', bold: true });
-          lines.push({ text: 'ENTER YOURSELF IN THIS CONTEST', size: 20, colour: '#ffb000', bold: true });
+          // Face the tablet head-on, dead-centre of your real playspace, BEFORE
+          // claiming — taking the corner recenters + aims your playspace on the
+          // tablet, so where you're standing/facing now is where you fight.
+          lines.push({ text: 'FACE THIS TABLET HEAD ON', size: 20, colour: '#aeb6c2' });
+          lines.push({ text: 'GET IN THE CENTER OF', size: 20, colour: '#aeb6c2' });
+          lines.push({ text: 'YOUR PLAYSPACE IRL', size: 20, colour: '#aeb6c2' });
+          lines.push({ text: 'ONLY THEN — PRESS TRIGGER', size: 20, colour: '#ffb000', bold: true });
+          lines.push({ text: 'HERE TO FIGHT', size: 20, colour: '#ffb000', bold: true });
         } else {
           lines.push({ text: 'EMPTY CORNER', size: 24, colour: '#9aa3b2' });
         }
