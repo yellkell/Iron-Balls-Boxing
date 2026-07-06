@@ -140,7 +140,10 @@ export class CollisionSystem extends createSystem({
       if (!hbObj) continue;
       hbObj.getWorldPosition(_otherPos);
       const reach = radius + (hitbox.getValue(Hitbox, 'radius') ?? 0.2);
-      if (_ballPos.distanceToSquared(_otherPos) > reach * reach) continue;
+      // Test the ball's whole swept path this frame, not just its endpoint —
+      // a max-speed throw on a dropped frame moves further than a head's
+      // reach, and used to tunnel clean through the body between frames.
+      if (pointSegDistSq(_otherPos, _ballPrev, _ballPos) > reach * reach) continue;
 
       const actualDamage = this.damageFor(hitbox, damage);
       const me = (hitbox.getValue(Hitbox, 'owner') as Entity | null) ?? hitbox;
@@ -214,7 +217,8 @@ export class CollisionSystem extends createSystem({
       if (!hbObj) continue;
       hbObj.getWorldPosition(_otherPos);
       const reach = radius + (hitbox.getValue(Hitbox, 'radius') ?? 0.2);
-      if (_ballPos.distanceToSquared(_otherPos) > reach * reach) continue;
+      // Swept, like enemyBallVsMe: fast balls must not skip bodies between frames.
+      if (pointSegDistSq(_otherPos, _ballPrev, _ballPos) > reach * reach) continue;
       const victim = (hitbox.getValue(Hitbox, 'owner') as Entity | null) ?? hitbox;
       if ((victim.getValue(Health, 'current') ?? 1) <= 0) continue; // already down
       if (scale > bestScale) {

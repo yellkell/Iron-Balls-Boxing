@@ -672,9 +672,13 @@ export class FireballSystem extends createSystem({
         if (obj.position.distanceTo(_grip) <= FIREBALL.catchRadius) {
           if (shard) {
             this.destroyBall(ball);
-          } else if (owner === 1) {
+          } else if (owner >= 1) {
+            // ANY remote fighter's main ball — not just opponent 1. The old
+            // `owner === 1` clamp meant FFA opponents 2 and 3 never reverted
+            // after a split recall, so our copy of their ball kept its 1/3
+            // split damage forever and every later plain throw "hit for 7".
             this.revertBall(ball);
-            this.destroyShards(1, hand);
+            this.destroyShards(owner, hand);
             ball.setValue(Fireball, 'state', BallState.Hover);
           }
         }
@@ -749,6 +753,15 @@ export class FireballSystem extends createSystem({
           // punch speed. Keep the ball where OUR sim shows it and let
           // `integrate` decay the offset onto the authoritative trajectory.
           const obj = ball.object3D!;
+          // Attachments are RETURN-leg weapons: a broadcast throw is always a
+          // plain ball (the sender reverts on catch before it can throw). If
+          // our copy still wears a stale attachment — the catch-revert raced
+          // the throw, or was missed — scrub it here so a fresh throw can
+          // never deal split/grow/shrink damage it doesn't have.
+          if ((ball.getValue(Fireball, 'attach') ?? 0) !== 0) {
+            this.revertBall(ball);
+            this.destroyShards(owner, cmd.hand);
+          }
           _offset.copy(obj.position).sub(cmd.pos);
           if (obj.visible && _offset.lengthSq() < 1) {
             this.netBlend.set(ball, _offset.clone());
