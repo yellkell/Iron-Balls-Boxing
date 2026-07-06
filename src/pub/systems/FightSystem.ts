@@ -393,6 +393,10 @@ export class FightSystem extends createSystem({}) {
   private rimGroup: Group | null = null;
   private rimEdges: RimEdge[] = [];
   private rimSide: -1 | 0 | 1 = -1;
+  /** Head is leant out past my platform rim (drives the arena-style hp drain). */
+  private headOutside = false;
+  /** 0.2 s drain-tick accumulator, same cadence as the arena guardian. */
+  private drainTick = 0;
 
   init(): void {
     preloadAnnouncer(); // decode 3/2/1/FIGHT so the countdown speaks like the arena
@@ -633,6 +637,7 @@ export class FightSystem extends createSystem({}) {
     group.visible = show;
     if (!show) {
       this.rimSide = -1;
+      this.headOutside = false;
       for (const e of this.rimEdges) {
         e.glow = 0;
         e.mat.opacity = 0;
@@ -656,6 +661,7 @@ export class FightSystem extends createSystem({}) {
       e.mat.opacity = e.glow;
       if (d > BOUNDARY.graceDepth) outside = true;
     }
+    this.headOutside = outside;
     const hex = outside ? PALETTE.danger : PALETTE.ember;
     for (const e of this.rimEdges) e.mat.color.setHex(hex);
   }
@@ -702,6 +708,7 @@ export class FightSystem extends createSystem({}) {
       // was still armed, so a half-step after winning round 1 was read as
       // walking off — forfeiting the whole best-of-5 before round 2 rang.
       if (fighting) this.checkForfeit();
+      if (fighting) this.drainBoundary(delta);
       this.checkIncomingHits(fighting);
       this.streamBalls(delta);
     } else {
@@ -892,6 +899,31 @@ export class FightSystem extends createSystem({}) {
     if (Math.hypot(_head.x - FIGHT.centerX, _head.z - z) > FIGHT.forfeitRadius) {
       pubSendRaw({ t: 'leave-fight' });
     }
+  }
+
+  /** Lean your head OUT past the rim and the arena's fire eats your health —
+   *  arena parity (BOUNDARY.drainPerSec), on the same 0.2 s tick. This is the
+   *  peek-out-to-dodge cost; walking fully off the pad still forfeits the bout
+   *  (checkForfeit, at the wider forfeitRadius). updateRimBarrier sets
+   *  headOutside (and flashes the walls red) each frame. */
+  private drainBoundary(delta: number): void {
+    if (!this.headOutside) {
+      this.drainTick = 0;
+      return;
+    }
+    this.drainTick += delta;
+    if (this.drainTick < 0.2) return;
+    this.drainTick = 0;
+    const dmg = Math.max(1, Math.round(BOUNDARY.drainPerSec * 0.2));
+    this.myHp = Math.max(0, this.myHp - dmg);
+    // Head-height burst + buzz + double-hand haptic so the drain reads like the
+    // arena's boundary fire, then report the new hp to the room.
+    this.player.head.getWorldPosition(_head);
+    spawnFireImpact(this.world, _head, 1, 1.3);
+    sfx.boundaryBuzz(1);
+    pulseHand(this.world.session, 'left', 0.9, 140);
+    pulseHand(this.world.session, 'right', 0.9, 140);
+    pubSendEvent({ e: 'FIGHT_HP', hp: this.myHp });
   }
 
   // --- glove-touch (fist bump the other fighter) ------------------------------
