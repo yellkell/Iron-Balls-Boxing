@@ -37,7 +37,7 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
-import { makePaperDouble, makeRng } from '../desert/paper.js';
+import { makePaperDouble, makeRng, valueNoise2D } from '../desert/paper.js';
 
 export interface SaltFlats {
   root: Group;
@@ -50,9 +50,22 @@ export interface SaltFlats {
 const SKY_TOP = 0x172142; // deep indigo overhead
 const SKY_HORIZON = 0xf3b072; // warm gold at eye level
 const SKY_BOTTOM = 0x5c4f63; // muted dusk below the horizon
-const SALT_NEAR = 0xe6edf1; // pale cool salt underfoot (the pan fades to the
-//                             horizon via the scene fog, not a vertex ramp)
+// Muted dusk-lit salt (NOT blazing white): a warm-pale crust on the swells, a
+// cooler grey in the hollows. Vertex-coloured for tonal interest; the pan fades
+// to the horizon via the scene fog.
+const SALT_CREST = 0xcdc9c2; // warm pale on the rises
+const SALT_HOLLOW = 0x8f898e; // cooler, dimmer in the dips
 const MOUNTAIN = 0x2b2b47; // far dusky silhouettes
+
+// The salt pan is gently sculpted so it isn't a dead-flat fill and so the
+// fight platforms read as RAISED — the clearing around the origin is lowered
+// (like the desert's platformReveal), leaving the pedestals standing proud.
+const FLAT_RADIUS = 16; // level, lowered clearing around the platforms (m)
+// Drop the clearing by a full pedestal thickness so the salt meets the slab's
+// BASE and the whole pedestal stands proud (the arena/desert raised look);
+// deeper than this and the salt sinks below the slab, reading as a saucer.
+const PLATFORM_REVEAL = 0.15;
+const SWELL_HEIGHT = 0.55; // amplitude of the slow salt swells farther out (m)
 
 // The sun sits low over the FAR platform (−z), so it reads for a player facing
 // their opponent. Everything warm keys off this direction.
@@ -95,19 +108,54 @@ function makeSkyDome(): Mesh {
   return dome;
 }
 
-/** The flat salt pan: a big matte white plane. It reads as infinite because
- *  the scene FOG (set by DesertSystem for this backdrop) melts its far reaches
- *  into the horizon band — no tessellation seam, no texture, dead cheap. Takes
- *  the platform's (baked) shadow. */
+/** Slow salt swells + the lowered platform clearing. Near the origin the pan
+ *  drops to −PLATFORM_REVEAL (a level basin) so the pedestals stand proud;
+ *  farther out it rolls in gentle swells so it isn't a dead-flat sheet. */
+const saltNoise = valueNoise2D(makeRng(0x5a17c0), 16);
+function saltHeight(x: number, z: number): number {
+  const swell =
+    (saltNoise(x / 60 + 3, z / 60 + 3) - 0.5) * SWELL_HEIGHT +
+    (saltNoise(x / 22 + 9, z / 22 + 9) - 0.5) * SWELL_HEIGHT * 0.35;
+  const d = Math.hypot(x, z);
+  const falloff = Math.min(1, Math.max(0, (d - FLAT_RADIUS) / FLAT_RADIUS));
+  // Near platforms → flat, lowered clearing; farther out → the swells.
+  return swell * falloff - PLATFORM_REVEAL * (1 - falloff);
+}
+
+/** The salt pan: a big plane pushed into gentle swells, vertex-coloured muted
+ *  salt (crust on the rises, dimmer in the dips) so it reads with relief and
+ *  isn't blown-out white. It looks infinite because the scene FOG melts its far
+ *  reaches into the horizon band. Takes the platforms' (baked) shadow. */
 function buildGround(parent: Group): void {
   const R = 750;
-  const geo = new PlaneGeometry(R * 2, R * 2, 8, 8);
+  const geo = new PlaneGeometry(R * 2, R * 2, 96, 96);
   geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  const crest = new Color(SALT_CREST);
+  const hollow = new Color(SALT_HOLLOW);
+  const tmp = new Color();
+  const rng = makeRng(0x2b1e);
+  const colors: number[] = [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const y = saltHeight(x, z);
+    pos.setY(i, y);
+    // Tone by height (rises catch the light, hollows sit in shade) + a little
+    // patchy jitter so the crust isn't uniform.
+    const t = Math.min(1, Math.max(0, y / SWELL_HEIGHT + 0.5)) * (0.9 + rng() * 0.1);
+    tmp.copy(hollow).lerp(crest, t);
+    colors.push(tmp.r, tmp.g, tmp.b);
+  }
+  pos.needsUpdate = true;
+  geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
   const mat = new MeshStandardMaterial({
-    color: new Color(SALT_NEAR),
-    roughness: 0.72, // faint sheen — damp salt, not a real reflection
+    vertexColors: true,
+    color: 0xffffff, // vertex colours carry the (muted) tone
+    roughness: 0.9, // matte salt — no blown-out sheen
     metalness: 0.0,
-    envMapIntensity: 0.5,
+    envMapIntensity: 0.25,
   });
   const ground = new Mesh(geo, mat);
   ground.receiveShadow = true;
@@ -190,7 +238,7 @@ export function buildSaltFlats(): SaltFlats {
   root.add(sun, sun.target); // target at origin → sun points at the platforms
 
   root.add(new AmbientLight(new Color('#4a4668'), 0.4)); // cool dusk fill
-  root.add(new HemisphereLight(new Color(SKY_HORIZON), new Color(SALT_NEAR), 0.55));
+  root.add(new HemisphereLight(new Color(SKY_HORIZON), new Color(SALT_CREST), 0.55));
 
   // Paper sun disc + halo low on the horizon.
   const halo = new Mesh(new CircleGeometry(52, 36), makePaperDouble('#ffca8a', 0.5));
