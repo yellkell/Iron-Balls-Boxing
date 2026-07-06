@@ -2209,7 +2209,6 @@ interface LobbyMeta {
   seatSoft: string;
   hostTag: string;
   title: string;
-  subtitle: string;
 }
 
 /** Per-mode look + copy for the shared lobby modal. */
@@ -2222,7 +2221,6 @@ function lobbyMeta(mode: ArcadeMode): LobbyMeta {
         seatSoft: 'rgba(79,183,255,0.10)',
         hostTag: UI.coolBright,
         title: '2V2',
-        subtitle: 'two on two · you + an ally vs a pair · last team standing',
       };
     case 'ffa':
       return {
@@ -2231,7 +2229,6 @@ function lobbyMeta(mode: ArcadeMode): LobbyMeta {
         seatSoft: 'rgba(255,176,0,0.10)',
         hostTag: UI.amberSoft,
         title: 'FFA',
-        subtitle: 'four-way free-for-all · every fist for itself',
       };
     default:
       return {
@@ -2240,7 +2237,6 @@ function lobbyMeta(mode: ArcadeMode): LobbyMeta {
         seatSoft: 'rgba(178,107,255,0.10)',
         hostTag: '#d9c2ff',
         title: 'RAID',
-        subtitle: 'four fists · five titans · one life for the squad',
       };
   }
 }
@@ -2256,9 +2252,6 @@ function drawRaid(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null)
   const meta = lobbyMeta(mode);
   panelBg(ctx, false, meta.accent, meta.title, RAID_W, RAID_H);
   ctx.textAlign = 'center';
-  ctx.font = '600 21px system-ui, sans-serif';
-  ctx.fillStyle = UI.textDim;
-  ctx.fillText(meta.subtitle, RAID_W / 2, 100);
 
   if (app.lobbyView === 'lobby') return drawRaidLobby(ctx, hoverAction, mode, meta);
 
