@@ -13,6 +13,7 @@
       } from 'three';
       import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
       import { buildSaltFlats } from '/src/arena/saltflats/index.ts';
+      import { makePlatform } from '/src/arena/arena.ts';
 
       const params = new URLSearchParams(location.search);
       const yaw = Number(params.get('yaw') ?? 0); // camera heading, radians
@@ -33,6 +34,13 @@
       scene.add(env.root);
       scene.background = env.skyColor;
       scene.fog = new Fog(env.skyColor.getHex(), 30, 700); // matches DesertSystem
+
+      // Show the fight pedestals so the raised-platform effect is visible.
+      const mine = makePlatform(0xff7a18);
+      scene.add(mine);
+      const foe = makePlatform(0x4fb7ff);
+      foe.position.set(0, 0, -3);
+      scene.add(foe);
 
       const camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 2000);
       camera.position.set(0, 1.6, 2.2); // standing on the pan, near the platform spot
