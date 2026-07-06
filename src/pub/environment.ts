@@ -1094,12 +1094,16 @@ function buildFightHall(root: Group): {
   const NZ = hall.minZ + 0.05; // north wall (faces +z)
   const SZ = hall.maxZ - 0.05; // south wall (faces −z)
   const WX = hall.minX + 0.05; // far-west wall (faces +x)
-  hallPoster('posters/split.png', cx + 2.8, 2.2, NZ, 0, 0.05);
-  hallPoster('posters/eagle.jpg', cx - 3.2, 2.3, NZ, 0, -0.04);
-  hallPoster('posters/shrink.jpg', cx - 2.6, 2.2, SZ, Math.PI, 0.06);
-  hallPoster('posters/balls.png', cx + 3.4, 2.1, SZ, Math.PI, -0.03);
-  hallPoster('posters/eagle.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04);
-  hallPoster('posters/shrink.jpg', WX, 2.15, 3.8, Math.PI / 2, -0.05);
+  // One print per wall pairing, and the two west-wall prints chosen so the NW
+  // corner (north-left + west-north) and the SW corner (south-left +
+  // west-south) never repeat — the eagle/shrink twins used to double up right
+  // at those corners. Any repeat now sits on opposite ends of the hall.
+  hallPoster('posters/split.png', cx + 2.8, 2.2, NZ, 0, 0.05); // north-right
+  hallPoster('posters/eagle.jpg', cx - 3.2, 2.3, NZ, 0, -0.04); // north-left
+  hallPoster('posters/shrink.jpg', cx - 2.6, 2.2, SZ, Math.PI, 0.06); // south-left
+  hallPoster('posters/balls.png', cx + 3.4, 2.1, SZ, Math.PI, -0.03); // south-right
+  hallPoster('posters/balls.png', WX, 2.25, -3.4, Math.PI / 2, 0.04); // west-north (was 2nd eagle)
+  hallPoster('posters/split.png', WX, 2.15, 3.8, Math.PI / 2, -0.05); // west-south (was 2nd shrink)
 
   return {
     consolePanels: [consolePanels[0], consolePanels[1]],

@@ -20,6 +20,11 @@
  *     match /{document=**} { allow read, write: if true; }   // sig + c{seat}
  *   }
  *
+ * The pub server (server/pub.mjs) also persists the OCTA HUNT all-time board
+ * here (Render's disk is ephemeral), in a single doc `pub/octaHunt`:
+ *
+ *   match /pub/{doc} { allow read, write: if true; }
+ *
  * (Tighten with App Check / auth before a big public release.)
  *
  * Set `FIREBASE_ENABLED = false` to force the WebSocket relay everywhere.
