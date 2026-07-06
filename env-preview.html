@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- DEV-ONLY harness: renders an arena backdrop for screenshots. Not shipped. -->
+<html>
+  <body style="margin:0; background:#000">
+    <script type="module">
+      import {
+        ACESFilmicToneMapping,
+        Fog,
+        PerspectiveCamera,
+        PMREMGenerator,
+        Scene,
+        WebGLRenderer,
+      } from 'three';
+      import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+      import { buildSaltFlats } from '/src/arena/saltflats/index.ts';
+
+      const params = new URLSearchParams(location.search);
+      const yaw = Number(params.get('yaw') ?? 0); // camera heading, radians
+      const pitch = Number(params.get('pitch') ?? -0.05);
+
+      const scene = new Scene();
+      const renderer = new WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(1);
+      renderer.toneMapping = ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+      scene.environment = new PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+
+      const env = buildSaltFlats();
+      env.root.visible = true;
+      scene.add(env.root);
+      scene.background = env.skyColor;
+      scene.fog = new Fog(env.skyColor.getHex(), 30, 700); // matches DesertSystem
+
+      const camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 2000);
+      camera.position.set(0, 1.6, 2.2); // standing on the pan, near the platform spot
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          renderer.render(scene, camera);
+          document.title = 'preview-ready';
+        });
+      });
+    </script>
+  </body>
+</html>

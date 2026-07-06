@@ -408,8 +408,13 @@ export const RAID = {
   resStillTime: 3.0,
   resShakeTime: 1.4,
   resRiseTime: 6.0,
-  /** Phase 2: the crown walked in REVERSE, this many loops, enrage locked on. */
-  phase2Loops: 2,
+  /** Phase 2: the crown walked in REVERSE, this many loops, enrage locked on.
+   *  MUST be at least CAMPAIGN.crownLoops (phase 1 = 3) or the second life dies
+   *  FASTER than the first — GOLIATH's bar steps down 1 notch per crown hit, so
+   *  fewer loops = fewer required hits = bigger chunk per hit. At 3 it matches
+   *  phase 1's 30 crown hits, and with enrage cadence + the reversed crown walk
+   *  the second life plays harder overall (was 2 → died 33% quicker). */
+  phase2Loops: 3,
   /** Host state-echo cadence (seconds). */
   stateEcho: 0.3,
 };

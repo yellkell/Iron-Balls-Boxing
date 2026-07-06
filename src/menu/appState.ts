@@ -18,8 +18,9 @@ export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
 export type AppMode = 'bot' | 'net' | 'campaign';
 export type { ArcadeMode } from '../config.js';
 import type { ArcadeMode } from '../config.js';
-/** The arena backdrop: bare AR passthrough, or the papercraft desert. */
-export type AppEnvironment = 'ar' | 'desert' | 'factory';
+/** The arena backdrop: bare AR passthrough, the papercraft desert, the salt
+ *  flats, or the (shelved) factory. */
+export type AppEnvironment = 'ar' | 'desert' | 'saltflats' | 'factory';
 
 export interface LifetimeStats {
   wins: number;
@@ -207,7 +208,7 @@ export const app: {
     // we honour whatever the player last chose — including bare AR. The OLD
     // FACTORY backdrop is shelved (COMING SOON in the picker), so anyone who
     // had it equipped falls back to the desert.
-    if (e === 'desert' || e === 'ar') return e;
+    if (e === 'desert' || e === 'saltflats' || e === 'ar') return e;
     return 'desert';
   })(),
   accentHue: loadAccentHue(),

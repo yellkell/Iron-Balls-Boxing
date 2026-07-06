@@ -111,7 +111,8 @@ const _fwd = new Vector3();
 // The backdrop the passthrough disc restores when you toggle AR back off —
 // remembered as you pick one in the ARENA tab (or flip passthrough on over a
 // live backdrop). Defaults to the saved env, or DESERT if you booted in AR.
-let lastBackdrop: 'desert' | 'factory' = app.environment === 'factory' ? 'factory' : 'desert';
+let lastBackdrop: 'desert' | 'saltflats' | 'factory' =
+  app.environment === 'saltflats' ? 'saltflats' : app.environment === 'factory' ? 'factory' : 'desert';
 const BOARD_SCROLL_DEADZONE = 0.55;
 const BOARD_SCROLL_INITIAL_REPEAT = 0.28;
 const BOARD_SCROLL_REPEAT = 0.12;
@@ -679,6 +680,11 @@ export class MenuSystem extends createSystem({}) {
       case 'env-desert':
         app.environment = 'desert';
         lastBackdrop = 'desert';
+        saveEnvironment();
+        break;
+      case 'env-saltflats':
+        app.environment = 'saltflats';
+        lastBackdrop = 'saltflats';
         saveEnvironment();
         break;
       case 'env-factory':

@@ -128,9 +128,10 @@ export type MenuAction =
   /** Quick passthrough toggle (BATTLE-panel disc): flip the backdrop off to
    *  bare AR so you can see your real room, and back. */
   | 'toggle-passthrough'
-  /** Arena-backdrop picker (LOCKER » ARENA tab): bare AR / desert / factory. */
+  /** Arena-backdrop picker (LOCKER » ARENA tab): bare AR / desert / salt flats. */
   | 'env-ar'
   | 'env-desert'
+  | 'env-saltflats'
   | 'env-factory'
   | 'tab-arena'
   /** Leaderboard top tab: BATTLE fronts the 1v1 / 2v2 / ffa boards. */
@@ -2734,14 +2735,13 @@ function drawColourTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
 }
 
 /** The LOCKER's ARENA tab — pick the backdrop that hangs behind your bouts:
- *  bare AR (your real room) or the papercraft desert. A third slot is held
- *  for the next arena (COMING SOON — not selectable). The quick passthrough
- *  disc above the BATTLE panel flips between AR and whatever you last chose
- *  here. */
+ *  bare AR (your real room), the papercraft desert, or the salt flats. The
+ *  quick passthrough disc above the BATTLE panel flips between AR and whatever
+ *  you last chose here. */
 const ARENA_OPTS: Array<{ env: AppEnvironment | null; label: string; action: MenuAction | null; soon?: boolean }> = [
   { env: 'ar', label: 'PASSTHROUGH', action: 'env-ar' },
   { env: 'desert', label: 'DESERT', action: 'env-desert' },
-  { env: null, label: 'COMING SOON', action: null, soon: true },
+  { env: 'saltflats', label: 'SALT FLATS', action: 'env-saltflats' },
 ];
 const ARENA_ROW = { x: 40, y0: 168, w: PAN_W - 80, h: 96, step: 112 };
 
