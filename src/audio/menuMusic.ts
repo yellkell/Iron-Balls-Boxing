@@ -1,5 +1,5 @@
 /**
- * Lobby music — the "Start Again" track that rides under the main menu.
+ * Lobby music — the "Smoldering" track that rides under the main menu.
  * It starts the moment you enter VR from the landing page (a user gesture, so
  * autoplay is allowed) and loops while you're in the LOBBY. It pauses the
  * instant you start a bout or aim training, and resumes when you land back in
@@ -12,7 +12,7 @@
  * three gates — entered VR, in the lobby, not muted — funnelled through sync().
  */
 
-import musicUrl from '../assets/music/start-again.m4a?url';
+import musicUrl from '../assets/music/smoldering.m4a?url';
 import { musicVolume, onMusicVolume } from './musicVolume.js';
 
 const MUTE_KEY = 'ibb-music-muted';
