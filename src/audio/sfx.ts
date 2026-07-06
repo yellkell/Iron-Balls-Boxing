@@ -252,6 +252,15 @@ export function throwWhoosh(): void {
   tone({ freq: 210, to: 70, type: 'triangle', dur: 0.18, gain: 0.18 });
 }
 
+/** A CURVED throw leaving the fist — the straight throw's punch plus a rising
+ *  doppler whip and a bent falling tail, so a hook SOUNDS like a hook. */
+export function curveWhoosh(): void {
+  clank(620, 0.06, 0.09); // same piston knock — it's still a throw
+  whooshNoise(0.5, 0.26, 240, 2100); // longer, airier rip
+  tone({ freq: 170, to: 460, type: 'triangle', dur: 0.2, gain: 0.13 }); // the whip winds UP…
+  tone({ freq: 340, to: 88, type: 'triangle', dur: 0.26, gain: 0.14, delay: 0.1 }); // …then bends away
+}
+
 /** Recall pulled — a winch servo spools the ball back in. */
 export function recall(): void {
   servo(150, 520, 0.35, 0.09);

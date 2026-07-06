@@ -45,7 +45,7 @@ import {
   Vector3,
 } from 'three';
 import type { XROrigin } from '@iwsdk/xr-input';
-import { ATTACH, BODY_IK, BOUNDARY, FIREBALL, NET, OCTAGON_VERTICES, PALETTE, teamColor } from '../../config.js';
+import { ATTACH, BODY_IK, BOUNDARY, CURL, FIREBALL, NET, OCTAGON_VERTICES, PALETTE, teamColor } from '../../config.js';
 import { buildBoxer, solveTorso, type BoxerRig } from '../../avatar/boxer.js';
 import { applyAvatarSkin, platformSkin } from '../../avatar/skins.js';
 import { customization, myAvatarSkin } from '../../menu/customization.js';
@@ -99,17 +99,16 @@ const FIST_LANE_RADIUS = 0.34;
 const FIST_CLOSING_SPEED = 1.35;
 const FIST_LOCAL_HAND_SPEED = 1.2;
 
-// Curveball tuning — identical to the arena (FireballSystem). The raw swing
-// turn-rate (rad/s) is scaled by GAIN and capped, then in flight the velocity
-// rotates about the curl axis while the rate decays — so the ball banks hard
-// early (just off the fist) and straightens out. Only applied when the fist's
+// Curveball tuning — the shared CURL block in config.ts (one source for the
+// arena and this pub port, which used to carry a drifting private copy),
+// aliased to the names this file always used. Only applied when the fist's
 // "Curve" loadout toggle is on (ff-ballarc), exactly like the arena.
-const CURL_MIN = 2.5; // rad/s dead zone: below this the punch is "straight" → no curve
-const CURL_GAIN = 1.5; // applied to the swing rate ABOVE the dead zone
-const CURL_MAX = 4.0; // rad/s after gain
-const CURL_DECAY = 2.0; // per second — lower = the bend carries further
-const CURL_SPEED_MIN = 2.6; // below this swing speed → essentially no curve
-const CURL_SPEED_FULL = 4.4; // at/above this → full curve
+const CURL_MIN = CURL.min;
+const CURL_GAIN = CURL.gain;
+const CURL_MAX = CURL.max;
+const CURL_DECAY = CURL.decay;
+const CURL_SPEED_MIN = CURL.speedMin;
+const CURL_SPEED_FULL = CURL.speedFull;
 
 /** Ring buffer of recent hand positions → smoothed punch velocity. */
 class VelocityTracker {
@@ -299,6 +298,7 @@ const _ggLift = new Vector3();
 const _hitAt = new Vector3();
 const _hitAnchor = new Vector3();
 const _lead = new Vector3();
+const _spiral = new Vector3();
 const _rimLocal = new Vector3();
 const _cA = new Vector3();
 const _cB = new Vector3();
@@ -1343,7 +1343,7 @@ export class FightSystem extends createSystem({}) {
       }
 
       ball.visual.group.position.copy(ball.pos);
-      this.driveFireLook(ball.visual, ball.pos, ball.state, ball, delta, cool);
+      this.driveFireLook(ball.visual, ball.pos, ball.state, ball, delta, cool, ball.curl, ball.vel);
     }
   }
 
@@ -1363,19 +1363,27 @@ export class FightSystem extends createSystem({}) {
     ball.vel.copy(_dir).multiplyScalar(speed);
     // Curve: read the swing's turn-rate, gate it on a committed (fast) swing,
     // and store axis × rate as the in-flight curl. Same maths as the arena.
+    let curlRate = 0;
     if (this.ballArc[hand]) {
       const raw = this.trackers[hand].curl(_curl, this.time);
       const speedK = Math.max(0, Math.min(1, (handSpeed - CURL_SPEED_MIN) / (CURL_SPEED_FULL - CURL_SPEED_MIN)));
-      const rate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
-      ball.curl.copy(_curl).multiplyScalar(rate);
+      curlRate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
+      ball.curl.copy(_curl).multiplyScalar(curlRate);
     } else {
       ball.curl.set(0, 0, 0);
     }
     ball.state = FLYING;
     ball.elapsed = 0;
     ball.recallLock = 0;
-    sfx.throwWhoosh();
-    pulseHand(this.world.session, HANDS[hand], 0.8, 110);
+    // Arena parity: a throw that bit into a curve gets the whip-crack launch
+    // and a harder buzz, so the hook is felt the instant it leaves.
+    if (curlRate >= CURL.feelMin) {
+      sfx.curveWhoosh();
+      pulseHand(this.world.session, HANDS[hand], 1.0, 150);
+    } else {
+      sfx.throwWhoosh();
+      pulseHand(this.world.session, HANDS[hand], 0.8, 110);
+    }
   }
 
   private opponentChest(out: Vector3): void {
@@ -1689,6 +1697,11 @@ export class FightSystem extends createSystem({}) {
     rec: { heat: number; trailAcc: number },
     delta: number,
     cool: boolean,
+    // A LOCAL curveball passes its live curl + velocity so the trail can ride
+    // a corkscrew (arena parity); remote balls stream positions only, so their
+    // trail simply traces the already-curved path.
+    curl?: Vector3,
+    vel?: Vector3,
   ): void {
     const target =
       state === ORBIT ? 1.45 : state === FLYING ? 1.25 : state === RETURNING ? 1.35 : state === DEAD ? 0.18 : 0.8;
@@ -1702,6 +1715,22 @@ export class FightSystem extends createSystem({}) {
       if (rec.trailAcc >= 0.009) {
         rec.trailAcc = 0;
         stampTrail(pos, cool);
+        // A live curveball rides a corkscrew: an extra stamp spiralling round
+        // the rope makes the bend read as SPIN, not a wobbly straight throw.
+        if (state === FLYING && curl && vel && curl.length() >= CURL.feelMin) {
+          _perp1.set(0, 1, 0);
+          if (Math.abs(vel.y) > vel.length() * 0.94) _perp1.set(1, 0, 0);
+          _perp1.cross(vel).normalize();
+          _perp2.crossVectors(vel, _perp1).normalize();
+          const phase = this.time * 24;
+          _spiral
+            .copy(_perp1)
+            .multiplyScalar(Math.cos(phase))
+            .addScaledVector(_perp2, Math.sin(phase))
+            .multiplyScalar(FIREBALL.radius * 1.1 * visual.group.scale.x)
+            .add(pos);
+          stampTrail(_spiral, cool);
+        }
       }
     } else if (state === ORBIT) {
       rec.trailAcc += delta;

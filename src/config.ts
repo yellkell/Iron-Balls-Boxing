@@ -151,6 +151,28 @@ export const FIREBALL = {
 };
 
 /**
+ * Curveball tuning (the per-fist CURVE loadout toggle) — ONE source shared by
+ * the arena (FireballSystem) and the pub fight hall (FightSystem), which used
+ * to carry drifting private copies. The raw swing turn-rate (rad/s, read off
+ * the punch's curvature) is scaled by `gain` above the `min` dead zone and
+ * capped at `max`; in flight the velocity rotates about the curl axis while
+ * the rate decays at `decay`/s — bank hard off the fist, straighten downrange.
+ */
+export const CURL = {
+  min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
+  gain: 1.6, // applied to the swing rate ABOVE the dead zone
+  max: 5.0, // rad/s after gain — the hardest hook the ball will bite into
+  decay: 1.4, // per second — lower = the bend carries further downrange
+  // Curve only really bites on a committed, WIDE swing — small movements are
+  // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
+  speedMin: 2.2, // below this swing speed → essentially no curve
+  speedFull: 4.0, // at/above this → full curve
+  /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
+   *  launch sfx, the harder haptic and the corkscrew trail. */
+  feelMin: 0.5,
+};
+
+/**
  * Per-ball attachments (the BALL LOADOUT panel). Each of your two balls can
  * carry one. The effect fires the instant you RECALL a still-FLYING ball — a
  * dead ball on the floor returns plain — and lasts only until you catch it,
