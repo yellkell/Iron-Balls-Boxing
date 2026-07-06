@@ -204,8 +204,10 @@ export const app: {
   environment: ((): AppEnvironment => {
     const e = localStorage.getItem('ff-env');
     // First-ever launch (nothing stored) opens in the desert arena; after that
-    // we honour whatever the player last chose — including bare AR.
-    if (e === 'desert' || e === 'factory' || e === 'ar') return e;
+    // we honour whatever the player last chose — including bare AR. The OLD
+    // FACTORY backdrop is shelved (COMING SOON in the picker), so anyone who
+    // had it equipped falls back to the desert.
+    if (e === 'desert' || e === 'ar') return e;
     return 'desert';
   })(),
   accentHue: loadAccentHue(),
