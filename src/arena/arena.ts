@@ -239,8 +239,10 @@ export function makePlatform(color: number): Group {
   return group;
 }
 
-/** A white "XD" grin (X eyes, D mouth) on transparent — painted on the deck of
- *  the black premium platform. Built once and shared by every pedestal. */
+/** A white "XD" on transparent — painted huge across the deck of the black
+ *  premium platform: ONE big X and a bigger D, the whole thing centred and
+ *  laid on its side, so it reads as the laughing face. Built once and shared
+ *  by every pedestal. */
 let xdFaceTex: CanvasTexture | undefined;
 function xdFaceTexture(): CanvasTexture {
   if (xdFaceTex) return xdFaceTex;
@@ -251,17 +253,12 @@ function xdFaceTexture(): CanvasTexture {
   ctx.fillStyle = '#f6f8ff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '900 190px system-ui, sans-serif';
-  // X eyes.
-  ctx.fillText('X', s * 0.31, s * 0.36);
-  ctx.fillText('X', s * 0.69, s * 0.36);
-  // D mouth — the letter laid on its back so the flat edge tops a big grin.
-  ctx.save();
-  ctx.translate(s * 0.5, s * 0.66);
-  ctx.rotate(Math.PI / 2);
-  ctx.font = '900 250px system-ui, sans-serif';
-  ctx.fillText('D', 0, 0);
-  ctx.restore();
+  ctx.translate(s * 0.5, s * 0.5);
+  ctx.rotate(Math.PI / 2); // on its side
+  ctx.font = '900 300px system-ui, sans-serif';
+  ctx.fillText('X', -s * 0.22, 0);
+  ctx.font = '900 380px system-ui, sans-serif';
+  ctx.fillText('D', s * 0.21, 0);
   xdFaceTex = new CanvasTexture(canvas);
   xdFaceTex.colorSpace = SRGBColorSpace;
   xdFaceTex.minFilter = LinearFilter;
