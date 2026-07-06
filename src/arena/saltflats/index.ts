@@ -1,0 +1,215 @@
+/**
+ * SALT FLATS — an open, mirror-flat dusk backdrop, deliberately built to be
+ * even LIGHTER than the papercraft desert. The whole sense of scale comes from
+ * a cheap gradient sky and a flat vertex-coloured pan that fades into the
+ * horizon, so there's almost no geometry and near-zero overdraw (the opposite
+ * of the enclosed OLD FACTORY, which paid for a double-sided shell + a fistful
+ * of point lights).
+ *
+ * Cost budget, roughly one draw call each:
+ *   - a gradient sky dome (one ShaderMaterial, like the desert),
+ *   - one big flat ground plane (vertex-coloured salt→horizon, one crack map),
+ *   - a stretched sun-glare streak (one additive quad),
+ *   - a sun disc + halo (paper discs),
+ *   - a ring of distant mountain silhouettes, MERGED to one batch,
+ *   - 3 lights total (sun + ambient + hemi), no point lights.
+ *
+ * Same render-switch trick as the desert: the opaque dome paints out AR
+ * passthrough. Nothing moves, so update() is a no-op.
+ */
+
+import {
+  AmbientLight,
+  BackSide,
+  BufferGeometry,
+  CircleGeometry,
+  Color,
+  DirectionalLight,
+  DoubleSide,
+  Float32BufferAttribute,
+  Group,
+  HemisphereLight,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  ShaderMaterial,
+  SphereGeometry,
+  Vector3,
+} from 'three';
+import { makePaperDouble, makeRng } from '../desert/paper.js';
+
+export interface SaltFlats {
+  root: Group;
+  /** Fallback background colour behind the dome (the warm horizon band). */
+  skyColor: Color;
+  update(delta: number, time: number): void;
+}
+
+// Dusk / golden-hour palette.
+const SKY_TOP = 0x172142; // deep indigo overhead
+const SKY_HORIZON = 0xf3b072; // warm gold at eye level
+const SKY_BOTTOM = 0x5c4f63; // muted dusk below the horizon
+const SALT_NEAR = 0xe6edf1; // pale cool salt underfoot (the pan fades to the
+//                             horizon via the scene fog, not a vertex ramp)
+const MOUNTAIN = 0x2b2b47; // far dusky silhouettes
+
+// The sun sits low over the FAR platform (−z), so it reads for a player facing
+// their opponent. Everything warm keys off this direction.
+const SUN_ELEV = 0.11; // fraction of a right-angle above the horizon
+const SUN_AZ = new Vector3(0.18, 0, -0.98).normalize();
+
+/** A big inward-facing gradient sky: indigo overhead → gold horizon → dusk floor. */
+function makeSkyDome(): Mesh {
+  const mat = new ShaderMaterial({
+    side: BackSide,
+    depthWrite: false,
+    uniforms: {
+      top: { value: new Color(SKY_TOP) },
+      horizon: { value: new Color(SKY_HORIZON) },
+      bottom: { value: new Color(SKY_BOTTOM) },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 top, horizon, bottom;
+      varying vec3 vDir;
+      void main() {
+        float h = vDir.y;
+        // A tight warm band hugs the horizon, fading up to indigo and down to dusk.
+        vec3 c = h > 0.0
+          ? mix(horizon, top, smoothstep(0.0, 0.5, h))
+          : mix(horizon, bottom, smoothstep(0.0, -0.25, h));
+        gl_FragColor = vec4(c, 1.0);
+      }
+    `,
+  });
+  const dome = new Mesh(new SphereGeometry(800, 32, 16), mat);
+  dome.renderOrder = -1;
+  dome.frustumCulled = false;
+  return dome;
+}
+
+/** The flat salt pan: a big matte white plane. It reads as infinite because
+ *  the scene FOG (set by DesertSystem for this backdrop) melts its far reaches
+ *  into the horizon band — no tessellation seam, no texture, dead cheap. Takes
+ *  the platform's (baked) shadow. */
+function buildGround(parent: Group): void {
+  const R = 750;
+  const geo = new PlaneGeometry(R * 2, R * 2, 8, 8);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new MeshStandardMaterial({
+    color: new Color(SALT_NEAR),
+    roughness: 0.72, // faint sheen — damp salt, not a real reflection
+    metalness: 0.0,
+    envMapIntensity: 0.5,
+  });
+  const ground = new Mesh(geo, mat);
+  ground.receiveShadow = true;
+  parent.add(ground);
+}
+
+/** A distant mountain range on the horizon — ONE ribbon of geometry: a ring
+ *  wall whose base sits on the ground line and whose top edge zig-zags into
+ *  peaks and valleys (layered noise). Flat unlit navy so it reads as a crisp
+ *  silhouette against the glowing sky, dipping to a low valley under the sun so
+ *  it rises over open flat. One draw call, no lighting, no fog. */
+function buildMountains(parent: Group): void {
+  const ring = 560;
+  const N = 96; // ridge resolution around the horizon
+  const rng = makeRng(0x9c33);
+  const sunAngle = Math.atan2(SUN_AZ.x, SUN_AZ.z);
+  // Per-point ridge height from layered sines + a little jitter.
+  const ph1 = rng() * 6.28;
+  const ph2 = rng() * 6.28;
+  const ph3 = rng() * 6.28;
+  const height = (a: number): number => {
+    let h =
+      42 +
+      20 * Math.sin(a * 3 + ph1) +
+      13 * Math.sin(a * 7 + ph2) +
+      8 * Math.sin(a * 13 + ph3) +
+      (rng() - 0.5) * 10;
+    // Dip the range to a low ridge in a window around the sun.
+    let da = a - sunAngle;
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    const dip = Math.min(1, Math.abs(da) / 0.7); // 0 at the sun → 1 outside the window
+    h *= 0.18 + 0.82 * (dip * dip * (3 - 2 * dip));
+    return Math.max(6, h);
+  };
+
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const sx = Math.sin(a) * ring;
+    const sz = Math.cos(a) * ring;
+    pos.push(sx, 0, sz); // base on the ground line
+    pos.push(sx, height(a), sz); // jagged summit
+  }
+  for (let i = 0; i < N; i++) {
+    const b0 = i * 2;
+    const t0 = i * 2 + 1;
+    const b1 = i * 2 + 2;
+    const t1 = i * 2 + 3;
+    idx.push(b0, b1, t1, b0, t1, t0); // two tris per segment
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  const mat = new MeshBasicMaterial({ color: new Color(MOUNTAIN), side: DoubleSide, fog: false });
+  parent.add(new Mesh(geo, mat));
+}
+
+export function buildSaltFlats(): SaltFlats {
+  const root = new Group();
+  root.name = 'saltflats-environment';
+  root.visible = false;
+
+  root.add(makeSkyDome());
+
+  // A low warm sun keying the whole scene from over the far platform.
+  const e = SUN_ELEV * (Math.PI / 2);
+  const sunDir = new Vector3(SUN_AZ.x * Math.cos(e), Math.sin(e), SUN_AZ.z * Math.cos(e)).normalize();
+  const sun = new DirectionalLight(new Color('#ffcf9a'), 1.7);
+  sun.position.copy(sunDir).multiplyScalar(60);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.bias = -0.0004;
+  const cam = sun.shadow.camera;
+  cam.near = 8;
+  cam.far = 150;
+  cam.left = cam.bottom = -42;
+  cam.right = cam.top = 42;
+  cam.updateProjectionMatrix();
+  root.add(sun, sun.target); // target at origin → sun points at the platforms
+
+  root.add(new AmbientLight(new Color('#4a4668'), 0.4)); // cool dusk fill
+  root.add(new HemisphereLight(new Color(SKY_HORIZON), new Color(SALT_NEAR), 0.55));
+
+  // Paper sun disc + halo low on the horizon.
+  const halo = new Mesh(new CircleGeometry(52, 36), makePaperDouble('#ffca8a', 0.5));
+  halo.position.copy(sunDir).multiplyScalar(602);
+  halo.lookAt(0, halo.position.y, 0);
+  root.add(halo);
+  const disc = new Mesh(new CircleGeometry(30, 32), makePaperDouble('#ffe9c4', 1.2));
+  disc.position.copy(sunDir).multiplyScalar(600);
+  disc.lookAt(0, disc.position.y, 0);
+  root.add(disc);
+
+  buildGround(root);
+  buildMountains(root);
+
+  return {
+    root,
+    skyColor: new Color(SKY_HORIZON),
+    update: () => {
+      /* the flats are dead still — nothing to animate */
+    },
+  };
+}
