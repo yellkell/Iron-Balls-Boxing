@@ -2195,10 +2195,12 @@ const RAID_CLOSE_BTN = { x: RAID_W / 2 - 90, y: RAID_H - 78, w: 180, h: 48 };
 const RAID_SLOT_Y0 = 148;
 const RAID_SLOT_H = 52;
 const RAID_SLOT_GAP = 10;
-const RAID_HC_Y = 406;
+const RAID_HC_Y = 398;
 // Status line over the bottom controls. In a joined lobby the FFA host also
-// gets a START button (short-handed launch) tucked left of LEAVE.
-const RAID_STATUS_Y = RAID_H - 116;
+// gets a START button (short-handed launch) tucked left of LEAVE. Sits well
+// clear of the HARDCORE row above (its text + toggle plate) — the two used to
+// crowd into each other by a few pixels in a full raid lobby.
+const RAID_STATUS_Y = RAID_H - 98;
 const RAID_LEAVE_BTN = { x: RAID_W / 2 - 110, y: RAID_H - 74, w: 220, h: 52 };
 const LOBBY_START_BTN = { x: 70, y: RAID_H - 74, w: 200, h: 52 };
 const LOBBY_LEAVE_BTN = { x: RAID_W - 70 - 200, y: RAID_H - 74, w: 200, h: 52 };
@@ -2732,13 +2734,14 @@ function drawColourTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
 }
 
 /** The LOCKER's ARENA tab — pick the backdrop that hangs behind your bouts:
- *  bare AR (your real room), the papercraft desert, or the old factory. The
- *  quick passthrough disc above the BATTLE panel flips between AR and whatever
- *  you last chose here. */
-const ARENA_OPTS: Array<{ env: AppEnvironment; label: string; action: MenuAction }> = [
+ *  bare AR (your real room) or the papercraft desert. A third slot is held
+ *  for the next arena (COMING SOON — not selectable). The quick passthrough
+ *  disc above the BATTLE panel flips between AR and whatever you last chose
+ *  here. */
+const ARENA_OPTS: Array<{ env: AppEnvironment | null; label: string; action: MenuAction | null; soon?: boolean }> = [
   { env: 'ar', label: 'PASSTHROUGH', action: 'env-ar' },
   { env: 'desert', label: 'DESERT', action: 'env-desert' },
-  { env: 'factory', label: 'OLD FACTORY', action: 'env-factory' },
+  { env: null, label: 'COMING SOON', action: null, soon: true },
 ];
 const ARENA_ROW = { x: 40, y0: 168, w: PAN_W - 80, h: 96, step: 112 };
 
@@ -2749,6 +2752,21 @@ function arenaRowRect(i: number): PanRect {
 function drawArenaTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   ARENA_OPTS.forEach((opt, i) => {
     const r = arenaRowRect(i);
+    // The held slot: a dim, non-interactive COMING SOON placeholder.
+    if (opt.soon) {
+      plate(ctx, r.x, r.y, r.w, r.h, {
+        cut: 16,
+        fill: 'rgba(60,62,70,0.16)',
+        stroke: UI.steelDim,
+        rivets: false,
+      });
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = stencilFont(30);
+      ctx.fillStyle = UI.steelDim;
+      ctx.fillText(opt.label, r.x + 36, r.y + r.h / 2);
+      return;
+    }
     const on = app.environment === opt.env;
     const hot = hoverAction === opt.action;
     plate(ctx, r.x, r.y, r.w, r.h, {
@@ -2778,7 +2796,8 @@ function drawArenaTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
 
 function hitArenaTab(x: number, y: number): MenuAction | null {
   for (let i = 0; i < ARENA_OPTS.length; i++) {
-    if (inPanRect(x, y, arenaRowRect(i))) return ARENA_OPTS[i].action;
+    const opt = ARENA_OPTS[i];
+    if (opt.action && inPanRect(x, y, arenaRowRect(i))) return opt.action;
   }
   return null;
 }

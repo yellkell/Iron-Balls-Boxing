@@ -47,6 +47,13 @@ export interface PlatformSkin {
    */
   slab?: number;
   /**
+   * The slab's EMISSIVE tint. The deck normally glows faintly in the neon
+   * colour, but over a near-black slab a saturated neon (e.g. VOLT's yellow)
+   * washes the whole deck that colour. Set this to keep the deck truly black
+   * (0x000000) while the rim + any decal still burn the neon. Omitted = neon.
+   */
+  slabEmissive?: number;
+  /**
    * Earned, never sold: how this skin is won (shown on its shop tile in place
    * of a price; tapping it there does nothing until it's yours). The CHAMPION
    * pad carries 'FELL GOLIATH'.
@@ -94,9 +101,10 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // hot-pink grid over a midnight-purple deck.
   { id: 'frostbite', name: 'FROSTBITE', neon: 0x8ae4ff, slab: 0x2a4a58, price: 250 },
   { id: 'synthwave', name: 'SYNTHWAVE', neon: 0xff4fd8, slab: 0x251043, price: 250 },
-  // …the storm pad: electric-yellow piping over near-black steel with a big
-  // lightning bolt painted across the deck (a skinTag decal, like the XD grin).
-  { id: 'volt', name: 'VOLT', neon: 0xffe94a, slab: 0x101218, price: 1000 },
+  // …the storm pad: electric-yellow piping + a big lightning bolt over a
+  // jet-black deck (slabEmissive black so the yellow rim doesn't wash the
+  // whole deck olive).
+  { id: 'volt', name: 'VOLT', neon: 0xffe94a, slab: 0x080808, slabEmissive: 0x000000, price: 1000 },
   // …and the top-shelf flex: a jet-black deck with a white XD grin painted on
   // it (X eyes, a capital-D mouth). The face mesh is built into every platform,
   // tagged with this id and shown only when it's worn.
@@ -210,7 +218,9 @@ export function applyPlatformSkin(root: Object3D, skin: PlatformSkin): void {
     if (!m || Array.isArray(m) || !m.userData?.role) return;
     switch (m.userData.role) {
       case 'slab':
-        m.emissive.setHex(skin.neon);
+        // Deck glows faintly in the neon by default; slabEmissive overrides
+        // it (VOLT wants a black deck under its yellow rim, not olive).
+        m.emissive.setHex(skin.slabEmissive ?? skin.neon);
         // Premium pads repaint the steel; plain recolours restore the default.
         m.color.setHex(skin.slab ?? DEFAULT_SLAB_TINT);
         break;
