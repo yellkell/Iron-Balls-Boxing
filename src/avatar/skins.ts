@@ -75,6 +75,12 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   { id: 'valkyrie', name: 'FLY GUY', chassis: 0x261b33, trim: 0x120d1a, accent: 0xff9ad5 },
   // Polished steel knight in heraldic gold — a shop unlock.
   { id: 'knight', name: 'KNIGHT', chassis: 0x2d333d, trim: 0x14181f, accent: 0xffcf6e, price: 100 },
+  // Hooded cobra in blackened green steel with venom-slit eyes — the slim
+  // silhouette (same deal as SHADOW: visual only, hitboxes untouched).
+  { id: 'viper', name: 'VIPER', chassis: 0x16281b, trim: 0x0b140e, accent: 0x54ff6e, slim: true, price: 250 },
+  // The siege engine: twin-horned battering-ram skull, slab pauldrons,
+  // riveted barrel chest. Top-shelf avatar flex.
+  { id: 'rhino', name: 'RHINO', chassis: 0x38342d, trim: 0x181612, accent: 0xff9d2e, price: 500 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
@@ -87,6 +93,13 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   { id: 'plasma', name: 'PLASMA', neon: PALETTE.violet, price: 100 },
   // …the fancier premium pad — gold piping AND a gold-tinted slab.
   { id: 'goldrush', name: 'GOLD RUSH', neon: 0xffc23a, slab: 0xb8902c, price: 100 },
+  // …two more premium repaints: glacier piping over deep-frozen steel, and a
+  // hot-pink grid over a midnight-purple deck.
+  { id: 'frostbite', name: 'FROSTBITE', neon: 0x8ae4ff, slab: 0x2a4a58, price: 250 },
+  { id: 'synthwave', name: 'SYNTHWAVE', neon: 0xff4fd8, slab: 0x251043, price: 250 },
+  // …the storm pad: electric-yellow piping over near-black steel with a big
+  // lightning bolt painted across the deck (a skinTag decal, like the XD grin).
+  { id: 'volt', name: 'VOLT', neon: 0xffe94a, slab: 0x101218, price: 1000 },
   // …and the top-shelf flex: a jet-black deck with a white XD grin painted on
   // it (X eyes, a capital-D mouth). The face mesh is built into every platform,
   // tagged with this id and shown only when it's worn.

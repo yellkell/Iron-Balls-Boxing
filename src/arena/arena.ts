@@ -196,6 +196,18 @@ function makePlatform(color: number): Group {
   face.visible = false;
   group.add(face);
 
+  // VOLT: a big lightning bolt struck across the deck, shown only for 'volt'.
+  const bolt = new Mesh(
+    new PlaneGeometry(1.18, 1.18),
+    new MeshBasicMaterial({ map: voltBoltTexture(), transparent: true, depthWrite: false }),
+  );
+  bolt.rotation.x = -Math.PI / 2;
+  bolt.position.y = 0.004;
+  bolt.renderOrder = 2;
+  bolt.userData.skinTag = 'volt';
+  bolt.visible = false;
+  group.add(bolt);
+
   // EMBER: the classic look — banding + bolts, no extra furniture.
   return group;
 }
@@ -227,6 +239,38 @@ function xdFaceTexture(): CanvasTexture {
   xdFaceTex.colorSpace = SRGBColorSpace;
   xdFaceTex.minFilter = LinearFilter;
   return xdFaceTex;
+}
+
+/** A jagged electric-yellow lightning bolt on transparent — painted diagonally
+ *  across the VOLT pad's deck. Built once and shared by every pedestal. */
+let voltBoltTex: CanvasTexture | undefined;
+function voltBoltTexture(): CanvasTexture {
+  if (voltBoltTex) return voltBoltTex;
+  const s = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = s;
+  const ctx = canvas.getContext('2d')!;
+  // The classic two-kink flash, drawn tall then rotated onto the diagonal.
+  ctx.translate(s * 0.5, s * 0.5);
+  ctx.rotate(0.35);
+  const x = (u: number): number => u * s;
+  const y = (v: number): number => v * s;
+  ctx.beginPath();
+  ctx.moveTo(x(0.1), y(-0.42));
+  ctx.lineTo(x(-0.14), y(0.02));
+  ctx.lineTo(x(0.015), y(0.02));
+  ctx.lineTo(x(-0.1), y(0.42));
+  ctx.lineTo(x(0.14), y(-0.06));
+  ctx.lineTo(x(-0.015), y(-0.06));
+  ctx.closePath();
+  ctx.fillStyle = '#ffe94a';
+  ctx.shadowColor = '#ffe94a';
+  ctx.shadowBlur = s * 0.05;
+  ctx.fill();
+  voltBoltTex = new CanvasTexture(canvas);
+  voltBoltTex.colorSpace = SRGBColorSpace;
+  voltBoltTex.minFilter = LinearFilter;
+  return voltBoltTex;
 }
 
 /** Recolour a platform's neon rim + slab emissive to a team tint. */
