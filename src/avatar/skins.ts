@@ -105,10 +105,11 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // jet-black deck (slabEmissive black so the yellow rim doesn't wash the
   // whole deck olive).
   { id: 'volt', name: 'VOLT', neon: 0xffe94a, slab: 0x080808, slabEmissive: 0x000000, price: 1000 },
-  // …and the top-shelf flex: a jet-black deck with a white XD grin painted on
-  // it (X eyes, a capital-D mouth). The face mesh is built into every platform,
-  // tagged with this id and shown only when it's worn.
-  { id: 'xdface', name: 'XD', neon: 0xf4f6fb, slab: 0x080808, price: 5000 },
+  // …and the top-shelf flex: a jet-black deck with a big white XD painted on
+  // it. slabEmissive black so the white rim doesn't wash the deck grey — the
+  // deck reads truly black, like VOLT. The face mesh is built into every
+  // platform, tagged with this id and shown only when it's worn.
+  { id: 'xdface', name: 'XD', neon: 0xf4f6fb, slab: 0x080808, slabEmissive: 0x000000, price: 5000 },
   // The CHAMPION pad — never sold. Awarded the first time GOLIATH, king of
   // the ARCADE campaign's titan gauntlet, is felled: white-hot piping over a
   // championship-crimson deck.

@@ -240,9 +240,8 @@ export function makePlatform(color: number): Group {
 }
 
 /** A white "XD" on transparent — painted huge across the deck of the black
- *  premium platform: ONE big X and a bigger D, the whole thing centred and
- *  laid on its side, so it reads as the laughing face. Built once and shared
- *  by every pedestal. */
+ *  premium platform: one big X and an equal-size D, side by side and centred,
+ *  reading left-to-right (horizontal). Built once and shared by every pedestal. */
 let xdFaceTex: CanvasTexture | undefined;
 function xdFaceTexture(): CanvasTexture {
   if (xdFaceTex) return xdFaceTex;
@@ -253,11 +252,14 @@ function xdFaceTexture(): CanvasTexture {
   ctx.fillStyle = '#f6f8ff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.translate(s * 0.5, s * 0.5);
-  ctx.rotate(Math.PI / 2); // on its side
   ctx.font = '900 320px system-ui, sans-serif';
-  ctx.fillText('X', -s * 0.22, 0);
-  ctx.fillText('D', s * 0.22, 0);
+  // Pre-mirror horizontally: the decal lies flat facing the foe, so viewed
+  // from that side an un-mirrored draw reads backwards ("DX"). Flipping the
+  // canvas in X makes it read "XD" the right way round on the deck.
+  ctx.translate(s, 0);
+  ctx.scale(-1, 1);
+  ctx.fillText('X', s * 0.28, s * 0.5);
+  ctx.fillText('D', s * 0.72, s * 0.5);
   xdFaceTex = new CanvasTexture(canvas);
   xdFaceTex.colorSpace = SRGBColorSpace;
   xdFaceTex.minFilter = LinearFilter;
