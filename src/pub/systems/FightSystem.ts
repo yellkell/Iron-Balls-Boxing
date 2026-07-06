@@ -90,6 +90,10 @@ const DEAD = 4;
 // so a pub bout tracks as smoothly as a quick match. Only the two fighters
 // stream, so the denser rate costs the room nothing.
 const STREAM_INTERVAL = 1 / NET.poseRateHz;
+// How far past the last packet a FLYING/RETURNING ball dead-reckons along its
+// streamed velocity (seconds). Covers the normal packet gap plus a dropped
+// packet or two; past this a stalled stream holds rather than flying blind.
+const EXTRAP_MAX = 0.15;
 const FIST_TOUCH_DISTANCE = 0.32;
 const FIST_LANE_RADIUS = 0.34;
 const FIST_CLOSING_SPEED = 1.35;
@@ -241,6 +245,14 @@ interface RemoteBall {
    * parity — see NET.throwBlend in config.ts.
    */
   blend: number;
+  /**
+   * Dead-reckoning: the ball's velocity estimated from the owner's stream
+   * (m/s) + seconds since the last packet. Between packets a FLYING/RETURNING
+   * target keeps advancing along this line, so the ball you're dodging renders
+   * where it IS, not where it was a packet (or a dropped packet) ago.
+   */
+  vel: Vector3;
+  age: number;
 }
 
 /** The local player's ball loadout per fist ([left, right]; 0 none / 1 split /
@@ -284,6 +296,9 @@ const _myFist = new Vector3();
 const _oppFist = new Vector3();
 const _ggMid = new Vector3();
 const _ggLift = new Vector3();
+const _hitAt = new Vector3();
+const _hitAnchor = new Vector3();
+const _lead = new Vector3();
 const _rimLocal = new Vector3();
 const _cA = new Vector3();
 const _cB = new Vector3();
@@ -410,8 +425,12 @@ export class FightSystem extends createSystem({}) {
               } else if (ball.state === FLYING || ball.state === RETURNING) {
                 this.spendLocalBall(ball);
               }
-              spawnFireImpact(this.world, ball.pos, 0);
-              spawnDamagePopup(this.world, ball.pos, dmg);
+              // Pop the burst + damage number ON the body we struck (as we
+              // render it), never at our own ball — by the time this report
+              // has made the round trip the ball has overshot well past them.
+              const anchor = this.hitAnchor(ev, ball.pos);
+              spawnFireImpact(this.world, anchor, 0);
+              spawnDamagePopup(this.world, anchor, dmg);
               sfx.hitDealt();
             }
             break;
@@ -702,6 +721,7 @@ export class FightSystem extends createSystem({}) {
       const cool = this.teamFor(id) === 1;
       for (const b of balls) {
         b.hitCooldown = Math.max(0, b.hitCooldown - delta);
+        b.age += delta;
         // Throw-blend (quick-match parity): for a short window after a throw the
         // ball eases onto the owner's authoritative line at the gentle
         // NET.throwBlend rate, otherwise it tracks tightly at NET.smoothing.
@@ -709,12 +729,20 @@ export class FightSystem extends createSystem({}) {
         b.blend = Math.max(0, b.blend - delta);
         const k = 1 - Math.exp(-rate * delta);
         if (b.hasTarget) {
+          // Dead-reckoned render point: a FLYING/RETURNING ball leads the last
+          // packet along its streamed velocity, so it renders where it IS
+          // rather than trailing (and freezing between packets). Capped so a
+          // real stream stall coasts briefly then holds instead of flying on.
+          _lead.copy(b.target);
+          if (b.state === FLYING || b.state === RETURNING) {
+            _lead.addScaledVector(b.vel, Math.min(b.age, EXTRAP_MAX));
+          }
           // A real teleport (round reset, a respawn) still snaps — but never
           // during the blend window, where a big gap is the launch easing in.
-          if (b.blend <= 0 && b.visual.group.position.distanceToSquared(b.target) > 9) {
-            b.visual.group.position.copy(b.target);
+          if (b.blend <= 0 && b.visual.group.position.distanceToSquared(_lead) > 9) {
+            b.visual.group.position.copy(_lead);
           } else {
-            b.visual.group.position.lerp(b.target, k);
+            b.visual.group.position.lerp(_lead, k);
           }
         }
         this.driveFireLook(b.visual, b.visual.group.position, b.state, b, delta, cool);
@@ -1432,11 +1460,21 @@ export class FightSystem extends createSystem({}) {
 
       // Body: head/chest/pelvis. A grow/shrink ball is bigger/smaller to clip,
       // and its loadout damage scale rides along (grow hits softer, shrink harder).
-      for (const [centre, radius, baseDamage] of spheres) {
+      for (let p = 0; p < 3; p++) {
+        const part = p as 0 | 1 | 2;
+        const [centre, radius, baseDamage] = spheres[part];
         if (ePos.distanceTo(centre) <= radius + FIREBALL.radius * enemy.scl) {
           const damage = Math.round(baseDamage * enemy.dmgScale);
           enemy.hitCooldown = 0.8;
           this.myHp = Math.max(0, this.myHp - damage);
+          // The impact point ON the struck sphere (its surface toward the ball)
+          // — sent along so the attacker can pop their damage number on MY body
+          // where it landed, not at their own overshot ball.
+          _hitAt.copy(ePos).sub(centre);
+          const d = _hitAt.length();
+          if (d > 1e-4) _hitAt.multiplyScalar(radius / d);
+          else _hitAt.set(0, 0, -radius);
+          _hitAt.add(centre);
           // Taking a hit is the loudest moment: oversized fiery burst, hard
           // double-hand buzz (arena's spawnFireImpact at 1.7). The damage NUMBER
           // belongs to the ATTACKER — they spawn it via their FIGHT_HIT handler
@@ -1445,19 +1483,38 @@ export class FightSystem extends createSystem({}) {
           sfx.hitTaken();
           pulseHand(this.world.session, 'left', 1, 160);
           pulseHand(this.world.session, 'right', 1, 160);
+          const at: [number, number, number] = [_hitAt.x, _hitAt.y, _hitAt.z];
           // A return-pass keeps homing home; a thrown ball is spent on contact.
           if (returning) {
             enemy.returnHit = 1;
-            pubSendEvent({ e: 'FIGHT_HIT', ball: idx, dmg: damage, ret: true });
+            pubSendEvent({ e: 'FIGHT_HIT', ball: idx, dmg: damage, ret: true, part, at });
           } else {
             enemy.state = DEAD;
-            pubSendEvent({ e: 'FIGHT_HIT', ball: idx, dmg: damage });
+            pubSendEvent({ e: 'FIGHT_HIT', ball: idx, dmg: damage, part, at });
           }
           pubSendEvent({ e: 'FIGHT_HP', hp: this.myHp });
           break;
         }
       }
     }
+  }
+
+  /**
+   * Where to pop a confirmed hit on the foe: the struck body part of THEIR RIG
+   * as we currently render it (so the number rides the body, not the lag),
+   * falling back to the victim's reported impact point (shared world space),
+   * then — for reports from older clients — to our ball's overshot position.
+   */
+  private hitAnchor(ev: { part?: 0 | 1 | 2; at?: [number, number, number] }, fallback: Vector3): Vector3 {
+    const side = this.mySide();
+    const oppId = side >= 0 ? pub.fight.sides[side === 0 ? 1 : 0] : null;
+    const rig = oppId ? pub.punters.get(oppId)?.rig : undefined;
+    if (rig && ev.part !== undefined) {
+      const anchor = ev.part === 0 ? rig.head : ev.part === 2 ? rig.pelvis : rig.chest;
+      return _hitAnchor.copy(anchor.position);
+    }
+    if (ev.at) return _hitAnchor.set(ev.at[0], ev.at[1], ev.at[2]);
+    return fallback;
   }
 
   /** My orbiting/returning ball slaps an incoming enemy ball from the air. */
@@ -1537,6 +1594,8 @@ export class FightSystem extends createSystem({}) {
           scl: 1,
           dmgScale: 1,
           blend: 0,
+          vel: new Vector3(),
+          age: 0,
         };
       };
       rec = [mk(), mk()];
@@ -1545,6 +1604,20 @@ export class FightSystem extends createSystem({}) {
     for (const idx of [0, 1] as const) {
       const [x, y, z, state, scl, dmg] = balls[idx];
       const prev = rec[idx].state;
+      // Dead-reckoning velocity: only mid-leg (same flight state as the last
+      // packet), so a launch/recall transition — where the previous target
+      // still sits at the fist — can't spike the estimate. `target` always
+      // holds the raw last-received point (the frame loop leads off it without
+      // mutating it), so packet-to-packet delta over `age` is the true speed.
+      const flightNow = state === FLYING || state === RETURNING;
+      if (rec[idx].hasTarget && flightNow && state === prev && rec[idx].age > 1e-3) {
+        _lead.set(x, y, z).sub(rec[idx].target).divideScalar(rec[idx].age);
+        // A stream gap or teleport reads as an absurd speed — coast, don't slingshot.
+        if (_lead.lengthSq() < 20 * 20) rec[idx].vel.copy(_lead);
+      } else if (!flightNow) {
+        rec[idx].vel.set(0, 0, 0);
+      }
+      rec[idx].age = 0;
       rec[idx].target.set(x, y, z);
       // The owner's ball-loadout size + damage scale (default 1 for a plain ball).
       rec[idx].scl = typeof scl === 'number' ? scl : 1;
