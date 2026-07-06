@@ -4,9 +4,12 @@
  * Same iron-boxer chassis as everyone else (house amber trim), bolted to a
  * wheeled base that runs the aisle behind the bar. You can't interact with
  * him and he never stops working: he wipes the counter, pulls pints at the
- * taps (with a proper pour stream), polishes glasses, and when the server
- * announces a restock (`glassOut`) he trundles a fresh pint over and sets
- * it down right as the real prop lands — up to the house limit of 15.
+ * taps (filling the glass under a proper pour stream), polishes glasses,
+ * takes the odd breather leaning on the counter, and when the server
+ * announces a restock (`glassOut`) he trundles a fresh pint over, holds it
+ * out and sets it down right as the real prop lands (PUB.glassDeliverDelay
+ * on the same broadcast clock) — up to the house limit of PUB.glassMax.
+ * Back-to-back restocks queue, so every pint that lands gets walked over.
  *
  * He is pure theatre: entirely client-side, no networking, no collision.
  * The only synchronised part is the glass landing, and PropSystem times
@@ -26,11 +29,11 @@ import { buildBoxer, type BoxerRig } from '../../avatar/boxer.js';
 import { applyAvatarSkin, type AvatarSkin } from '../../avatar/skins.js';
 import { PALETTE } from '../../config.js';
 import { PUB } from '../config.js';
-import { buildPintGlass } from '../props.js';
+import { buildPintGlass, setGlassFill } from '../props.js';
 import { bus, pub } from '../state.js';
 import { retintRig } from './PubPlayerSystem.js';
 
-type TaskKind = 'wipe' | 'pour' | 'polish' | 'deliver';
+type TaskKind = 'wipe' | 'pour' | 'polish' | 'deliver' | 'idle';
 
 interface Task {
   kind: TaskKind;
@@ -40,12 +43,18 @@ interface Task {
   duration: number;
   /** Deliver only: which glass slot he's heading for. */
   slot?: [number, number, number];
+  /** Deliver only: animTime at which PropSystem lands the real prop — he
+   *  holds the hand-off until then so the mime and the pint agree. */
+  landAt?: number;
 }
 
 const WALK_SPEED = 1.1;
 const DELIVER_SPEED = 2.6;
 const AISLE_MIN = -2.35;
 const AISLE_MAX = 2.35;
+// His look: the BEAR shape ('cobalt' is the skin id whose head/torso builders
+// give the bear silhouette — see boxer.ts HEAD_BUILDERS) in house-brown steel
+// with the amber trim every fixture in the pub wears.
 const BARTENDER_BEAR_SKIN: AvatarSkin = {
   id: 'cobalt',
   name: 'BEAR',
@@ -71,6 +80,11 @@ export class BartenderSystem extends createSystem({}) {
   private animTime = 0;
   private bob = 0;
   private gloveTarget: [Vector3, Vector3] = [REST[0].clone(), REST[1].clone()];
+  /** Restocks announced while he's already mid-delivery — walked in order. */
+  private deliveries: Task[] = [];
+  /** Rota memory, so he doesn't repeat a chore or re-wipe the same spot. */
+  private lastKind: TaskKind | null = null;
+  private lastX = 0;
 
   init(): void {
     this.buildBody();
@@ -78,8 +92,18 @@ export class BartenderSystem extends createSystem({}) {
       bus.on('glassOut', (id) => {
         const slot = pub.refs!.glassSlots[id];
         if (!slot) return;
-        // Drop whatever he was doing — a customer needs a glass.
-        this.setTask({ kind: 'deliver', x: slot[0], duration: 1.2, slot });
+        const order: Task = {
+          kind: 'deliver',
+          x: slot[0],
+          duration: 1.2, // recomputed on arrival against landAt
+          slot,
+          landAt: this.animTime + PUB.glassDeliverDelay,
+        };
+        // Drop whatever chore he was on — a customer needs a glass. But a
+        // delivery already underway finishes first: back-to-back restocks
+        // queue (both pints land, so both deserve the walk-over).
+        if (this.task?.kind === 'deliver') this.deliveries.push(order);
+        else this.setTask(order);
       }),
     );
   }
@@ -169,8 +193,10 @@ export class BartenderSystem extends createSystem({}) {
     // --- roll along the aisle toward the task spot ------------------------------
     const speed = task.kind === 'deliver' ? DELIVER_SPEED : WALK_SPEED;
     const dx = task.x - this.root.position.x;
+    let rolling = false;
     if (!this.arrived) {
       if (Math.abs(dx) > 0.04) {
+        rolling = true;
         // Ease off as he closes in — no hard stop at the mark.
         const step = Math.sign(dx) * Math.min(Math.abs(dx), Math.max(0.25, Math.min(speed, Math.abs(dx) * 3)) * delta);
         this.root.position.x += step;
@@ -178,8 +204,20 @@ export class BartenderSystem extends createSystem({}) {
         this.root.position.y = Math.abs(Math.sin(this.bob)) * 0.011;
       } else {
         this.arrived = true;
+        // A delivery holds the reach until the shared broadcast clock lands
+        // the real pint (PropSystem), so the hand-off and the prop agree —
+        // he used to mime it and wander off ~3 s before the glass appeared.
+        if (task.kind === 'deliver' && task.landAt !== undefined) {
+          this.taskTimer = Math.max(0.45, task.landAt - this.animTime);
+          task.duration = this.taskTimer;
+        }
       }
     }
+
+    // Face down the aisle while rolling (wheels first, not a sideways glide),
+    // then swing back square to the room once he's parked at the job.
+    const yawTarget = rolling ? Math.PI + Math.sign(dx) * (Math.PI / 2) : Math.PI;
+    this.root.rotation.y += (yawTarget - this.root.rotation.y) * Math.min(1, delta * 6);
 
     // --- act -------------------------------------------------------------------
     if (this.arrived) {
@@ -204,22 +242,44 @@ export class BartenderSystem extends createSystem({}) {
   // --- the work rota -----------------------------------------------------------
 
   private pickNextTask(): void {
-    const roll = Math.random();
-    if (roll < 0.4) {
-      this.setTask({
-        kind: 'wipe',
-        x: AISLE_MIN + Math.random() * (AISLE_MAX - AISLE_MIN),
-        duration: 3.5 + Math.random() * 2,
-      });
-    } else if (roll < 0.75) {
-      const tap = PUB.tapXs[Math.floor(Math.random() * PUB.tapXs.length)];
-      this.setTask({ kind: 'pour', x: tap, duration: 4.5 });
-    } else {
-      this.setTask({
-        kind: 'polish',
-        x: AISLE_MIN + Math.random() * (AISLE_MAX - AISLE_MIN),
-        duration: 4,
-      });
+    const rollKind = (): TaskKind => {
+      const roll = Math.random();
+      if (roll < 0.35) return 'wipe';
+      if (roll < 0.62) return 'pour';
+      if (roll < 0.85) return 'polish';
+      return 'idle';
+    };
+    // Rota memory: the same chore twice running reads robotic — one reroll
+    // breaks most streaks (a rare double is fine, a habit isn't).
+    let kind = rollKind();
+    if (kind === this.lastKind) kind = rollKind();
+    // …and wiping/polishing returns to a FRESH stretch of counter.
+    const awayFromLast = (): number => {
+      let x = AISLE_MIN + Math.random() * (AISLE_MAX - AISLE_MIN);
+      for (let tries = 0; tries < 4 && Math.abs(x - this.lastX) < 0.7; tries++) {
+        x = AISLE_MIN + Math.random() * (AISLE_MAX - AISLE_MIN);
+      }
+      return x;
+    };
+    switch (kind) {
+      case 'wipe':
+        this.setTask({ kind, x: awayFromLast(), duration: 3.5 + Math.random() * 2 });
+        break;
+      case 'pour': {
+        // A different tap from last time when the dice allow.
+        let tap = PUB.tapXs[Math.floor(Math.random() * PUB.tapXs.length)];
+        if (Math.abs(tap - this.lastX) < 0.1) tap = PUB.tapXs[Math.floor(Math.random() * PUB.tapXs.length)];
+        this.setTask({ kind, x: tap, duration: 4.5 });
+        break;
+      }
+      case 'polish':
+        this.setTask({ kind, x: awayFromLast(), duration: 4 });
+        break;
+      default:
+        // A breather right where he stands: elbows on the counter, minding
+        // the room. Even a tireless robot landlord earns a lean.
+        this.setTask({ kind: 'idle', x: this.root.position.x, duration: 2.5 + Math.random() * 2 });
+        break;
     }
   }
 
@@ -228,8 +288,14 @@ export class BartenderSystem extends createSystem({}) {
     this.taskTimer = task.duration;
     this.arrived = false;
     this.pourStream.visible = false;
+    this.lastKind = task.kind;
+    this.lastX = task.x;
+    this.restGloves(); // clear any wrist tilt the previous chore left behind
     // He carries a glass to the tap and on deliveries.
     this.carryGlass.visible = task.kind === 'pour' || task.kind === 'deliver' || task.kind === 'polish';
+    // A pour STARTS empty and fills under the stream; anything else he
+    // carries is already a full pint.
+    setGlassFill(this.carryGlass, task.kind === 'pour' ? 0 : 1);
   }
 
   private finishTask(task: Task): void {
@@ -241,6 +307,9 @@ export class BartenderSystem extends createSystem({}) {
     this.pourStream.visible = false;
     this.task = null;
     this.restGloves();
+    // Queued restocks jump the rota — the next pint goes straight out.
+    const next = this.deliveries.shift();
+    if (next) this.setTask(next);
   }
 
   private restGloves(): void {
@@ -255,38 +324,59 @@ export class BartenderSystem extends createSystem({}) {
     const t = this.animTime;
     switch (task.kind) {
       case 'wipe': {
-        // Right glove sweeps circles over the counter top.
+        // Right glove sweeps circles over the counter top, wrist riding the
+        // sweep — pressing INTO the counter, not floating over it.
         this.gloveTarget[1].set(
           0.2 + Math.cos(t * 3.2) * 0.16,
           1.06,
           -0.38 + Math.sin(t * 3.2) * 0.1,
         );
+        this.rig.gloves[1].rotation.set(0.35, 0, Math.sin(t * 3.2) * 0.18);
         break;
       }
       case 'pour': {
-        // Left glove holds the glass under the tap; right rests the handle.
+        // Left glove holds the glass under the tap; right rests the handle,
+        // tipped forward like it's holding the pull.
         this.gloveTarget[0].set(-0.08, 1.06, -0.42);
         this.gloveTarget[1].set(0.16, 1.32, -0.34);
+        this.rig.gloves[1].rotation.x = -0.3;
         // Stream runs while the glass is under the spout (world space; the
         // glove's local offset mirrors through the root's 180° yaw).
         this.pourStream.visible = this.taskTimer > 0.8;
         this.pourStream.position.set(task.x + 0.08, 1.21, PUB.bar.aisleZ + 0.42);
+        // The pint FILLS under the stream (it used to pour into an already
+        // full glass), the head settling in the last beat after it shuts off.
+        const fill = Math.max(0, Math.min(1, 1 - (this.taskTimer - 0.8) / Math.max(0.1, task.duration - 0.8)));
+        setGlassFill(this.carryGlass, fill);
         break;
       }
       case 'polish': {
-        // Glass in the left, right buffs it in little circles.
+        // Glass in the left, right buffs it in little circles, wrist
+        // twisting with the rag.
         this.gloveTarget[0].set(-0.12, 1.18, -0.28);
         this.gloveTarget[1].set(
           0.02 + Math.cos(t * 5) * 0.05,
           1.2 + Math.sin(t * 5) * 0.04,
           -0.3,
         );
+        this.rig.gloves[1].rotation.set(0, 0, Math.sin(t * 5) * 0.3);
         break;
       }
       case 'deliver': {
-        // Reach out and set the fresh pint down on its slot.
-        const k = 1 - Math.max(0, this.taskTimer / task.duration);
-        this.gloveTarget[0].set(-0.1, 1.18 - k * 0.12, -0.3 - k * 0.25);
+        // Reach out quickly (~0.6 s), HOLD the pint over its slot while the
+        // shared clock runs down, then dip to set it down as the prop lands.
+        const elapsed = task.duration - this.taskTimer;
+        const reach = Math.min(1, elapsed / 0.6);
+        const setdown = this.taskTimer < 0.4 ? 1 - this.taskTimer / 0.4 : 0;
+        this.gloveTarget[0].set(-0.1, 1.18 - setdown * 0.14, -0.3 - reach * 0.25);
+        this.rig.gloves[0].rotation.x = reach * 0.25;
+        break;
+      }
+      case 'idle': {
+        // The lean: both hands settle low on the counter with a slow sway.
+        // aimHead keeps him minding the room while he takes the breather.
+        this.gloveTarget[0].set(-0.24, 1.05 + Math.sin(t * 1.1) * 0.008, -0.3);
+        this.gloveTarget[1].set(0.3, 1.0 + Math.sin(t * 1.1 + 1.7) * 0.008, -0.16);
         break;
       }
     }
