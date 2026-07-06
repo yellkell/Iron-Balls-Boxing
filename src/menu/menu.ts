@@ -2489,12 +2489,23 @@ interface DisplayItem {
 function panelItems(locker: boolean): { items: DisplayItem[]; soon: PanRect | null } {
   const tab = activeTab(locker);
   const items: DisplayItem[] = [];
+  // Count this tab's tiles first: a catalogue tall enough to need a 4th row
+  // compresses its rows so the grid stays clear of the footer buttons.
+  const count =
+    tab === 'avatars'
+      ? AVATAR_SKINS.filter((s) => !s.locked && avatarOwned(s.id) === locker).length + (locker ? 0 : 1)
+      : PLATFORM_SKINS.filter((s) => platformOwned(s.id) === locker).length;
+  const rows = Math.max(1, Math.ceil(count / GRID_COLS));
+  // Up to 3 rows fit at full height (the classic layout, untouched); more
+  // than that shares the same vertical span between the rows.
+  const rowStep = rows <= 3 ? ROW_STEP : Math.floor((FOOT_SWAP.y - 12 - GRID_TOP) / rows);
+  const itemH = rowStep - (ROW_STEP - ITEM_H);
   let idx = 0;
   const next = (): PanRect => {
     const col = idx % GRID_COLS;
     const row = Math.floor(idx / GRID_COLS);
     idx++;
-    return { x: 40 + col * (ITEM_W + GRID_GAP), y: GRID_TOP + row * ROW_STEP, w: ITEM_W, h: ITEM_H };
+    return { x: 40 + col * (ITEM_W + GRID_GAP), y: GRID_TOP + row * rowStep, w: ITEM_W, h: itemH };
   };
   // LOCKER shows what you OWN (to equip); SHOP shows what you DON'T (to buy) —
   // owned items drop out of the shop so it only ever lists fresh unlocks.

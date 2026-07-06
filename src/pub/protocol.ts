@@ -130,8 +130,12 @@ export type PubEvent =
    * Victim-authoritative: YOUR ball `ball` hit me — it's spent. `ret` marks a
    * RETURN-PASS connect (a recalled ball caught me on its way home): it keeps
    * homing instead of dying, exactly like the arena's recall-through technique.
+   * `part` names the struck body sphere (0 head / 1 chest / 2 pelvis) and `at`
+   * the impact point on it, so the attacker can pop the damage number ON the
+   * body they hit instead of at their own (by-now overshot) ball. Both are
+   * optional so older clients stay readable.
    */
-  | { e: 'FIGHT_HIT'; ball: 0 | 1; dmg?: number; ret?: boolean }
+  | { e: 'FIGHT_HIT'; ball: 0 | 1; dmg?: number; ret?: boolean; part?: 0 | 1 | 2; at?: Vec3T }
   /** I parried your ball `ball` out of the air. */
   | { e: 'FIGHT_DEFLECT'; ball: 0 | 1 }
   /** Your ball `ball` clashed mid-air with one of mine — both are spent. */

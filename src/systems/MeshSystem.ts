@@ -421,7 +421,15 @@ export class MeshSystem extends createSystem({
       case 'throw': {
         peerPos(_p, seat, msg.pos[0], msg.pos[1], msg.pos[2]);
         peerVel(_v, seat, msg.vel[0], msg.vel[1], msg.vel[2]);
-        ballCommands.push({ type: 'throw', slot: oppIdx, hand: msg.hand, pos: _p.clone(), vel: _v.clone() });
+        // Carry the thrower's curveball too (this used to be dropped, so a
+        // curved throw flew dead straight on everyone else's screen and hits
+        // came out of nowhere). The curl axis is an angular velocity — a pure
+        // seat-yaw rotation moves it into room space, same as a linear one.
+        const curl =
+          msg.curl && (msg.curl[0] || msg.curl[1] || msg.curl[2])
+            ? peerVel(new Vector3(), seat, msg.curl[0], msg.curl[1], msg.curl[2])
+            : undefined;
+        ballCommands.push({ type: 'throw', slot: oppIdx, hand: msg.hand, pos: _p.clone(), vel: _v.clone(), curl });
         break;
       }
       case 'recall':

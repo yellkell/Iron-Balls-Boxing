@@ -31,7 +31,7 @@ import { mesh } from '../net/mesh.js';
 import type { PeerMessage } from '../net/protocol.js';
 import { pulseHand } from '../input/haptics.js';
 import * as sfx from '../audio/sfx.js';
-import { ARENA_BOUNDS, ARENA_GAP, ATTACH, FIREBALL, NET } from '../config.js';
+import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, FIREBALL, NET } from '../config.js';
 
 const HANDS = ['left', 'right'] as const;
 type Hand = 0 | 1;
@@ -107,17 +107,14 @@ class VelocityTracker {
   }
 }
 
-// Curveball tuning. The raw swing turn-rate (rad/s) is scaled by GAIN and capped,
-// then in flight the velocity rotates about the curl axis while the rate decays —
-// so the ball banks hard early (just off the fist) and straightens out.
-const CURL_MIN = 2.5; // rad/s dead zone: below this the punch is "straight" → no curve
-const CURL_GAIN = 1.5; // applied to the swing rate ABOVE the dead zone
-const CURL_MAX = 4.0; // rad/s after gain
-const CURL_DECAY = 2.0; // per second — lower = the bend carries further
-// Curve only really bites on a committed, WIDE swing — small movements are too
-// jittery to read a clean arc, so the curve ramps in with hand speed (m/s).
-const CURL_SPEED_MIN = 2.6; // below this swing speed → essentially no curve
-const CURL_SPEED_FULL = 4.4; // at/above this → full curve
+// Curveball tuning — the shared CURL block in config.ts (one source for the
+// arena and the pub fight hall), aliased to the names this file always used.
+const CURL_MIN = CURL.min;
+const CURL_GAIN = CURL.gain;
+const CURL_MAX = CURL.max;
+const CURL_DECAY = CURL.decay;
+const CURL_SPEED_MIN = CURL.speedMin;
+const CURL_SPEED_FULL = CURL.speedFull;
 
 const _grip = new Vector3();
 const _gripQ = new Quaternion();
@@ -479,6 +476,7 @@ export class FireballSystem extends createSystem({
     // and store it as the curl axis*rate; the flight integrator banks the ball
     // along that arc. Off → a dead-straight throw (zero curl).
     const c = ball.getVectorView(Fireball, 'curl');
+    let curlRate = 0;
     if (app.ballArc[hand]) {
       // Dead zone: a near-straight punch (low swing curvature) throws straight;
       // only a deliberate hook past CURL_MIN bends the ball. And ramp the whole
@@ -486,10 +484,10 @@ export class FireballSystem extends createSystem({
       // and only wide committed swipes curve.
       const raw = this.trackers[hand].curl(_curl, this.time);
       const speedK = Math.max(0, Math.min(1, (handSpeed - CURL_SPEED_MIN) / (CURL_SPEED_FULL - CURL_SPEED_MIN)));
-      const rate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
-      c[0] = _curl.x * rate;
-      c[1] = _curl.y * rate;
-      c[2] = _curl.z * rate;
+      curlRate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
+      c[0] = _curl.x * curlRate;
+      c[1] = _curl.y * curlRate;
+      c[2] = _curl.z * curlRate;
     } else {
       c[0] = 0;
       c[1] = 0;
@@ -500,8 +498,15 @@ export class FireballSystem extends createSystem({
     ball.setValue(Fireball, 'elapsed', 0);
     ball.setValue(Fireball, 'recallLock', 0);
 
-    sfx.throwWhoosh();
-    pulseHand(this.world.session, HANDS[hand], 0.8, 110);
+    // A throw that BIT into a curve answers back: the whip-crack launch and a
+    // harder, longer buzz — so a landed hook is felt the instant it leaves.
+    if (curlRate >= CURL.feelMin) {
+      sfx.curveWhoosh();
+      pulseHand(this.world.session, HANDS[hand], 1.0, 150);
+    } else {
+      sfx.throwWhoosh();
+      pulseHand(this.world.session, HANDS[hand], 0.8, 110);
+    }
     app.stats.ballsThrown += 1;
     if (app.state === 'training') training.thrown += 1;
 
@@ -761,7 +766,9 @@ export class FireballSystem extends createSystem({
           c[2] = cmd.curl?.z ?? 0;
           ball.setValue(Fireball, 'state', BallState.Flying);
           ball.setValue(Fireball, 'elapsed', 0);
-          sfx.throwWhoosh();
+          // A rival's curved throw cracks its whip on our side too.
+          if (cmd.curl && cmd.curl.length() >= CURL.feelMin) sfx.curveWhoosh();
+          else sfx.throwWhoosh();
           break;
         }
         case 'recall': {
@@ -845,6 +852,25 @@ export class FireballSystem extends createSystem({
       if (acc >= 0.009) {
         this.trailAcc.set(ball, 0);
         stampTrail(obj.position, cool);
+        // A live curveball rides a corkscrew: an extra stamp spiralling round
+        // the rope makes the bend read as SPIN, not a wobbly straight throw.
+        const c = ball.getVectorView(Fireball, 'curl');
+        if (state === BallState.Flying && Math.hypot(c[0], c[1], c[2]) >= CURL.feelMin) {
+          const v = ball.getVectorView(Fireball, 'velocity');
+          _vel.set(v[0], v[1], v[2]);
+          // Any stable frame perpendicular to the flight line will do.
+          _perp1.set(0, 1, 0);
+          if (Math.abs(_vel.y) > _vel.length() * 0.94) _perp1.set(1, 0, 0);
+          _perp1.cross(_vel).normalize();
+          _perp2.crossVectors(_vel, _perp1).normalize();
+          const phase = this.time * 24;
+          _offset
+            .copy(_perp1)
+            .multiplyScalar(Math.cos(phase))
+            .addScaledVector(_perp2, Math.sin(phase))
+            .multiplyScalar(FIREBALL.radius * 1.1 * obj.scale.x);
+          stampTrail(_offset.add(obj.position), cool);
+        }
       } else {
         this.trailAcc.set(ball, acc);
       }
