@@ -271,70 +271,96 @@ function taggedHead(id: string): Group {
   return g;
 }
 
-/** COBALT → BEAR: broad heavy skull, rounded ears, blunt muzzle, tusks. */
+/** COBALT → BEAR, lofted for accuracy: a broad domed skull that is widest
+ *  at the cheeks, a dished STOP at the brow dropping onto a short deep
+ *  muzzle, small close forward eyes, wide-set round cupped ears, a big nose
+ *  pad and fur ruffs flaring off the jaw. */
 function buildBearHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('cobalt');
 
-  const skull = new Mesh(new SphereGeometry(r * 0.92, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(1.14, 0.96, 1.04);
-  skull.position.y = r * 0.16;
+  // The skull loft, back of head → nose. A bear's profile is the opposite of
+  // the horse's wedge: high round dome, a concave dip at the brow (the stop),
+  // then a short, deep, nearly level muzzle ending in the nose pad.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.55, 0.55], bot: [-0.3, 0.6], w: 0.4, n: 2.0 }, // occiput
+        { top: [0.86, 0.3], bot: [-0.48, 0.42], w: 0.55, n: 2.1 }, // crown
+        { top: [0.84, 0.02], bot: [-0.55, 0.22], w: 0.62, n: 2.15 }, // cheeks (widest)
+        { top: [0.6, -0.32], bot: [-0.55, -0.1], w: 0.58, n: 2.15 }, // brow
+        { top: [0.22, -0.58], bot: [-0.52, -0.38], w: 0.42, n: 2.0 }, // the dished stop
+        { top: [0.1, -0.76], bot: [-0.5, -0.6], w: 0.3, n: 1.95 }, // muzzle root
+        { top: [0.04, -0.94], bot: [-0.46, -0.84], w: 0.27, n: 1.9 }, // mid muzzle
+        { top: [0.02, -1.1], bot: [-0.38, -1.02], w: 0.22, n: 1.85 }, // nose
+        { top: [0.0, -1.16], bot: [-0.3, -1.1], w: 0.13, n: 1.8 }, // tip
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
   g.add(skull);
-  // Forehead plate + a glowing crown seam down the middle.
-  const forehead = new Mesh(new BoxGeometry(r * 1.5, r * 0.5, r * 0.5), chassisMat(accent, 0.05));
-  forehead.position.set(0, r * 0.34, -r * 0.5);
-  g.add(forehead);
-  const seam = new Mesh(new BoxGeometry(r * 0.09, r * 0.05, r * 1.3), glowMat(accent, 0.5));
-  seam.position.set(0, r * 0.66, -r * 0.2);
-  g.add(seam);
-  // Heavy brow ridges + deep-set glowing eyes.
+
+  // Round cupped ears set WIDE on the dome's top corners, dark inners
+  // turned forward — the bear's unmistakable outline.
   for (const side of [-1, 1]) {
-    const ridge = new Mesh(new BoxGeometry(r * 0.62, r * 0.18, r * 0.42), darkMat());
-    ridge.position.set(side * r * 0.42, r * 0.26, -r * 0.78);
-    ridge.rotation.z = side * 0.16;
-    g.add(ridge);
-    const eye = new Mesh(new BoxGeometry(r * 0.26, r * 0.16, r * 0.1), glowMat(accent, 2.2));
-    eye.position.set(side * r * 0.42, r * 0.1, -r * 0.86);
-    g.add(eye);
-  }
-  // Rounded ears: outer disc + dark inner.
-  for (const side of [-1, 1]) {
-    const ear = new Mesh(new CylinderGeometry(r * 0.34, r * 0.34, r * 0.14, 16), chassisMat(accent, 0.05));
-    ear.rotation.x = Math.PI / 2;
-    ear.position.set(side * r * 0.72, r * 0.96, -r * 0.02);
+    const ear = new Mesh(new SphereGeometry(r * 0.27, 14, 12), chassisMat(accent, 0.05));
+    ear.scale.set(1, 1, 0.55);
+    ear.position.set(side * r * 0.5, r * 0.88, r * 0.12);
+    ear.rotation.set(-0.15, side * 0.35, side * -0.12);
     g.add(ear);
-    const inner = new Mesh(new CylinderGeometry(r * 0.2, r * 0.2, r * 0.16, 16), darkMat());
-    inner.rotation.x = Math.PI / 2;
-    inner.position.set(side * r * 0.72, r * 0.96, -r * 0.05);
+    const inner = new Mesh(new SphereGeometry(r * 0.17, 12, 10), darkMat());
+    inner.scale.set(1, 1, 0.4);
+    inner.position.set(side * r * 0.52, r * 0.86, r * 0.05);
+    inner.rotation.set(-0.15, side * 0.35, side * -0.12);
     g.add(inner);
   }
-  // Blunt muzzle: bridge + snout box + nose pad + lower jaw.
-  const bridge = new Mesh(new BoxGeometry(r * 0.4, r * 0.26, r * 0.55), chassisMat(accent, 0.04));
-  bridge.position.set(0, r * 0.02, -r * 0.98);
-  g.add(bridge);
-  const muzzle = new Mesh(new BoxGeometry(r * 0.72, r * 0.46, r * 0.66), chassisMat(accent, 0.04));
-  muzzle.position.set(0, -r * 0.34, -r * 0.96);
-  g.add(muzzle);
-  const nose = new Mesh(new SphereGeometry(r * 0.18, 10, 8), darkMat());
-  nose.scale.set(1.3, 0.85, 0.9);
-  nose.position.set(0, -r * 0.26, -r * 1.32);
-  g.add(nose);
-  const jaw = new Mesh(new BoxGeometry(r * 0.6, r * 0.22, r * 0.5), chassisMat(accent, 0.03));
-  jaw.position.set(0, -r * 0.62, -r * 0.9);
-  g.add(jaw);
-  // Tusks at the mouth corners.
+
+  // Small, close-set forward eyes — bear eyes are tiny relative to the huge
+  // skull, which is what sells the scale. The lofted brow shades them.
   for (const side of [-1, 1]) {
-    const tusk = new Mesh(new ConeGeometry(r * 0.06, r * 0.2, 5), darkMat());
-    tusk.rotation.x = Math.PI;
-    tusk.position.set(side * r * 0.22, -r * 0.5, -r * 1.18);
-    g.add(tusk);
+    const socket = new Mesh(new SphereGeometry(r * 0.1, 12, 10), darkMat());
+    socket.scale.set(0.85, 1, 0.7);
+    socket.position.set(side * r * 0.27, r * 0.2, -r * 0.63);
+    g.add(socket);
+    const eye = new Mesh(new SphereGeometry(r * 0.075, 12, 10), glowMat(accent, 2.4));
+    eye.scale.set(0.85, 1, 0.75);
+    eye.position.set(side * r * 0.27, r * 0.195, -r * 0.67);
+    eye.rotation.y = side * -0.2;
+    g.add(eye);
   }
-  // Cheek fur tufts (angled plates).
+
+  // The big nose pad capping the muzzle, with the philtrum seam splitting
+  // down to the mouth line and a soft chin below it.
+  const nose = new Mesh(new SphereGeometry(r * 0.15, 12, 10), darkMat());
+  nose.scale.set(1.25, 0.75, 0.7);
+  nose.position.set(0, -r * 0.04, -r * 1.16);
+  g.add(nose);
+  const philtrum = new Mesh(new BoxGeometry(r * 0.035, r * 0.18, r * 0.03), darkMat());
+  philtrum.position.set(0, -r * 0.22, -r * 1.14);
+  philtrum.rotation.x = 0.25;
+  g.add(philtrum);
+  const mouth = new Mesh(new BoxGeometry(r * 0.28, r * 0.03, r * 0.3), darkMat());
+  mouth.position.set(0, -r * 0.45, -r * 0.96);
+  mouth.rotation.x = 0.15;
+  g.add(mouth);
+  const chin = new Mesh(new SphereGeometry(r * 0.13, 12, 10), chassisMat(accent, 0.05));
+  chin.scale.set(1, 0.7, 0.85);
+  chin.position.set(0, -r * 0.42, -r * 1.0);
+  g.add(chin);
+
+  // Fur ruffs: thin plates swept BACK along the cheeks and jaw — the shaggy
+  // silhouette a real bear carries around its huge masseters, hugging the
+  // skull rather than boarding off it.
   for (const side of [-1, 1]) {
-    const tuft = new Mesh(new BoxGeometry(r * 0.12, r * 0.5, r * 0.42), chassisMat(accent, 0.04));
-    tuft.position.set(side * r * 0.82, -r * 0.12, -r * 0.42);
-    tuft.rotation.set(0, side * 0.3, side * 0.5);
-    g.add(tuft);
+    const upper = new Mesh(new BoxGeometry(r * 0.05, r * 0.36, r * 0.42), darkMat());
+    upper.position.set(side * r * 0.55, -r * 0.2, r * 0.06);
+    upper.rotation.set(0.15, side * 0.65, side * 0.3);
+    g.add(upper);
+    const lower = new Mesh(new BoxGeometry(r * 0.045, r * 0.28, r * 0.34), darkMat());
+    lower.position.set(side * r * 0.45, -r * 0.38, -r * 0.1);
+    lower.rotation.set(0.15, side * 0.6, side * 0.5);
+    g.add(lower);
   }
   return g;
 }
@@ -409,69 +435,146 @@ function buildPantherHead(accent: number): Group {
   return g;
 }
 
-/** VALKYRIE → EAGLE: scowling brow, big hooked beak, swept feather crest. */
+/** VALKYRIE → EAGLE, lofted for accuracy: a sleek rounded raptor skull with
+ *  a heavy supraorbital ledge shading fierce side-set eyes, the huge hooked
+ *  beak lofted through its real down-curve (cere, nostrils, and a smaller
+ *  lower mandible tucked beneath), and a hackle ruff of layered feathers
+ *  around the nape instead of a fantasy mohawk. */
 function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
 
-  const skull = new Mesh(new SphereGeometry(r * 0.82, 16, 12), chassisMat(accent, 0.06));
-  skull.scale.set(0.96, 0.98, 1.0);
-  skull.position.y = r * 0.18;
+  // The head loft, nape → cere. The crown stays high and flat all the way
+  // to the brow ledge (the eagle "scowl" is bone, not eyebrow), then steps
+  // down sharply onto the beak base.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.48, 0.5], bot: [-0.42, 0.58], w: 0.4, n: 2.05 }, // nape ruff root
+        { top: [0.64, 0.28], bot: [-0.48, 0.42], w: 0.45, n: 2.05 }, // back crown
+        { top: [0.68, -0.05], bot: [-0.5, 0.18], w: 0.46, n: 2.1 }, // crown (low, flat)
+        { top: [0.7, -0.45], bot: [-0.46, -0.15], w: 0.44, n: 2.3 }, // brow shelf (proud, square)
+        { top: [0.44, -0.66], bot: [-0.4, -0.46], w: 0.34, n: 2.1 }, // eye line, cut UNDER the shelf
+        { top: [0.28, -0.88], bot: [-0.32, -0.7], w: 0.24, n: 2.0 }, // forehead step
+        { top: [0.2, -1.0], bot: [-0.26, -0.84], w: 0.17, n: 1.9 }, // cere
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
   g.add(skull);
-  // Scowling brow (two angled plates) + fierce forward eyes.
+
+  // The upper beak: one loft riding the real raptor curve — it projects
+  // FORWARD from the cere, the culmen staying nearly level, then
+  // accelerates DOWN into the hooked tip that ends below the mouth line.
+  const beak = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.22, -0.92], bot: [-0.34, -0.8], w: 0.18, n: 1.9 }, // buried in the head
+        { top: [0.1, -1.18], bot: [-0.38, -1.06], w: 0.145, n: 1.85 },
+        { top: [-0.06, -1.38], bot: [-0.4, -1.24], w: 0.11, n: 1.8 },
+        { top: [-0.24, -1.5], bot: [-0.42, -1.38], w: 0.065, n: 1.75 },
+        { top: [-0.46, -1.5], bot: [-0.5, -1.42], w: 0.025, n: 1.7 }, // the hook, dropping dead-down
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.09),
+  );
+  g.add(beak);
+
+  // The smaller lower mandible tucked under the upper beak's cutting edge.
+  const mandible = new Mesh(
+    loftGeometry(
+      [
+        { top: [-0.32, -0.82], bot: [-0.5, -0.76], w: 0.135, n: 1.9 },
+        { top: [-0.36, -1.04], bot: [-0.52, -0.98], w: 0.1, n: 1.85 },
+        { top: [-0.42, -1.26], bot: [-0.5, -1.22], w: 0.05, n: 1.8 },
+      ],
+      r,
+    ),
+    darkMat(),
+  );
+  g.add(mandible);
+
+  // Cere saddle wrapping the beak root, hiding the head/beak seam, with the
+  // two nostril slits ahead of it.
+  const cere = new Mesh(new SphereGeometry(r * 0.13, 12, 10), darkMat());
+  cere.scale.set(1.15, 0.6, 0.9);
+  cere.position.set(0, r * 0.14, -r * 0.9);
+  cere.rotation.x = 0.5;
+  g.add(cere);
   for (const side of [-1, 1]) {
-    const brow = new Mesh(new BoxGeometry(r * 0.56, r * 0.18, r * 0.32), chassisMat(accent, 0.05));
-    brow.position.set(side * r * 0.3, r * 0.3, -r * 0.7);
-    brow.rotation.z = side * 0.5;
-    g.add(brow);
-    const eye = new Mesh(new BoxGeometry(r * 0.22, r * 0.16, r * 0.1), glowMat(accent, 2.6));
-    eye.position.set(side * r * 0.34, r * 0.1, -r * 0.82);
+    const nostril = new Mesh(new SphereGeometry(r * 0.035, 8, 6), darkMat());
+    nostril.scale.set(0.7, 1, 0.6);
+    nostril.position.set(side * r * 0.09, r * 0.06, -r * 1.04);
+    g.add(nostril);
+  }
+
+  // The eyes tuck up under the lofted brow shelf's crease — the eye in
+  // shadow BENEATH the bony overhang is the whole raptor glare.
+  for (const side of [-1, 1]) {
+    const socket = new Mesh(new SphereGeometry(r * 0.12, 12, 10), darkMat());
+    socket.scale.set(0.7, 0.9, 0.9);
+    socket.position.set(side * r * 0.31, r * 0.4, -r * 0.54);
+    g.add(socket);
+    const eye = new Mesh(new SphereGeometry(r * 0.095, 12, 10), glowMat(accent, 2.8));
+    eye.scale.set(0.75, 1, 0.9);
+    eye.position.set(side * r * 0.34, r * 0.39, -r * 0.56);
+    eye.rotation.y = side * -0.5;
     g.add(eye);
   }
-  // Upper beak: base box → forward cone → downturned hook; shorter lower beak.
-  const beakBase = new Mesh(new BoxGeometry(r * 0.36, r * 0.36, r * 0.42), chassisMat(accent, 0.05));
-  beakBase.position.set(0, -r * 0.12, -r * 0.9);
-  g.add(beakBase);
-  const beak = new Mesh(new ConeGeometry(r * 0.22, r * 0.72, 4), chassisMat(accent, 0.06));
-  beak.rotation.x = -Math.PI / 2;
-  beak.position.set(0, -r * 0.18, -r * 1.22);
-  g.add(beak);
-  const hook = new Mesh(new ConeGeometry(r * 0.13, r * 0.26, 4), darkMat());
-  hook.rotation.x = -Math.PI * 0.78;
-  hook.position.set(0, -r * 0.34, -r * 1.44);
-  g.add(hook);
-  const lower = new Mesh(new ConeGeometry(r * 0.16, r * 0.44, 4), darkMat());
-  lower.rotation.x = -Math.PI / 2;
-  lower.position.set(0, -r * 0.4, -r * 1.12);
-  g.add(lower);
-  // Cere (nostril band).
-  const cere = new Mesh(new BoxGeometry(r * 0.3, r * 0.14, r * 0.2), darkMat());
-  cere.position.set(0, -r * 0.04, -r * 1.0);
-  g.add(cere);
-  // BIG layered crown plume — a tall mohawk crest of metal feathers sweeping
-  // up and back over the dome, the eagle's signature headdress.
-  const crestBase = new Mesh(new BoxGeometry(r * 0.8, r * 0.2, r * 0.24), darkMat());
-  crestBase.position.set(0, r * 0.8, r * 0.05);
-  crestBase.rotation.x = 0.4;
-  g.add(crestBase);
-  for (let i = -4; i <= 4; i++) {
-    const a = Math.abs(i);
-    const len = r * (1.55 - a * 0.14); // long feathers, tallest in the middle
-    const back = new Mesh(new BoxGeometry(r * 0.1, len, r * 0.15), chassisMat(accent, 0.04));
-    back.position.set(i * r * 0.13, r * (1.06 - a * 0.04), r * (0.18 + a * 0.05));
-    back.rotation.set(0.6 + a * 0.085, i * -0.05, i * 0.13);
-    g.add(back);
-    const vane = new Mesh(new BoxGeometry(r * 0.045, len * 0.84, r * 0.17), glowMat(accent, 0.7 + (4 - a) * 0.13));
-    vane.position.set(i * r * 0.13, r * (1.11 - a * 0.03), r * (0.12 + a * 0.04));
-    vane.rotation.copy(back.rotation);
+
+  // The hackle ruff: a second, smaller loft flaring back and DOWN off the
+  // nape — the layered feather collar a real eagle carries, read as one
+  // smooth swept mass instead of taped-on plates.
+  const ruff = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.52, 0.3], bot: [-0.46, 0.4], w: 0.42, n: 2.1 }, // buried in the head
+        { top: [0.28, 0.6], bot: [-0.6, 0.66], w: 0.47, n: 2.0 }, // flaring…
+        { top: [-0.08, 0.76], bot: [-0.68, 0.78], w: 0.38, n: 1.9 }, // …to the collar tip
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.05),
+  );
+  g.add(ruff);
+
+  // The CREST: a fan of long feathers sweeping up and back off the crown —
+  // harpy-eagle style — tallest over the poll, laying flatter as it runs
+  // down the nape. Each dark feather carries a thin accent vane, so this is
+  // also where the head reads team-coloured across the arena.
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const len = r * (0.62 + Math.sin(t * Math.PI) * 0.3);
+    const tilt = -0.12 + t * 1.02; // near-vertical in front → swept back at the nape
+    const baseY = r * (0.6 - t * 0.16);
+    const baseZ = r * (-0.12 + t * 0.56);
+    const cy = baseY + (Math.cos(tilt) * len) / 2 - r * 0.08;
+    const cz = baseZ + (Math.sin(tilt) * len) / 2;
+    const feather = new Mesh(new BoxGeometry(r * 0.13, len, r * 0.16), darkMat());
+    feather.position.set(0, cy, cz);
+    feather.rotation.x = tilt;
+    g.add(feather);
+    const vane = new Mesh(new BoxGeometry(r * 0.045, len * 0.9, r * 0.17), glowMat(accent, 0.6 + Math.sin(t * Math.PI) * 0.25));
+    vane.position.set(0, cy + r * 0.015, cz);
+    vane.rotation.x = tilt;
     g.add(vane);
   }
-  // Layered cheek feather plates.
+  // A shorter flanking pair splayed off the crown for crest volume.
+  for (const side of [-1, 1]) {
+    const feather = new Mesh(new BoxGeometry(r * 0.1, r * 0.52, r * 0.13), darkMat());
+    feather.position.set(side * r * 0.16, r * 0.84, r * 0.1);
+    feather.rotation.set(0.18, 0, side * -0.22);
+    g.add(feather);
+  }
+
+  // Cheek feather lines sweeping back from the beak under the eyes.
   for (const side of [-1, 1]) {
     for (let i = 0; i < 2; i++) {
-      const plate = new Mesh(new BoxGeometry(r * 0.07, r * 0.34, r * 0.4 - i * r * 0.1), chassisMat(accent, 0.04));
-      plate.position.set(side * (r * 0.55 - i * r * 0.08), -r * 0.05 - i * r * 0.12, -r * 0.48 + i * r * 0.1);
-      plate.rotation.set(0, side * 0.5, side * 0.25);
+      const plate = new Mesh(new BoxGeometry(r * 0.06, r * 0.3, r * 0.42 - i * r * 0.1), chassisMat(accent, 0.04));
+      plate.position.set(side * (r * 0.42 - i * r * 0.06), -r * 0.1 - i * r * 0.14, -r * 0.35 + i * r * 0.12);
+      plate.rotation.set(0, side * 0.5, side * 0.28);
       g.add(plate);
     }
   }
@@ -992,6 +1095,7 @@ function loftGeometry(stations: HeadStation[], scale: number, seg = 22): BufferG
 function buildStallionHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('stallion');
+  g.scale.setScalar(1.25); // carried proud — reads bigger than the hitbox sphere
 
   // The skull loft, back of head → nose tip. Stations traced from a real
   // head: the wedge is widest at the brow/jowls and tapers steadily down the
