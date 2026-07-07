@@ -33,6 +33,7 @@ import { Hitbox, HitboxKind } from '../components/Hitbox.js';
 import { MAX_OPPONENTS, opponents } from '../combat/opponentBus.js';
 import { localLayout } from '../combat/layout.js';
 import { app } from '../menu/appState.js';
+import { mesh } from '../net/mesh.js';
 import { rival } from '../net/leaderboard.js';
 import { BODY_IK, hueToColor, teamColor } from '../config.js';
 
@@ -151,12 +152,15 @@ export class OpponentSystem extends createSystem({
 
       this.applySkins(r, slot);
 
-      // Neon: a downed fighter greys out; otherwise an online rival wears their
-      // own synced accent and everyone else their team tint. Recolour only on
-      // a real change.
+      // Neon: a downed fighter greys out; otherwise every remote HUMAN wears
+      // their own synced accent (their pose packets carry it in ALL online
+      // modes — duel, 2v2, FFA and raids; ball fire stays team-tinted, which
+      // already tells friend from foe) and bots wear the team tint. accentHue
+      // is -1 until a real peer packet arrives. Recolour only on a change.
+      const human = pose.accentHue >= 0 && (app.mode === 'net' || (app.arcade === 'raid' && mesh.joined));
       const want = dead
         ? DEAD_GREY
-        : app.mode === 'net' && slot === 1 && pose.accentHue >= 0
+        : human
           ? hueToColor(pose.accentHue, pose.accentLight)
           : teamColor(team);
       if (want !== r.accentColor) {
@@ -215,29 +219,39 @@ export class OpponentSystem extends createSystem({
   }
 
   /**
-   * Dress the primary rival the way THEY chose (skins from their `iam`
-   * message); allies and bots wear the team default. Visual only.
+   * Dress every remote HUMAN the way THEY chose — the 1v1 rival from the
+   * duel's `iam` (leaderboard) store, every mesh fighter (2v2 / FFA rivals,
+   * raid squadmates) from the cosmetics their mesh `iam` broadcast — and give
+   * bots a random bout skin. Visual only.
    */
   private applySkins(r: OppRig, slot: number): void {
-    const net = app.mode === 'net' && slot === 1;
-    // Arcade bots wear a random head/chassis skin (team-colour accent still
-    // applied below, so teams stay readable); the rival wears their own; 1v1
-    // and the default keep the house look.
+    // The classic duel rival syncs through the 1v1 net client's store; it is
+    // NOT valid in mesh bouts (it holds whoever you last duelled — reading it
+    // for mesh slot 1 was why 2v2/FFA rivals sometimes wore a stranger's kit).
+    const duel = app.mode === 'net' && app.arcade === '1v1' && slot === 1;
+    // Any seated mesh peer: look their cosmetics up by canonical seat.
+    const seat = !duel && mesh.joined ? (localLayout()[slot]?.canonical ?? -1) : -1;
+    const peer = seat >= 0 ? mesh.cosmetics[seat] : undefined;
     let av: AvatarSkin;
-    if (net && rival.avatarSkin) av = resolveAvatarSkin(rival.avatarSkin, rival.avColor, rival.avLight);
-    else if (app.mode !== 'net' && app.arcade !== '1v1') {
+    if (duel && rival.avatarSkin) av = resolveAvatarSkin(rival.avatarSkin, rival.avColor, rival.avLight);
+    else if (peer?.av) av = resolveAvatarSkin(peer.av, peer.avc ?? -1, peer.avl ?? 0.5);
+    else if (!mesh.joined && app.mode !== 'net' && app.arcade !== '1v1') {
+      // Arcade BOTS wear a random head/chassis skin (team-colour accent still
+      // applied above, so teams stay readable). A mesh peer whose `iam`
+      // hasn't landed yet gets the house default instead of a random roll —
+      // that random was exactly the "teammates in random skins" raid bug.
       r.botSkin ??= AVATAR_SKINS[Math.floor(Math.random() * AVATAR_SKINS.length)];
       av = r.botSkin;
     } else av = OPPONENT_DEFAULT_AVATAR;
-    // Only a genuine online rival overrides their platform skin; allies and
+    // Only the duel rival overrides their platform skin; mesh fighters and
     // bots keep the team tint applyArenaLayout painted (so FFA pads stay
     // colour-coded), so the skin key folds the platform in only for the rival.
-    const pf = net && rival.platformSkin ? platformSkin(rival.platformSkin) : OPPONENT_DEFAULT_PLATFORM;
-    const key = `${av.id}|${net ? pf.id : 'tint'}`;
+    const pf = duel && rival.platformSkin ? platformSkin(rival.platformSkin) : OPPONENT_DEFAULT_PLATFORM;
+    const key = `${av.id}|${peer?.avc ?? ''}|${peer?.avl ?? ''}|${duel ? pf.id : 'tint'}`;
     if (key === r.appliedSkins) return;
     r.appliedSkins = key;
     for (const piece of r.rig.all) applyAvatarSkin(piece, av);
-    if (net) {
+    if (duel) {
       const pad = this.scene.getObjectByName(platformName(slot));
       if (pad) applyPlatformSkin(pad, pf);
     }

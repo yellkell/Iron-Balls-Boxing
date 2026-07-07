@@ -43,6 +43,11 @@ class Mesh {
    *  until it arrives). The HUD reads this so brawlers show real names, not
    *  the bot-bout 'ALLY'/'BOT' placeholders. */
   names: string[] = [];
+  /** Seat → that player's chosen cosmetics (avatar/platform skin ids + custom
+   *  colour), learned from the same `iam` message. OpponentSystem dresses
+   *  every mesh fighter (raid squadmates, FFA/2v2 rivals) from this, so
+   *  people wear what they actually chose instead of bot randoms. */
+  cosmetics: ({ av?: string; pf?: string; avc?: number; avl?: number } | undefined)[] = [];
   /** Seat → that peer's remote voice stream, set by the impl on `ontrack`. */
   voice = new Map<number, MediaStream>();
   /** True once every seat is filled by a human. */
@@ -134,6 +139,7 @@ class Mesh {
     this.mySeat = 0;
     this.occupants = [];
     this.names = [];
+    this.cosmetics = [];
     this.voice.clear();
   }
 }

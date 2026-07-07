@@ -385,11 +385,13 @@ export class MeshSystem extends createSystem({
       if (app.arcade === 'raid') raidInbox.push({ seat, msg });
       return;
     }
-    // A peer's callsign — store it by their canonical seat so the HUD can show
-    // real names. Handled BEFORE the local-index gate (the name is keyed by
-    // seat, not by whether they map to one of my opponent slots).
+    // A peer's callsign + cosmetics — store them by their canonical seat so
+    // the HUD can show real names and OpponentSystem can dress their avatar
+    // the way THEY chose. Handled BEFORE the local-index gate (keyed by seat,
+    // not by whether they map to one of my opponent slots).
     if (msg.k === 'iam') {
       mesh.names[seat] = msg.name;
+      mesh.cosmetics[seat] = { av: msg.av, pf: msg.pf, avc: msg.avc, avl: msg.avl };
       return;
     }
 
