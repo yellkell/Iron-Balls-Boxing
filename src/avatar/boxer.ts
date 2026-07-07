@@ -678,17 +678,23 @@ function buildBearChest(accent: number): Group {
   );
   g.add(core);
 
-  // The hump proper and two shoulder boulders — round bear mass sunk INTO
-  // the loft so they read as muscle over the frame, not balloons on it.
+  // The hump proper stays organic muscle behind the neck.
   const hump = new Mesh(new SphereGeometry(0.1, 16, 12), chassisMat(accent, 0.05));
   hump.scale.set(1.25, 0.6, 0.9);
   hump.position.set(0, 0.2, 0.08);
   g.add(hump);
+
+  // Bespoke PAULDRONS: a domed crown shell with two smaller shells
+  // cascading tight beneath it, wrapping the shoulder's curve — heavy
+  // lapped bear armour, each plate mostly tucked under the one above.
   for (const side of [-1, 1]) {
-    const boulder = new Mesh(new SphereGeometry(0.1, 16, 12), chassisMat(accent, 0.05));
-    boulder.scale.set(1.1, 0.8, 0.95);
-    boulder.position.set(side * 0.295, 0.135, 0);
-    g.add(boulder);
+    for (let i = 0; i < 3; i++) {
+      const plate = new Mesh(new SphereGeometry(0.105 - i * 0.02, 16, 12), chassisMat(accent, 0.05));
+      plate.scale.set(1.1, 0.55 - i * 0.06, 1.0);
+      plate.position.set(side * (0.28 + i * 0.012), 0.165 - i * 0.042, 0);
+      plate.rotation.z = side * -(0.15 + i * 0.22);
+      g.add(plate);
+    }
   }
 
   // Shaggy fur: dark plates swept down the flanks and a fringe under the
@@ -710,11 +716,18 @@ function buildBearChest(accent: number): Group {
     g.add(fringe);
   }
 
-  // The scar: three claw-mark slashes glowing across the left of the chest.
+  // The scars: three claw-mark slashes glowing across the left of the chest,
+  // and an older two-slash rake low on the right flank.
   for (let i = 0; i < 3; i++) {
     const claw = new Mesh(new BoxGeometry(0.016, 0.11, 0.012), glowMat(accent, 0.9));
     claw.position.set(-0.04 - i * 0.042, 0.04 - i * 0.012, -0.202 + i * 0.006);
     claw.rotation.set(0.12, 0, -0.35);
+    g.add(claw);
+  }
+  for (let i = 0; i < 2; i++) {
+    const claw = new Mesh(new BoxGeometry(0.013, 0.08, 0.011), glowMat(accent, 0.7));
+    claw.position.set(0.12 + i * 0.036, -0.15 - i * 0.01, -0.145 + i * 0.008);
+    claw.rotation.set(0.1, 0.25, 0.4);
     g.add(claw);
   }
 
@@ -760,21 +773,29 @@ function buildPantherChest(accent: number): Group {
   );
   g.add(core);
 
-  // Smooth sloped deltoids and low subtle pecs — muscle, not armour, sunk
-  // into the loft so the silhouette stays one surface.
+  // Bespoke PAULDRONS: one swept teardrop BLADE per shoulder, canted back
+  // like a laid ear, its crest traced in neon — sleek, not a bubble.
   for (const side of [-1, 1]) {
-    const delt = new Mesh(new SphereGeometry(0.078, 16, 12), chassisMat(accent, 0.05));
-    delt.scale.set(1.2, 0.62, 0.88);
-    delt.position.set(side * 0.245, 0.148, 0);
-    delt.rotation.z = side * -0.28;
-    g.add(delt);
+    const blade = new Mesh(new SphereGeometry(0.09, 16, 12), chassisMat(accent, 0.05));
+    blade.scale.set(1.55, 0.42, 0.68);
+    blade.position.set(side * 0.26, 0.162, 0.005);
+    blade.rotation.set(0.08, side * 0.3, side * -0.12);
+    g.add(blade);
+    const crest = new Mesh(new BoxGeometry(0.13, 0.011, 0.011), glowMat(accent, 0.9));
+    crest.position.set(side * 0.272, 0.196, -0.008);
+    crest.rotation.set(0.08, side * 0.3, side * -0.12);
+    g.add(crest);
   }
 
-  // A dark ridge down the spine, nape to mid-back.
-  const spine = new Mesh(new BoxGeometry(0.035, 0.28, 0.02), darkMat());
-  spine.position.set(0, 0.0, 0.145);
-  spine.rotation.x = 0.08;
-  g.add(spine);
+  // Neon spine: three glow diamonds stepping down the back where a dark
+  // ridge used to sit.
+  for (let i = 0; i < 3; i++) {
+    const s = 0.026 - i * 0.004;
+    const stud = new Mesh(new BoxGeometry(s, s, 0.014), glowMat(accent, 0.9));
+    stud.position.set(0, 0.06 - i * 0.12, 0.148 - i * 0.024);
+    stud.rotation.z = Math.PI / 4;
+    g.add(stud);
+  }
 
   // Rib streaks: three thin glow slashes raking down-forward along each
   // flank — the torso's echo of the whisker fan.
@@ -832,11 +853,18 @@ function buildEagleChest(accent: number): Group {
   // feathers sweeping back and down the arm line, the first carrying a thin
   // accent vane — the same feather language as the head's crest and ruff.
   for (const side of [-1, 1]) {
-    const cap = new Mesh(new SphereGeometry(0.085, 16, 12), chassisMat(accent, 0.05));
-    cap.scale.set(1.2, 0.65, 0.9);
-    cap.position.set(side * 0.265, 0.15, 0);
-    cap.rotation.z = side * -0.22;
-    g.add(cap);
+    // Bespoke PAULDRONS: two swept wing-plates pointing out and back like
+    // the folded wing's leading edge, the top one traced in neon.
+    for (let i = 0; i < 2; i++) {
+      const plate = new Mesh(new BoxGeometry(0.15 - i * 0.03, 0.028, 0.1 - i * 0.02), chassisMat(accent, 0.05));
+      plate.position.set(side * (0.255 + i * 0.03), 0.16 - i * 0.045, 0.01 + i * 0.02);
+      plate.rotation.set(0.1, side * -0.25, side * -(0.2 + i * 0.2));
+      g.add(plate);
+    }
+    const edge = new Mesh(new BoxGeometry(0.148, 0.012, 0.012), glowMat(accent, 0.9));
+    edge.position.set(side * 0.255, 0.177, -0.038);
+    edge.rotation.set(0.1, side * -0.25, side * -0.2);
+    g.add(edge);
     // Folded wing coverts: three plates LYING back over the shoulder top,
     // shingled toward the spine — every one carrying a neon vane, so the
     // folded wings read as banked fire from behind.
@@ -857,11 +885,14 @@ function buildEagleChest(accent: number): Group {
   // the breast where the collar bones meet — the raid-wing sigil.
   g.add(glowBand(accent, 0.21, 0.15, 0.114, 0.022, 0.016, 0.85));
   g.add(glowBand(accent, -0.28, 0.102, 0.086, -0.008, 0.014, 0.85));
-  for (const side of [-1, 1]) {
-    const bar = new Mesh(new BoxGeometry(0.012, 0.07, 0.012), glowMat(accent, 1.1));
-    bar.position.set(side * 0.027, 0.075, -0.196);
-    bar.rotation.set(0.28, 0, side * 0.6);
-    g.add(bar);
+  // A DOUBLE chevron down the breast — rank stripes on the keel.
+  for (let row = 0; row < 2; row++) {
+    for (const side of [-1, 1]) {
+      const bar = new Mesh(new BoxGeometry(0.012, 0.07 - row * 0.012, 0.012), glowMat(accent, 1.1 - row * 0.3));
+      bar.position.set(side * (0.027 - row * 0.004), 0.075 - row * 0.07, -0.196 - row * 0.012);
+      bar.rotation.set(0.28, 0, side * 0.6);
+      g.add(bar);
+    }
   }
 
   // The tail fan rides the lower back, spread down and out past the V —
