@@ -1407,10 +1407,10 @@ export class FightSystem extends createSystem({}) {
     ball.state = FLYING;
     ball.elapsed = 0;
     ball.recallLock = 0;
-    // Arena parity: a throw that bit into a curve gets the whip-crack launch
-    // and a harder buzz, so the hook is felt the instant it leaves.
+    // Arena parity: a throw that bit into a curve gets a harder buzz, so the
+    // hook is felt the instant it leaves. Same whoosh as a straight throw.
     if (curlRate >= CURL.feelMin) {
-      sfx.curveWhoosh();
+      sfx.throwWhoosh();
       pulseHand(this.world.session, HANDS[hand], 1.0, 150);
     } else {
       sfx.throwWhoosh();
