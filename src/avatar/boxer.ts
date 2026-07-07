@@ -290,6 +290,7 @@ function buildBearHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('cobalt');
   g.scale.setScalar(1.5); // a bear's head IS the intimidation — reads huge
+  g.position.y = 0.05; // carried a touch high so the neck shows under the jaw
 
   // The skull loft, back of head → nose. A bear's profile is the opposite of
   // the horse's wedge: high round dome, a concave dip at the brow (the stop),
@@ -386,7 +387,8 @@ function buildBearHead(accent: number): Group {
 function buildPantherHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('crimson');
-  g.scale.setScalar(1.35); // between the eagle (1.25) and the bear (1.5)
+  g.scale.setScalar(1.35); // between the eagle and the bear
+  g.position.y = 0.04; // carried a touch high so the neck shows under the jaw
 
   // The skull loft, occiput → nose. A cat is all cheeks and no snout: the
   // width peaks at the temples and holds through the eye line, then the
@@ -459,13 +461,13 @@ function buildPantherHead(accent: number): Group {
   for (const side of [-1, 1]) {
     const ear = new Mesh(new ConeGeometry(r * 0.24, r * 0.42, 10), chassisMat(accent, 0.05));
     ear.scale.z = 0.6;
-    ear.position.set(side * r * 0.42, r * 0.8, r * 0.1);
-    ear.rotation.set(-0.1, 0, side * -0.3);
+    ear.position.set(side * r * 0.37, r * 0.72, r * 0.08);
+    ear.rotation.set(-0.1, 0, side * -0.22);
     g.add(ear);
     const inner = new Mesh(new ConeGeometry(r * 0.15, r * 0.32, 10), darkMat());
     inner.scale.z = 0.5;
-    inner.position.set(side * r * 0.43, r * 0.77, r * 0.05);
-    inner.rotation.set(-0.1, 0, side * -0.3);
+    inner.position.set(side * r * 0.38, r * 0.69, r * 0.03);
+    inner.rotation.set(-0.1, 0, side * -0.22);
     g.add(inner);
   }
 
@@ -505,6 +507,7 @@ function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
   g.scale.setScalar(1.5); // carried proud — as big as the bear
+  g.position.y = 0.06; // highest carry of the three — the low nape ruff needs the clearance
 
   // The head loft, nape → cere. The crown stays high and flat all the way
   // to the brow ledge (the eagle "scowl" is bone, not eyebrow), then steps
@@ -655,8 +658,10 @@ function buildEagleHead(accent: number): Group {
  *  left pec. Wide shoulders, hard waist taper — brutish but organic. */
 function buildBearChest(accent: number): Group {
   const g = taggedHead('cobalt');
-  const neck = new Mesh(new CylinderGeometry(0.08, 0.1, 0.12, 10), darkMat());
-  neck.position.y = 0.17;
+  // A REAL neck: tall dark column rising well clear of the yoke to meet the
+  // head, so the skull doesn't sit swallowed in the shoulders.
+  const neck = new Mesh(new CylinderGeometry(0.075, 0.105, 0.22, 10), darkMat());
+  neck.position.y = 0.25;
   g.add(neck);
 
   // The torso core: a vertical loft, shoulders → waist. The first ring tilts
@@ -751,8 +756,9 @@ function buildBearChest(accent: number): Group {
  *  flanks (the body echo of the whisker fan). Athletic V-taper, no plates. */
 function buildPantherChest(accent: number): Group {
   const g = taggedHead('crimson');
-  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.12, 10), darkMat());
-  neck.position.y = 0.17;
+  // A REAL neck — slender and long, clear of the shoulders.
+  const neck = new Mesh(new CylinderGeometry(0.06, 0.09, 0.2, 10), darkMat());
+  neck.position.y = 0.24;
   g.add(neck);
 
   // The torso core: a vertical loft with the hard feline V — shoulders wide,
@@ -827,8 +833,10 @@ function buildPantherChest(accent: number): Group {
  *  and a single glow filament tracing the keel line. */
 function buildEagleChest(accent: number): Group {
   const g = taggedHead('valkyrie');
-  const neck = new Mesh(new CylinderGeometry(0.06, 0.08, 0.12, 10), darkMat());
-  neck.position.y = 0.17;
+  // A REAL neck — the longest of the three (birds lead with it), so the
+  // head and its low-hanging nape ruff ride clear of the shoulders.
+  const neck = new Mesh(new CylinderGeometry(0.055, 0.085, 0.24, 10), darkMat());
+  neck.position.y = 0.26;
   g.add(neck);
 
   // The torso core: shoulders wide, then the breast swelling FORWARD into
