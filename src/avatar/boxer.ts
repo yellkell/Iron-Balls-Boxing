@@ -527,8 +527,8 @@ function buildEagleHead(accent: number): Group {
         { top: [0.68, -0.05], bot: [-0.5, 0.18], w: 0.46, n: 2.1 }, // crown (low, flat)
         { top: [0.7, -0.45], bot: [-0.46, -0.15], w: 0.44, n: 2.3 }, // brow shelf (proud, square)
         { top: [0.44, -0.66], bot: [-0.4, -0.46], w: 0.34, n: 2.1 }, // eye line, cut UNDER the shelf
-        { top: [0.28, -0.88], bot: [-0.32, -0.7], w: 0.24, n: 2.0 }, // forehead step
-        { top: [0.2, -1.0], bot: [-0.26, -0.84], w: 0.17, n: 1.9 }, // cere
+        { top: [0.32, -0.86], bot: [-0.34, -0.68], w: 0.26, n: 2.0 }, // forehead step
+        { top: [0.26, -0.96], bot: [-0.3, -0.8], w: 0.2, n: 1.9 }, // cere
       ],
       r,
     ),
@@ -536,17 +536,17 @@ function buildEagleHead(accent: number): Group {
   );
   g.add(skull);
 
-  // The upper beak: one loft riding the real raptor curve — it projects
-  // FORWARD from the cere, the culmen staying nearly level, then
-  // accelerates DOWN into the hooked tip that ends below the mouth line.
+  // The upper beak: HUGE — the face-dominating hooked wedge, deep from
+  // culmen to cutting edge, projecting far forward before the tip plunges
+  // past the chin line.
   const beak = new Mesh(
     loftGeometry(
       [
-        { top: [0.22, -0.92], bot: [-0.34, -0.8], w: 0.18, n: 1.9 }, // buried in the head
-        { top: [0.1, -1.18], bot: [-0.38, -1.06], w: 0.145, n: 1.85 },
-        { top: [-0.06, -1.38], bot: [-0.4, -1.24], w: 0.11, n: 1.8 },
-        { top: [-0.24, -1.5], bot: [-0.42, -1.38], w: 0.065, n: 1.75 },
-        { top: [-0.46, -1.5], bot: [-0.5, -1.42], w: 0.025, n: 1.7 }, // the hook, dropping dead-down
+        { top: [0.3, -0.85], bot: [-0.45, -0.7], w: 0.24, n: 1.95 }, // buried in the head
+        { top: [0.26, -1.22], bot: [-0.5, -1.08], w: 0.2, n: 1.9 }, // culmen holds HIGH…
+        { top: [0.08, -1.5], bot: [-0.55, -1.36], w: 0.15, n: 1.8 }, // …arching forward…
+        { top: [-0.28, -1.68], bot: [-0.6, -1.54], w: 0.09, n: 1.75 }, // …then breaking over
+        { top: [-0.64, -1.66], bot: [-0.69, -1.56], w: 0.03, n: 1.7 }, // the hook, plunging
       ],
       r,
     ),
@@ -554,13 +554,13 @@ function buildEagleHead(accent: number): Group {
   );
   g.add(beak);
 
-  // The smaller lower mandible tucked under the upper beak's cutting edge.
+  // The lower mandible scaled up with it, tucked under the cutting edge.
   const mandible = new Mesh(
     loftGeometry(
       [
-        { top: [-0.32, -0.82], bot: [-0.5, -0.76], w: 0.135, n: 1.9 },
-        { top: [-0.36, -1.04], bot: [-0.52, -0.98], w: 0.1, n: 1.85 },
-        { top: [-0.42, -1.26], bot: [-0.5, -1.22], w: 0.05, n: 1.8 },
+        { top: [-0.46, -0.78], bot: [-0.64, -0.7], w: 0.17, n: 1.9 },
+        { top: [-0.5, -1.06], bot: [-0.66, -0.98], w: 0.125, n: 1.85 },
+        { top: [-0.56, -1.32], bot: [-0.64, -1.26], w: 0.055, n: 1.8 },
       ],
       r,
     ),
@@ -570,30 +570,35 @@ function buildEagleHead(accent: number): Group {
 
   // Cere saddle wrapping the beak root, hiding the head/beak seam, with the
   // two nostril slits ahead of it.
-  const cere = new Mesh(new SphereGeometry(r * 0.13, 12, 10), darkMat());
-  cere.scale.set(1.15, 0.6, 0.9);
-  cere.position.set(0, r * 0.14, -r * 0.9);
+  const cere = new Mesh(new SphereGeometry(r * 0.15, 12, 10), darkMat());
+  cere.scale.set(1.2, 0.6, 0.9);
+  cere.position.set(0, r * 0.24, -r * 0.86);
   cere.rotation.x = 0.5;
   g.add(cere);
   for (const side of [-1, 1]) {
-    const nostril = new Mesh(new SphereGeometry(r * 0.035, 8, 6), darkMat());
+    const nostril = new Mesh(new SphereGeometry(r * 0.04, 8, 6), darkMat());
     nostril.scale.set(0.7, 1, 0.6);
-    nostril.position.set(side * r * 0.09, r * 0.06, -r * 1.04);
+    nostril.position.set(side * r * 0.11, r * 0.1, -r * 1.02);
     g.add(nostril);
   }
 
-  // The eyes tuck up under the lofted brow shelf's crease — the eye in
-  // shadow BENEATH the bony overhang is the whole raptor glare.
+  // The eyes: BIG — wide expressive ovals under a heavy slanted dark lid
+  // (the cartoon-raptor scowl), tucked against the brow shelf.
   for (const side of [-1, 1]) {
-    const socket = new Mesh(new SphereGeometry(r * 0.12, 12, 10), darkMat());
-    socket.scale.set(0.7, 0.9, 0.9);
-    socket.position.set(side * r * 0.31, r * 0.4, -r * 0.54);
+    const socket = new Mesh(new SphereGeometry(r * 0.17, 14, 12), darkMat());
+    socket.scale.set(0.7, 0.95, 0.85);
+    socket.position.set(side * r * 0.3, r * 0.36, -r * 0.52);
     g.add(socket);
-    const eye = new Mesh(new SphereGeometry(r * 0.095, 12, 10), glowMat(accent, 2.8));
-    eye.scale.set(0.75, 1, 0.9);
-    eye.position.set(side * r * 0.34, r * 0.39, -r * 0.56);
+    const eye = new Mesh(new SphereGeometry(r * 0.14, 14, 12), glowMat(accent, 2.8));
+    eye.scale.set(0.72, 1.0, 0.85);
+    eye.position.set(side * r * 0.33, r * 0.35, -r * 0.55);
     eye.rotation.y = side * -0.5;
     g.add(eye);
+    // The lid: a dark bar slanting DOWN toward the beak — the glare.
+    const lid = new Mesh(new BoxGeometry(r * 0.3, r * 0.09, r * 0.14), darkMat());
+    lid.position.set(side * r * 0.28, r * 0.52, -r * 0.56);
+    lid.rotation.set(0.25, side * -0.3, side * 0.4);
+    g.add(lid);
   }
 
   // The hackle ruff: a second, smaller loft flaring back and DOWN off the
@@ -611,6 +616,26 @@ function buildEagleHead(accent: number): Group {
     chassisMat(accent, 0.05),
   );
   g.add(ruff);
+
+  // The SCRUFF: a ring of jagged feather tips around the base of the head,
+  // pointing down and out — the smooth ruff mass above ends in zigzag
+  // points, the shaggy collar that sells the eagle's neck.
+  const _sDir = new Vector3();
+  const _sUp = new Vector3(0, 1, 0);
+  for (let i = 0; i < 11; i++) {
+    const a = ((35 + i * 29) * Math.PI) / 180; // wraps the neck, skips the beak
+    const sx = Math.sin(a);
+    const sz = Math.cos(a);
+    const len = r * (0.26 + (i % 2) * 0.09); // alternating long/short = the zigzag
+    _sDir.set(sx * 0.6, -1, sz * 0.6).normalize();
+    const quill = new Mesh(new ConeGeometry(r * 0.125, len, 6), chassisMat(accent, 0.05));
+    quill.scale.z = 0.55;
+    quill.quaternion.setFromUnitVectors(_sUp, _sDir);
+    quill.position
+      .set(sx * r * 0.36, -r * 0.38, sz * r * 0.34 + r * 0.1)
+      .addScaledVector(_sDir, len / 2);
+    g.add(quill);
+  }
 
   // The CREST: a fan of long feathers sweeping up and back off the crown —
   // harpy-eagle style — tallest over the poll, laying flatter as it runs
