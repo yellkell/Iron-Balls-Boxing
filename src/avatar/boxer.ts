@@ -670,7 +670,8 @@ function buildBearChest(accent: number): Group {
         { top: [0.04, -0.21], bot: [0.05, 0.19], w: 0.27, n: 2.1 }, // the barrel (deepest)
         { top: [-0.12, -0.17], bot: [-0.12, 0.15], w: 0.2, n: 2.05 }, // ribs
         { top: [-0.28, -0.1], bot: [-0.28, 0.1], w: 0.12, n: 2.0 }, // waist
-        { top: [-0.34, -0.07], bot: [-0.34, 0.07], w: 0.09, n: 2.0 }, // taper tip
+        { top: [-0.36, -0.06], bot: [-0.36, 0.06], w: 0.075, n: 2.0 }, // taper
+        { top: [-0.44, -0.03], bot: [-0.44, 0.03], w: 0.04, n: 2.0 }, // the V point
       ],
       1,
     ),
@@ -752,7 +753,8 @@ function buildPantherChest(accent: number): Group {
         { top: [0.02, -0.17], bot: [0.02, 0.135], w: 0.185, n: 2.0 }, // chest, shallow ribcage
         { top: [-0.13, -0.135], bot: [-0.13, 0.1], w: 0.125, n: 2.0 }, // ribs
         { top: [-0.28, -0.075], bot: [-0.28, 0.065], w: 0.09, n: 2.0 }, // high pinched waist
-        { top: [-0.35, -0.06], bot: [-0.35, 0.05], w: 0.065, n: 2.0 }, // taper tip
+        { top: [-0.36, -0.055], bot: [-0.36, 0.045], w: 0.06, n: 2.0 }, // taper
+        { top: [-0.44, -0.028], bot: [-0.44, 0.025], w: 0.032, n: 2.0 }, // the V point
       ],
       1,
     ),
@@ -820,7 +822,8 @@ function buildEagleChest(accent: number): Group {
         { top: [0.0, -0.23], bot: [0.0, 0.14], w: 0.19, n: 2.0 }, // the KEEL (deepest front)
         { top: [-0.16, -0.16], bot: [-0.16, 0.11], w: 0.135, n: 1.95 }, // lower breast
         { top: [-0.3, -0.085], bot: [-0.3, 0.07], w: 0.09, n: 2.0 }, // waist
-        { top: [-0.35, -0.06], bot: [-0.35, 0.05], w: 0.07, n: 2.0 }, // taper tip
+        { top: [-0.37, -0.055], bot: [-0.37, 0.045], w: 0.06, n: 2.0 }, // taper
+        { top: [-0.44, -0.028], bot: [-0.44, 0.025], w: 0.032, n: 2.0 }, // the V point
       ],
       1,
     ),
@@ -863,95 +866,39 @@ function buildEagleChest(accent: number): Group {
     bar.rotation.set(0.28, 0, side * 0.6);
     g.add(bar);
   }
-  return g;
-}
 
-/** BEAR hips: one round lofted haunch mass with fur tips hanging off the
- *  seat — heavy and organic, matching the barrel above. */
-function buildBearPelvis(accent: number): Group {
-  const g = taggedHead('cobalt');
-  // One smooth mass — the haunch width lives in the loft itself, no bolted-on
-  // bulbs.
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.08, -0.1], bot: [0.08, 0.11], w: 0.13, n: 2.05 }, // belt line
-        { top: [-0.01, -0.12], bot: [-0.01, 0.13], w: 0.165, n: 2.15 }, // haunches (widest)
-        { top: [-0.14, -0.07], bot: [-0.14, 0.08], w: 0.09, n: 2.0 }, // tuck
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.04),
-  );
-  g.add(core);
-  for (const side of [-1, 1]) {
-    const fur = new Mesh(new BoxGeometry(0.035, 0.11, 0.12), darkMat());
-    fur.position.set(side * 0.125, -0.1, 0.05);
-    fur.rotation.set(0.15, side * 0.45, side * 0.35);
-    g.add(fur);
-  }
-  const buckle = new Mesh(new CylinderGeometry(0.02, 0.02, 0.016, 12), glowMat(accent, 1.0));
-  buckle.rotation.x = Math.PI / 2;
-  buckle.position.set(0, 0.05, -0.102);
-  g.add(buckle);
-  return g;
-}
-
-/** PANTHER hips: a slim lofted feline pelvis — smooth haunch ellipsoids and
- *  two glow streaks tracing the hip V, matching the rib streaks above. */
-function buildPantherPelvis(accent: number): Group {
-  const g = taggedHead('crimson');
-  // One smooth flare — the hip width lives in the loft, no bolted-on bulbs.
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.08, -0.09], bot: [0.08, 0.09], w: 0.105, n: 2.05 }, // belt line (narrow off the waist)
-        { top: [-0.02, -0.1], bot: [-0.02, 0.105], w: 0.16, n: 2.1 }, // hips FLARE past the belt
-        { top: [-0.15, -0.06], bot: [-0.15, 0.06], w: 0.08, n: 2.0 }, // tuck
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.04),
-  );
-  g.add(core);
-  const buckle = new Mesh(new BoxGeometry(0.03, 0.03, 0.016), glowMat(accent, 1.1));
-  buckle.position.set(0, 0.05, -0.092);
-  buckle.rotation.z = Math.PI / 4;
-  g.add(buckle);
-  // A hip band riding the widest line of the flare.
-  g.add(glowBand(accent, -0.02, 0.168, 0.111, 0.003, 0.013, 0.7));
-  return g;
-}
-
-/** EAGLE hips: a lofted bird pelvis with a TAIL FAN — dark feather plates
- *  fanning down and back off the seat, the centre one carrying a glow vane. */
-function buildEaglePelvis(accent: number): Group {
-  const g = taggedHead('valkyrie');
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.08, -0.09], bot: [0.08, 0.1], w: 0.11, n: 2.05 }, // belt line
-        { top: [0.0, -0.1], bot: [0.0, 0.105], w: 0.125, n: 2.05 }, // hips
-        { top: [-0.14, -0.06], bot: [-0.14, 0.07], w: 0.07, n: 2.0 }, // tuck
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.04),
-  );
-  g.add(core);
-  // The tail fan, spread down-back off the seat — every feather vaned so
-  // the fan reads neon from behind, brightest in the middle.
+  // The tail fan rides the lower back, spread down and out past the V —
+  // every feather vaned so the tail reads neon from behind, brightest in
+  // the middle. (It lived on the pelvis until the bodies went legless-V.)
   for (let i = -2; i <= 2; i++) {
     const feather = new Mesh(new BoxGeometry(0.04, 0.13, 0.02), darkMat());
-    feather.position.set(i * 0.034, -0.09, 0.09 + Math.abs(i) * 0.008);
-    feather.rotation.set(0.6, i * -0.12, i * 0.14);
+    feather.position.set(i * 0.034, -0.33, 0.065 + Math.abs(i) * 0.008);
+    feather.rotation.set(0.55, i * -0.12, i * 0.14);
     g.add(feather);
     const vane = new Mesh(new BoxGeometry(0.013, 0.12, 0.022), glowMat(accent, 0.7 - Math.abs(i) * 0.18));
-    vane.position.set(i * 0.034, -0.092, 0.09 + Math.abs(i) * 0.008);
-    vane.rotation.set(0.6, i * -0.12, i * 0.14);
+    vane.position.set(i * 0.034, -0.332, 0.065 + Math.abs(i) * 0.008);
+    vane.rotation.set(0.55, i * -0.12, i * 0.14);
     g.add(vane);
   }
   return g;
+}
+
+/** BEAR hips: NONE — the redesigned bodies are a clean V, the torso
+ *  tapering to a point with nothing below (the pelvis hitbox sphere is
+ *  unchanged; there's just no geometry drawn at it). */
+function buildBearPelvis(_accent: number): Group {
+  return taggedHead('cobalt');
+}
+
+/** PANTHER hips: NONE — clean V (see buildBearPelvis). */
+function buildPantherPelvis(_accent: number): Group {
+  return taggedHead('crimson');
+}
+
+/** EAGLE hips: NONE — clean V; the tail fan now rides the chest's lower
+ *  back (see buildEagleChest). */
+function buildEaglePelvis(_accent: number): Group {
+  return taggedHead('valkyrie');
 }
 
 /** KNIGHT → a CRUSADER great helm: a flat-topped steel barrel with a raised
