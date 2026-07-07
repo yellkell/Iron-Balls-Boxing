@@ -493,7 +493,7 @@ function buildPantherHead(accent: number): Group {
 function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
-  g.scale.setScalar(1.25); // carried proud, like the stallion
+  g.scale.setScalar(1.5); // carried proud — as big as the bear
 
   // The head loft, nape → cere. The crown stays high and flat all the way
   // to the brow ledge (the eagle "scowl" is bone, not eyebrow), then steps
