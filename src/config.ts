@@ -571,11 +571,12 @@ export const TEAM_SPACING = 1.9;
 
 /**
  * FFA plus arm length — distance from the cross centre out to each pinnacle.
- * Half the duel gap keeps the across-the-cross distance equal to the classic
- * 3 m duel; the four arms then sit ~2.1 m from each diagonal neighbour, tight
- * and chaotic — right for a brawl.
+ * 0.7× the duel gap puts each DIAGONAL neighbour at √2×2.1 ≈ 3 m — the
+ * classic duel distance to everyone beside you — with 4.2 m to the fighter
+ * straight across. The old ARENA_GAP/2 arms felt too tight in playtests:
+ * ~2.1 m neighbours left no room to read incoming fire from three sides.
  */
-export const FFA_ARM = ARENA_GAP / 2;
+export const FFA_ARM = ARENA_GAP * 0.7;
 
 /** RAID arc seat bearings (radians about the boss anchor): a ~108° semicircle
  *  spread, symmetric — at RAID_RING_RADIUS that puts ~3.7 m centre-to-centre
