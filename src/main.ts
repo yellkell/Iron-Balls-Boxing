@@ -30,6 +30,7 @@ import { FireballSystem } from './systems/FireballSystem.js';
 import { CollisionSystem } from './systems/CollisionSystem.js';
 import { BoundarySystem } from './systems/BoundarySystem.js';
 import { GameStateSystem } from './systems/GameStateSystem.js';
+import { CountdownSystem } from './systems/CountdownSystem.js';
 import { MenuSystem } from './systems/MenuSystem.js';
 import { PromotionSystem } from './systems/PromotionSystem.js';
 import { PlayerFeedbackSystem } from './systems/PlayerFeedbackSystem.js';
@@ -105,6 +106,8 @@ World.create(container, {
   // Rim barrier damage, then the match brain + scoreboards.
   world.registerSystem(BoundarySystem);
   world.registerSystem(GameStateSystem);
+  // The big in-world 3-2-1-FIGHT hanging between the platforms.
+  world.registerSystem(CountdownSystem);
   // Lobby menu, promotion celebration, hit vignette, gloves, transient FX.
   world.registerSystem(MenuSystem);
   world.registerSystem(PromotionSystem);

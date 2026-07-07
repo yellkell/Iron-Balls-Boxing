@@ -290,7 +290,13 @@ function buildBearHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('cobalt');
   g.scale.setScalar(1.5); // a bear's head IS the intimidation — reads huge
-  g.position.y = 0.05; // carried a touch high so the neck shows under the jaw
+  g.position.y = 0.02; // just enough lift to clear the yoke
+
+  // A neck column hanging from the skull: it moves WITH the head, so however
+  // high the tracked head bobs off the torso mid-dodge, the join stays spanned.
+  const neckCol = new Mesh(new CylinderGeometry(r * 0.5, r * 0.36, r * 1.7, 10), darkMat());
+  neckCol.position.set(0, -r * 1.05, r * 0.05);
+  g.add(neckCol);
 
   // The skull loft, back of head → nose. A bear's profile is the opposite of
   // the horse's wedge: high round dome, a concave dip at the brow (the stop),
@@ -388,7 +394,13 @@ function buildPantherHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('crimson');
   g.scale.setScalar(1.35); // between the eagle and the bear
-  g.position.y = 0.04; // carried a touch high so the neck shows under the jaw
+  g.position.y = 0.015; // just enough lift to clear the yoke
+
+  // A neck column hanging from the skull — spans the gap to the torso however
+  // high the tracked head bobs (see the bear's for the why).
+  const neckCol = new Mesh(new CylinderGeometry(r * 0.4, r * 0.28, r * 1.8, 10), darkMat());
+  neckCol.position.set(0, -r * 1.15, r * 0.06);
+  g.add(neckCol);
 
   // The skull loft, occiput → nose. A cat is all cheeks and no snout: the
   // width peaks at the temples and holds through the eye line, then the
@@ -514,7 +526,13 @@ function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
   g.scale.setScalar(1.5); // carried proud — as big as the bear
-  g.position.y = 0.09; // highest carry of the three — the low nape ruff needs the clearance
+  g.position.y = 0.05; // highest carry of the three — the low nape ruff needs the clearance
+
+  // A neck column hanging from the skull — spans the gap to the torso however
+  // high the tracked head bobs (see the bear's for the why).
+  const neckCol = new Mesh(new CylinderGeometry(r * 0.42, r * 0.3, r * 1.9, 10), darkMat());
+  neckCol.position.set(0, -r * 1.2, r * 0.1);
+  g.add(neckCol);
 
   // The head loft, nape → cere. The crown stays high and flat all the way
   // to the brow ledge (the eagle "scowl" is bone, not eyebrow), then steps
@@ -1220,6 +1238,12 @@ function buildStallionHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('stallion');
   g.scale.setScalar(1.25); // carried proud — reads bigger than the hitbox sphere
+
+  // A neck column hanging from the skull — spans the gap to the torso however
+  // high the tracked head bobs (see the bear's for the why).
+  const neckColumn = new Mesh(new CylinderGeometry(r * 0.42, r * 0.3, r * 1.6, 10), darkMat());
+  neckColumn.position.set(0, -r * 0.95, r * 0.15);
+  g.add(neckColumn);
 
   // The skull loft, back of head → nose tip. Stations traced from a real
   // head: the wedge is widest at the brow/jowls and tapers steadily down the
