@@ -375,7 +375,7 @@ function buildBearHead(accent: number): Group {
 function buildPantherHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('crimson');
-  g.scale.setScalar(1.08);
+  g.scale.setScalar(1.35); // between the eagle (1.25) and the bear (1.5)
 
   // The skull loft, occiput → nose. A cat is all cheeks and no snout: the
   // width peaks at the temples and holds through the eye line, then the
@@ -458,13 +458,27 @@ function buildPantherHead(accent: number): Group {
     g.add(inner);
   }
 
-  // Glowing metal whisker spines fanning back off the pads — the panther's
-  // accent signature, kept from the old head but rooted where whiskers grow.
+  // Glowing metal whisker spines — the panther's accent signature. Each one
+  // ROOTS on the whisker pad and is aimed by real whisker geometry: fanned
+  // down the pad in rows, swept back along the cheek, the top row carried
+  // slightly proud and the lower rows drooping — mirrored properly per side
+  // (the old ones pivoted from mid-cheek and swept backward on one side of
+  // the face but forward on the other).
+  const _wDir = new Vector3();
+  const _yUp = new Vector3(0, 1, 0);
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      const wsp = new Mesh(new CylinderGeometry(r * 0.012, r * 0.004, r * 0.55, 4), glowMat(accent, 0.55));
-      wsp.rotation.set(0, -i * 0.18, Math.PI / 2 + side * (0.14 + i * 0.12));
-      wsp.position.set(side * r * 0.38, -r * (0.16 + i * 0.09), -r * 0.76);
+    for (let i = 0; i < 4; i++) {
+      const droop = 0.16 - i * 0.17; // raised top whisker → drooping lower ones
+      const sweep = 0.38 + (i % 2) * 0.22; // alternate columns sweep further back
+      const len = r * (0.8 - i * 0.05);
+      _wDir
+        .set(side * Math.cos(droop) * Math.cos(sweep), Math.sin(droop), Math.cos(droop) * Math.sin(sweep))
+        .normalize();
+      const wsp = new Mesh(new CylinderGeometry(r * 0.01, r * 0.003, len, 4), glowMat(accent, 0.45));
+      wsp.quaternion.setFromUnitVectors(_yUp, _wDir);
+      wsp.position
+        .set(side * r * 0.13, -r * (0.08 + i * 0.055), -r * 0.9)
+        .addScaledVector(_wDir, len / 2);
       g.add(wsp);
     }
   }
