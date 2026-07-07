@@ -459,15 +459,22 @@ function buildPantherHead(accent: number): Group {
   // Big triangular ears riding the top corners, tips leaning out, deep dark
   // inners facing forward — with the short face, the cat silhouette.
   for (const side of [-1, 1]) {
+    // A muff at the ear root bridges cone to dome, so the base can never
+    // read as hovering off the skull's curve.
+    const muff = new Mesh(new SphereGeometry(r * 0.14, 12, 10), chassisMat(accent, 0.05));
+    muff.scale.set(1.0, 0.6, 0.85);
+    muff.position.set(side * r * 0.33, r * 0.56, r * 0.06);
+    muff.rotation.z = side * -0.3;
+    g.add(muff);
     const ear = new Mesh(new ConeGeometry(r * 0.24, r * 0.42, 10), chassisMat(accent, 0.05));
     ear.scale.z = 0.6;
-    ear.position.set(side * r * 0.37, r * 0.72, r * 0.08);
-    ear.rotation.set(-0.1, 0, side * -0.22);
+    ear.position.set(side * r * 0.34, r * 0.68, r * 0.07);
+    ear.rotation.set(-0.1, 0, side * -0.18);
     g.add(ear);
     const inner = new Mesh(new ConeGeometry(r * 0.15, r * 0.32, 10), darkMat());
     inner.scale.z = 0.5;
-    inner.position.set(side * r * 0.38, r * 0.69, r * 0.03);
-    inner.rotation.set(-0.1, 0, side * -0.22);
+    inner.position.set(side * r * 0.35, r * 0.655, r * 0.02);
+    inner.rotation.set(-0.1, 0, side * -0.18);
     g.add(inner);
   }
 
@@ -507,7 +514,7 @@ function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
   g.scale.setScalar(1.5); // carried proud — as big as the bear
-  g.position.y = 0.06; // highest carry of the three — the low nape ruff needs the clearance
+  g.position.y = 0.09; // highest carry of the three — the low nape ruff needs the clearance
 
   // The head loft, nape → cere. The crown stays high and flat all the way
   // to the brow ledge (the eagle "scowl" is bone, not eyebrow), then steps
@@ -702,18 +709,7 @@ function buildBearChest(accent: number): Group {
     }
   }
 
-  // Shaggy fur: dark plates swept down the flanks and a fringe under the
-  // pecs, same language as the head's jaw ruffs.
-  for (const side of [-1, 1]) {
-    const flankFur = new Mesh(new BoxGeometry(0.025, 0.16, 0.14), darkMat());
-    flankFur.position.set(side * 0.235, -0.06, 0.05);
-    flankFur.rotation.set(0.15, side * 0.75, side * 0.3);
-    g.add(flankFur);
-    const underFur = new Mesh(new BoxGeometry(0.035, 0.13, 0.16), darkMat());
-    underFur.position.set(side * 0.16, -0.19, -0.01);
-    underFur.rotation.set(0.12, side * 0.5, side * 0.42);
-    g.add(underFur);
-  }
+  // A short fur fringe under the chest — the flanks stay clean.
   for (let i = -1; i <= 1; i++) {
     const fringe = new Mesh(new BoxGeometry(0.05, 0.1, 0.025), darkMat());
     fringe.position.set(i * 0.07, -0.12, -0.14);
