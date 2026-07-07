@@ -120,6 +120,17 @@ function glowMat(color: number, intensity = 1.4): MeshStandardMaterial {
   return m;
 }
 
+/** A thin neon band WRAPPED around a lofted body at height `y` — unlike a
+ *  surface filament it encircles the volume, so it can never read as
+ *  floating. `halfW`/`halfD` hug the loft's cross-section there (plus a
+ *  little proud), `zC` recentres on sections that sit off-axis. */
+function glowBand(accent: number, y: number, halfW: number, halfD: number, zC = 0, h = 0.016, intensity = 0.9): Mesh {
+  const band = new Mesh(new CylinderGeometry(1, 1, h, 24, 1, true), glowMat(accent, intensity));
+  band.scale.set(halfW, 1, halfD);
+  band.position.set(0, y, zC);
+  return band;
+}
+
 /**
  * How much of the accent the STEEL BODY takes through its emissive channel.
  * The glowing neon parts wear the colour at full; the chassis takes a softened
@@ -706,6 +717,19 @@ function buildBearChest(accent: number): Group {
     claw.rotation.set(0.12, 0, -0.35);
     g.add(claw);
   }
+
+  // Neon that wraps instead of floats: a collar band where the neck meets
+  // the yoke, a waist band at the taper, and three ember studs glowing out
+  // of each shoulder boulder like coals in the fur.
+  g.add(glowBand(accent, 0.228, 0.172, 0.128, 0.042, 0.018, 0.85));
+  g.add(glowBand(accent, -0.29, 0.122, 0.104, 0.0, 0.016, 0.85));
+  for (const side of [-1, 1]) {
+    for (let j = 0; j < 3; j++) {
+      const ember = new Mesh(new SphereGeometry(0.009, 8, 6), glowMat(accent, 1.6));
+      ember.position.set(side * (0.24 + j * 0.038), 0.203 - j * 0.02, -0.045 - j * 0.008);
+      g.add(ember);
+    }
+  }
   return g;
 }
 
@@ -768,6 +792,11 @@ function buildPantherChest(accent: number): Group {
   sternum.position.set(0, 0.1, -0.165);
   sternum.rotation.z = Math.PI / 4;
   g.add(sternum);
+
+  // Wrapped neon: a slim choker band at the neck and a waist band right in
+  // the pinch — the hourglass drawn in light.
+  g.add(glowBand(accent, 0.231, 0.126, 0.088, 0.018, 0.014, 0.9));
+  g.add(glowBand(accent, -0.27, 0.101, 0.081, -0.005, 0.014, 0.9));
   return g;
 }
 
@@ -809,26 +838,31 @@ function buildEagleChest(accent: number): Group {
     cap.rotation.z = side * -0.22;
     g.add(cap);
     // Folded wing coverts: three plates LYING back over the shoulder top,
-    // shingled toward the spine — not hanging off the arm.
+    // shingled toward the spine — every one carrying a neon vane, so the
+    // folded wings read as banked fire from behind.
     for (let i = 0; i < 3; i++) {
       const feather = new Mesh(new BoxGeometry(0.035, 0.13 - i * 0.015, 0.02), darkMat());
       feather.position.set(side * (0.25 - i * 0.015), 0.155 - i * 0.012, 0.06 + i * 0.045);
       feather.rotation.set(0.9 + i * 0.15, side * 0.2, side * -0.12);
       g.add(feather);
-      if (i === 0) {
-        const vane = new Mesh(new BoxGeometry(0.012, 0.125, 0.022), glowMat(accent, 0.6));
-        vane.position.set(side * 0.252, 0.16, 0.06);
-        vane.rotation.set(0.9, side * 0.2, side * -0.12);
-        g.add(vane);
-      }
+      const vane = new Mesh(new BoxGeometry(0.012, 0.12 - i * 0.015, 0.022), glowMat(accent, 0.65 - i * 0.15));
+      vane.position.set(side * (0.252 - i * 0.015), 0.159 - i * 0.012, 0.06 + i * 0.045);
+      vane.rotation.set(0.9 + i * 0.15, side * 0.2, side * -0.12);
+      g.add(vane);
     }
   }
 
-  // The keel line: one glow filament tracing the sternum ridge.
-  const keel = new Mesh(new BoxGeometry(0.012, 0.2, 0.01), glowMat(accent, 0.6));
-  keel.position.set(0, 0.02, -0.225);
-  keel.rotation.x = -0.12;
-  g.add(keel);
+  // Wrapped neon instead of the old floating keel filament: a gorget band
+  // at the neck, a waist band at the taper, and a sternum CHEVRON seated on
+  // the breast where the collar bones meet — the raid-wing sigil.
+  g.add(glowBand(accent, 0.21, 0.15, 0.114, 0.022, 0.016, 0.85));
+  g.add(glowBand(accent, -0.28, 0.102, 0.086, -0.008, 0.014, 0.85));
+  for (const side of [-1, 1]) {
+    const bar = new Mesh(new BoxGeometry(0.012, 0.07, 0.012), glowMat(accent, 1.1));
+    bar.position.set(side * 0.027, 0.075, -0.196);
+    bar.rotation.set(0.28, 0, side * 0.6);
+    g.add(bar);
+  }
   return g;
 }
 
@@ -836,11 +870,13 @@ function buildEagleChest(accent: number): Group {
  *  seat — heavy and organic, matching the barrel above. */
 function buildBearPelvis(accent: number): Group {
   const g = taggedHead('cobalt');
+  // One smooth mass — the haunch width lives in the loft itself, no bolted-on
+  // bulbs.
   const core = new Mesh(
     loftGeometry(
       [
         { top: [0.08, -0.1], bot: [0.08, 0.11], w: 0.13, n: 2.05 }, // belt line
-        { top: [0.0, -0.12], bot: [0.0, 0.13], w: 0.155, n: 2.1 }, // haunches (widest)
+        { top: [-0.01, -0.12], bot: [-0.01, 0.13], w: 0.165, n: 2.15 }, // haunches (widest)
         { top: [-0.14, -0.07], bot: [-0.14, 0.08], w: 0.09, n: 2.0 }, // tuck
       ],
       1,
@@ -849,13 +885,9 @@ function buildBearPelvis(accent: number): Group {
   );
   g.add(core);
   for (const side of [-1, 1]) {
-    const haunch = new Mesh(new SphereGeometry(0.09, 14, 12), chassisMat(accent, 0.04));
-    haunch.scale.set(0.9, 1.0, 1.1);
-    haunch.position.set(side * 0.115, -0.02, 0.01);
-    g.add(haunch);
     const fur = new Mesh(new BoxGeometry(0.035, 0.11, 0.12), darkMat());
-    fur.position.set(side * 0.115, -0.11, 0.04);
-    fur.rotation.set(0.15, side * 0.4, side * 0.35);
+    fur.position.set(side * 0.125, -0.1, 0.05);
+    fur.rotation.set(0.15, side * 0.45, side * 0.35);
     g.add(fur);
   }
   const buckle = new Mesh(new CylinderGeometry(0.02, 0.02, 0.016, 12), glowMat(accent, 1.0));
@@ -869,11 +901,12 @@ function buildBearPelvis(accent: number): Group {
  *  two glow streaks tracing the hip V, matching the rib streaks above. */
 function buildPantherPelvis(accent: number): Group {
   const g = taggedHead('crimson');
+  // One smooth flare — the hip width lives in the loft, no bolted-on bulbs.
   const core = new Mesh(
     loftGeometry(
       [
         { top: [0.08, -0.09], bot: [0.08, 0.09], w: 0.105, n: 2.05 }, // belt line (narrow off the waist)
-        { top: [-0.01, -0.1], bot: [-0.01, 0.1], w: 0.145, n: 2.05 }, // hips FLARE past the belt
+        { top: [-0.02, -0.1], bot: [-0.02, 0.105], w: 0.16, n: 2.1 }, // hips FLARE past the belt
         { top: [-0.15, -0.06], bot: [-0.15, 0.06], w: 0.08, n: 2.0 }, // tuck
       ],
       1,
@@ -881,16 +914,12 @@ function buildPantherPelvis(accent: number): Group {
     chassisMat(accent, 0.04),
   );
   g.add(core);
-  for (const side of [-1, 1]) {
-    const haunch = new Mesh(new SphereGeometry(0.085, 14, 12), chassisMat(accent, 0.04));
-    haunch.scale.set(0.85, 1.05, 1.05);
-    haunch.position.set(side * 0.105, -0.035, 0.01);
-    g.add(haunch);
-  }
   const buckle = new Mesh(new BoxGeometry(0.03, 0.03, 0.016), glowMat(accent, 1.1));
   buckle.position.set(0, 0.05, -0.092);
   buckle.rotation.z = Math.PI / 4;
   g.add(buckle);
+  // A hip band riding the widest line of the flare.
+  g.add(glowBand(accent, -0.02, 0.168, 0.111, 0.003, 0.013, 0.7));
   return g;
 }
 
@@ -910,18 +939,17 @@ function buildEaglePelvis(accent: number): Group {
     chassisMat(accent, 0.04),
   );
   g.add(core);
-  // The tail fan, spread down-back off the seat.
+  // The tail fan, spread down-back off the seat — every feather vaned so
+  // the fan reads neon from behind, brightest in the middle.
   for (let i = -2; i <= 2; i++) {
     const feather = new Mesh(new BoxGeometry(0.04, 0.13, 0.02), darkMat());
     feather.position.set(i * 0.034, -0.09, 0.09 + Math.abs(i) * 0.008);
     feather.rotation.set(0.6, i * -0.12, i * 0.14);
     g.add(feather);
-    if (i === 0) {
-      const vane = new Mesh(new BoxGeometry(0.014, 0.12, 0.022), glowMat(accent, 0.6));
-      vane.position.set(0, -0.092, 0.09);
-      vane.rotation.x = 0.6;
-      g.add(vane);
-    }
+    const vane = new Mesh(new BoxGeometry(0.013, 0.12, 0.022), glowMat(accent, 0.7 - Math.abs(i) * 0.18));
+    vane.position.set(i * 0.034, -0.092, 0.09 + Math.abs(i) * 0.008);
+    vane.rotation.set(0.6, i * -0.12, i * 0.14);
+    g.add(vane);
   }
   return g;
 }
