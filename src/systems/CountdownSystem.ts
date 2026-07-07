@@ -15,8 +15,12 @@ import { CanvasTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry } f
 import { localLayout } from '../combat/layout.js';
 import { match } from '../combat/matchState.js';
 import { app } from '../menu/appState.js';
+import { countdownArt } from '../ui/countdownArt.js';
+import { drawContentPlate } from '../ui/plateArt.js';
 
-/** The messages that belong to the countdown ritual, and their colours. */
+/** The messages that belong to the countdown ritual — drawn with the same
+ *  neon-metal plate PNGs the HUD scoreboard uses (countdownArt), with these
+ *  colours as the stencil fallback for the frames before a plate decodes. */
 const BEAT_STYLE: Record<string, { fill: string; glow: string }> = {
   '3': { fill: '#f4f6fb', glow: 'rgba(170,225,255,0.95)' },
   '2': { fill: '#f4f6fb', glow: 'rgba(170,225,255,0.95)' },
@@ -56,10 +60,16 @@ export class CountdownSystem extends createSystem({}) {
       return;
     }
 
-    if (msg !== this.shown) {
-      this.shown = msg;
-      this.pop = 1;
-      this.draw(msg, style.fill, style.glow);
+    // "Has the plate decoded yet" folds into the redraw key, so the stencil
+    // fallback swaps out for the PNG the moment it's ready (same trick as
+    // the HUD scoreboard).
+    const art = countdownArt(msg);
+    const key = `${msg}|${art ? 'art' : 'txt'}`;
+    if (key !== this.shown) {
+      const newBeat = !this.shown.startsWith(`${msg}|`);
+      this.shown = key;
+      if (newBeat) this.pop = 1; // pop on a new figure, not on the art swap-in
+      this.draw(msg, art, style.fill, style.glow);
     }
     this.pop = Math.max(0, this.pop - delta * 4);
 
@@ -82,19 +92,25 @@ export class CountdownSystem extends createSystem({}) {
     (this.board.material as MeshBasicMaterial).opacity = 1 - ease * 0.55;
   }
 
-  private draw(text: string, fill: string, glow: string): void {
+  private draw(text: string, art: HTMLImageElement | null, fill: string, glow: string): void {
     const ctx = this.canvas.getContext('2d')!;
     ctx.clearRect(0, 0, 1024, 512);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `900 ${text.length > 2 ? 240 : 400}px 'Arial Black', system-ui, sans-serif`;
-    ctx.lineWidth = 26;
-    ctx.strokeStyle = 'rgba(10,11,14,0.95)';
-    ctx.strokeText(text, 512, 268);
-    ctx.fillStyle = fill;
-    ctx.shadowColor = glow;
-    ctx.shadowBlur = 46;
-    ctx.fillText(text, 512, 268);
+    if (art) {
+      // The HUD's neon-metal plate, sized by its visible glyph: digits tall,
+      // the FIGHT word wide.
+      drawContentPlate(ctx, art, 1024, 512, text.length > 2 ? 310 : 440, 24);
+    } else {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${text.length > 2 ? 240 : 400}px 'Arial Black', system-ui, sans-serif`;
+      ctx.lineWidth = 26;
+      ctx.strokeStyle = 'rgba(10,11,14,0.95)';
+      ctx.strokeText(text, 512, 268);
+      ctx.fillStyle = fill;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 46;
+      ctx.fillText(text, 512, 268);
+    }
     this.texture.needsUpdate = true;
   }
 }
