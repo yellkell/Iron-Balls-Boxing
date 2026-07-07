@@ -184,6 +184,96 @@ function clank(base: number, gain = 0.2, dur = 0.3, delay = 0): void {
   whooshNoise(0.03, gain * 0.7, base * 4, base * 2, delay);
 }
 
+/** A slow sub-bass sine swell — the WEIGHT under every big titan moment.
+ *  `attack` widens from a thump (0.01) to a groundswell (1s+). */
+function subSwell(from: number, to: number, dur: number, gain: number, delay = 0, attack = 0.05): void {
+  const c = ready();
+  if (!c) return;
+  const t0 = c.currentTime + delay;
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(from, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, to), t0 + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + Math.min(attack, dur * 0.5));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g).connect(c._master!);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+}
+
+/**
+ * The titan's vocal cords: a five-saw detuned cluster that falls onto its
+ * fundamental, driven through a darkening lowpass with an amplitude SHUDDER
+ * (an LFO tremor) — a single glided saw reads as a kazoo dive-bomb; this
+ * reads as a chest. */
+function growl(base: number, dur: number, gain: number, delay = 0): void {
+  const c = ready();
+  if (!c) return;
+  const t0 = c.currentTime + delay;
+  const env = c.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.gain.exponentialRampToValueAtTime(gain, t0 + dur * 0.12);
+  env.gain.setValueAtTime(gain, t0 + dur * 0.55);
+  env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  // The shudder: ~11 Hz amplitude flutter, like air chopping through horns.
+  const trem = c.createGain();
+  trem.gain.value = 1;
+  const lfo = c.createOscillator();
+  lfo.frequency.value = 10 + Math.random() * 4;
+  const lfoDepth = c.createGain();
+  lfoDepth.gain.value = 0.35;
+  lfo.connect(lfoDepth).connect(trem.gain);
+  // Darkening body filter.
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 1.2;
+  lp.frequency.setValueAtTime(base * 10, t0);
+  lp.frequency.exponentialRampToValueAtTime(base * 3.5, t0 + dur);
+  for (const det of [-9, -4, 0, 5, 11]) {
+    const osc = c.createOscillator();
+    osc.type = 'sawtooth';
+    const f = base * (1 + det / 600);
+    osc.frequency.setValueAtTime(f * 1.9, t0); // starts high…
+    osc.frequency.exponentialRampToValueAtTime(f, t0 + dur * 0.35); // …falls onto the note
+    osc.connect(lp);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+  lp.connect(trem).connect(env).connect(c._master!);
+  lfo.start(t0);
+  lfo.stop(t0 + dur + 0.05);
+}
+
+/** A blown HORN note: three detuned squares through a lowpass, pitch sagging
+ *  slightly across the note — brass mass instead of a bare square beep. */
+function horn(freq: number, dur: number, gain: number, delay = 0): void {
+  const c = ready();
+  if (!c) return;
+  const t0 = c.currentTime + delay;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = freq * 4;
+  lp.Q.value = 0.8;
+  const env = c.createGain();
+  env.gain.setValueAtTime(0.0001, t0);
+  env.gain.exponentialRampToValueAtTime(gain, t0 + 0.03);
+  env.gain.setValueAtTime(gain, t0 + dur * 0.8);
+  env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  for (const det of [-6, 0, 7]) {
+    const osc = c.createOscillator();
+    osc.type = 'square';
+    const f = freq * (1 + det / 600);
+    osc.frequency.setValueAtTime(f, t0);
+    osc.frequency.linearRampToValueAtTime(f * 0.985, t0 + dur);
+    osc.connect(lp);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.03);
+  }
+  lp.connect(env).connect(c._master!);
+}
+
 /** Servo whine: a narrow-banded saw gliding between two pitches. */
 function servo(from: number, to: number, dur: number, gain = 0.07, delay = 0): void {
   const c = ready();
@@ -315,60 +405,81 @@ export function coreHit(): void {
   tone({ freq: 190, to: 60, type: 'sine', dur: 0.26, gain: 0.28 });
 }
 
-/** Pit klaxon — the two-tone warning horn before a titan surfaces. */
+/** Pit klaxon — the two-tone warning horn before a titan surfaces. Real horn
+ *  mass (detuned square stack with sag), not a bare square beep. */
 export function klaxon(): void {
   for (const d of [0, 0.55]) {
-    tone({ freq: 392, type: 'square', dur: 0.24, gain: 0.1, delay: d });
-    tone({ freq: 311, type: 'square', dur: 0.26, gain: 0.1, delay: d + 0.24 });
+    horn(392, 0.26, 0.13, d);
+    horn(311, 0.28, 0.13, d + 0.24);
   }
 }
 
-/** The titan surfacing — hydraulics, grinding plate, a rising rumble. */
+/** The titan surfacing — the ground swelling first, an engine mass under
+ *  grinding hydraulics, plate steel stepping as it climbs. */
 export function titanRise(): void {
-  servo(60, 220, 2.2, 0.1);
+  subSwell(30, 55, 2.6, 0.32, 0, 1.2); // the floor coming up under you
+  growl(44, 2.4, 0.11, 0.2); // engine mass
+  servo(60, 220, 2.2, 0.1); // main ram
+  servo(48, 150, 2.5, 0.06, 0.25); // second ram, slower
   whooshNoise(2.4, 0.14, 60, 240);
   clank(120, 0.12, 0.6, 0.4);
+  clank(88, 0.12, 0.7, 0.9);
   clank(95, 0.14, 0.8, 1.3);
+  clank(70, 0.12, 0.9, 1.9);
 }
 
-/** The titan's voice — a shuddering sub-bass roar through blown horns. */
+/** The titan's voice — a detuned, shuddering chest of a roar over a sub-bass
+ *  swell, never twice at exactly the same pitch. `depth` scales with the
+ *  titan (bigger boss, deeper voice). */
 export function bossRoar(depth = 1): void {
-  const base = 58 / depth;
-  tone({ freq: base * 2.4, to: base, type: 'sawtooth', dur: 1.1, gain: 0.22 });
-  tone({ freq: base * 3.1, to: base * 1.4, type: 'square', dur: 0.9, gain: 0.08, delay: 0.05 });
-  whooshNoise(1.0, 0.16, 90 * depth, 300);
-  clank(70, 0.1, 0.9, 0.1);
+  const base = (58 / depth) * (0.94 + Math.random() * 0.12);
+  growl(base, 1.5, 0.26); // the voice
+  growl(base * 0.5, 1.7, 0.18, 0.05); // sub-octave chest under it
+  subSwell(base * 1.2, base * 0.55, 1.6, 0.26, 0.02, 0.08); // the floor shaking with it
+  whooshNoise(1.3, 0.11, 90 * depth, 280, 0.05); // breath
+  clank(70, 0.1, 0.9, 0.12); // plates rattling in sympathy
+  clank(52, 0.07, 1.1, 0.55);
 }
 
-/** An attack charging — a rising whine that ends exactly at the strike. */
+/** An attack charging — a detuned rising whine over building dread, ending
+ *  exactly at the strike. */
 export function chargeWhine(dur: number): void {
   servo(140, 980, dur, 0.09);
+  servo(137, 964, dur, 0.05); // detuned twin — width, not volume
   whooshNoise(dur, 0.05, 200, 1400);
+  subSwell(36, 58, dur, 0.14, 0, dur * 0.7); // dread building underneath
 }
 
-/** A titan fist crashing onto the platform. */
+/** A titan fist crashing onto the platform — punch, then the earth answers. */
 export function slamImpact(): void {
-  tone({ freq: 80, to: 26, type: 'sine', dur: 0.42, gain: 0.4 });
+  tone({ freq: 80, to: 26, type: 'sine', dur: 0.42, gain: 0.4 }); // the punch
+  subSwell(34, 22, 0.9, 0.26, 0.02, 0.01); // the ground's long answer
   clank(140, 0.24, 0.5, 0.01);
+  clank(64, 0.12, 0.8, 0.06); // deep chassis boom behind it
   whooshNoise(0.18, 0.2, 300, 80);
+  whooshNoise(0.5, 0.07, 160, 40, 0.08); // dust settling
 }
 
 /** The horizontal sweep scything across the platform. */
 export function sweepWhoosh(): void {
   whooshNoise(0.32, 0.3, 500, 2200);
+  whooshNoise(0.4, 0.12, 220, 900, 0.03); // the arm's mass behind the blade
   clank(340, 0.08, 0.16, 0.06);
 }
 
-/** The eye beam firing down its marked strip. */
+/** The eye beam firing down its marked strip — a detuned twin-saw lance with
+ *  real weight underneath. */
 export function beamBlast(): void {
-  tone({ freq: 1900, to: 240, type: 'sawtooth', dur: 0.34, gain: 0.14 });
+  tone({ freq: 1900, to: 240, type: 'sawtooth', dur: 0.34, gain: 0.13 });
+  tone({ freq: 1911, to: 236, type: 'sawtooth', dur: 0.34, gain: 0.09 }); // detuned twin
   whooshNoise(0.34, 0.22, 2400, 500);
-  tone({ freq: 120, to: 55, type: 'sine', dur: 0.3, gain: 0.22, delay: 0.02 });
+  subSwell(95, 42, 0.55, 0.24, 0.02, 0.02);
 }
 
-/** One mortar shell bursting on the platform. */
+/** One mortar shell bursting on the platform — crack plus a distant report. */
 export function mortarThump(): void {
   tone({ freq: 130, to: 42, type: 'sine', dur: 0.24, gain: 0.26 });
+  subSwell(48, 28, 0.55, 0.18, 0.03, 0.02); // the report rolling out
   whooshNoise(0.1, 0.12, 700, 200);
   clank(240, 0.08, 0.2, 0.01);
 }
