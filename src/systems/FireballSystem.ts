@@ -498,10 +498,11 @@ export class FireballSystem extends createSystem({
     ball.setValue(Fireball, 'elapsed', 0);
     ball.setValue(Fireball, 'recallLock', 0);
 
-    // A throw that BIT into a curve answers back: the whip-crack launch and a
-    // harder, longer buzz — so a landed hook is felt the instant it leaves.
+    // A throw that BIT into a curve answers back with a harder, longer buzz —
+    // the hook is FELT the instant it leaves. Same whoosh as a straight throw
+    // (the whip-crack variant tested poorly).
     if (curlRate >= CURL.feelMin) {
-      sfx.curveWhoosh();
+      sfx.throwWhoosh();
       pulseHand(this.world.session, HANDS[hand], 1.0, 150);
     } else {
       sfx.throwWhoosh();
@@ -779,9 +780,7 @@ export class FireballSystem extends createSystem({
           c[2] = cmd.curl?.z ?? 0;
           ball.setValue(Fireball, 'state', BallState.Flying);
           ball.setValue(Fireball, 'elapsed', 0);
-          // A rival's curved throw cracks its whip on our side too.
-          if (cmd.curl && cmd.curl.length() >= CURL.feelMin) sfx.curveWhoosh();
-          else sfx.throwWhoosh();
+          sfx.throwWhoosh();
           break;
         }
         case 'recall': {

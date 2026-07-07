@@ -747,170 +747,118 @@ function buildBearChest(accent: number): Group {
   return g;
 }
 
-/** CRIMSON → PANTHER: one sleek lofted feline torso — smooth sloped deltoid
- *  caps, subtle pecs, a dark spine ridge, and glowing rib streaks raking the
- *  flanks (the body echo of the whisker fan). Athletic V-taper, no plates. */
+/** CRIMSON → PANTHER (SHADOW): the classic sleek bladed cuirass — sharp
+ *  angled plates, shoulder blades, V pecs, chevron abs. Predatory. Restored
+ *  by request; only the head above it is the new lofted design, so the neck
+ *  runs taller than the original to meet its raised carry. */
 function buildPantherChest(accent: number): Group {
   const g = taggedHead('crimson');
-  // A REAL neck — slender and long, clear of the shoulders.
-  const neck = new Mesh(new CylinderGeometry(0.06, 0.09, 0.2, 10), darkMat());
-  neck.position.y = 0.24;
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
+  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.2, 8), darkMat());
+  neck.position.y = 0.22;
   g.add(neck);
-
-  // The torso core: a vertical loft with the hard feline V — shoulders wide,
-  // chest deep, waist pinched to nearly nothing.
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.24, -0.05], bot: [0.24, 0.09], w: 0.1, n: 2.05 }, // neck ring
-        { top: [0.15, -0.14], bot: [0.15, 0.14], w: 0.26, n: 2.05 }, // shoulders (narrower)
-        { top: [0.02, -0.17], bot: [0.02, 0.135], w: 0.185, n: 2.0 }, // chest, shallow ribcage
-        { top: [-0.13, -0.135], bot: [-0.13, 0.1], w: 0.125, n: 2.0 }, // ribs
-        { top: [-0.28, -0.075], bot: [-0.28, 0.065], w: 0.09, n: 2.0 }, // high pinched waist
-        { top: [-0.3, -0.068], bot: [-0.3, 0.058], w: 0.083, n: 2.0 }, // hem — flat cut below the band
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.05),
-  );
-  g.add(core);
-
-  // Bespoke PAULDRONS: one swept teardrop BLADE per shoulder, canted back
-  // like a laid ear, its crest traced in neon — sleek, not a bubble.
   for (const side of [-1, 1]) {
-    const blade = new Mesh(new SphereGeometry(0.09, 16, 12), chassisMat(accent, 0.05));
-    blade.scale.set(1.55, 0.42, 0.68);
-    blade.position.set(side * 0.26, 0.162, 0.005);
-    blade.rotation.set(0.08, side * 0.3, side * -0.12);
+    const pad = new Mesh(new BoxGeometry(0.19, 0.07, 0.26), chassisMat(accent, 0.05));
+    pad.position.set(side * 0.27, 0.12, 0);
+    pad.rotation.z = side * -0.26;
+    g.add(pad);
+    const blade = new Mesh(new ConeGeometry(0.03, 0.2, 4), darkMat());
+    blade.position.set(side * 0.34, 0.16, -0.04);
+    blade.rotation.set(-0.5, 0, side * -0.5);
     g.add(blade);
-    const crest = new Mesh(new BoxGeometry(0.13, 0.011, 0.011), glowMat(accent, 0.9));
-    crest.position.set(side * 0.272, 0.196, -0.008);
-    crest.rotation.set(0.08, side * 0.3, side * -0.12);
-    g.add(crest);
+    const lip = new Mesh(new BoxGeometry(0.195, 0.015, 0.265), glowMat(accent, 0.55));
+    lip.position.set(side * 0.27, 0.165, 0);
+    lip.rotation.z = side * -0.26;
+    g.add(lip);
   }
-
-  // Neon spine: three glow diamonds stepping down the back where a dark
-  // ridge used to sit.
-  for (let i = 0; i < 3; i++) {
-    const s = 0.026 - i * 0.004;
-    const stud = new Mesh(new BoxGeometry(s, s, 0.014), glowMat(accent, 0.9));
-    stud.position.set(0, 0.06 - i * 0.12, 0.148 - i * 0.024);
-    stud.rotation.z = Math.PI / 4;
-    g.add(stud);
-  }
-
-  // Rib streaks: three thin glow slashes raking down-forward along each
-  // flank — the torso's echo of the whisker fan.
+  const trunk = new Mesh(new CylinderGeometry(0.155, 0.08, 0.42, 8), darkMat());
+  trunk.scale.z = 0.72;
+  trunk.position.y = -0.13;
+  g.add(trunk);
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      const streak = new Mesh(new BoxGeometry(0.012, 0.09, 0.01), glowMat(accent, 0.55));
-      streak.position.set(side * (0.125 - i * 0.008), -0.05 - i * 0.048, -0.072 - i * 0.014);
-      streak.rotation.set(0.1, side * -0.4, side * 0.5);
-      g.add(streak);
-    }
+    const pec = new Mesh(new BoxGeometry(0.14, 0.17, 0.06), chassisMat(accent, 0.05));
+    pec.position.set(side * 0.08, 0.0, -0.13);
+    pec.rotation.set(0.1, side * 0.4, side * 0.12);
+    g.add(pec);
   }
-
-  // A small glowing sternum diamond where the collar bones meet.
-  const sternum = new Mesh(new BoxGeometry(0.035, 0.035, 0.02), glowMat(accent, 1.3));
-  sternum.position.set(0, 0.1, -0.165);
-  sternum.rotation.z = Math.PI / 4;
-  g.add(sternum);
-
-  // Wrapped neon: a slim choker band at the neck and a waist band right in
-  // the pinch — the hourglass drawn in light.
-  g.add(glowBand(accent, 0.231, 0.126, 0.088, 0.018, 0.014, 0.9));
-  g.add(glowBand(accent, -0.27, 0.101, 0.081, -0.005, 0.014, 0.9));
+  const core = new Mesh(new BoxGeometry(0.04, 0.16, 0.04), glowMat(accent, 1.4));
+  core.position.set(0, -0.02, -0.16);
+  g.add(core);
+  for (let i = 0; i < 3; i++) {
+    const w = 0.18 - i * 0.035;
+    const ab = new Mesh(new BoxGeometry(w, 0.05, 0.07), chassisMat(accent, 0.04));
+    ab.position.set(0, -0.15 - i * 0.072, -0.1);
+    ab.rotation.x = -0.1;
+    g.add(ab);
+    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.009, 0.072), glowMat(accent, 0.32));
+    seam.position.set(0, -0.178 - i * 0.072, -0.1);
+    g.add(seam);
+  }
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.26, 0.2), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.14;
+    g.add(flank);
+  }
   return g;
 }
 
-/** VALKYRIE → EAGLE: one lofted bird torso — a deep KEELED breast (the
- *  proudest point of the whole body, like a real raptor's sternum), folded
- *  wing-top feather layers over each shoulder, lapped dark breast feathers,
- *  and a single glow filament tracing the keel line. */
+/** VALKYRIE → EAGLE: the classic regal winged cuirass — a crest emblem,
+ *  glowing winglet pauldrons, layered feather breast plates, a chevron
+ *  sigil. Restored by request; only the head above it is the new lofted
+ *  raptor, so the neck runs taller than the original to meet its raised
+ *  carry. */
 function buildEagleChest(accent: number): Group {
   const g = taggedHead('valkyrie');
-  // A REAL neck — the longest of the three (birds lead with it), so the
-  // head and its low-hanging nape ruff ride clear of the shoulders.
-  const neck = new Mesh(new CylinderGeometry(0.055, 0.085, 0.24, 10), darkMat());
-  neck.position.y = 0.26;
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
+  const neck = new Mesh(new CylinderGeometry(0.06, 0.08, 0.26, 8), darkMat());
+  neck.position.y = 0.27;
   g.add(neck);
-
-  // The torso core: shoulders wide, then the breast swelling FORWARD into
-  // the keel before the hard taper to the waist.
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.24, -0.05], bot: [0.24, 0.1], w: 0.11, n: 2.05 }, // neck ring
-        { top: [0.15, -0.14], bot: [0.15, 0.16], w: 0.285, n: 2.1 }, // shoulders
-        { top: [0.0, -0.23], bot: [0.0, 0.14], w: 0.19, n: 2.0 }, // the KEEL (deepest front)
-        { top: [-0.16, -0.16], bot: [-0.16, 0.11], w: 0.135, n: 1.95 }, // lower breast
-        { top: [-0.3, -0.085], bot: [-0.3, 0.07], w: 0.09, n: 2.0 }, // waist
-        { top: [-0.31, -0.082], bot: [-0.31, 0.067], w: 0.086, n: 2.0 }, // hem — flat cut below the band
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.05),
-  );
-  g.add(core);
-
-  // Folded wing-tops: a smooth cap on each shoulder with three layered dark
-  // feathers sweeping back and down the arm line, the first carrying a thin
-  // accent vane — the same feather language as the head's crest and ruff.
+  const crest = new Mesh(new BoxGeometry(0.05, 0.07, 0.04), glowMat(accent, 1.2));
+  crest.position.set(0, 0.2, -0.06);
+  crest.rotation.z = Math.PI / 4;
+  g.add(crest);
   for (const side of [-1, 1]) {
-    // Bespoke PAULDRONS: two swept wing-plates pointing out and back like
-    // the folded wing's leading edge, the top one traced in neon.
-    for (let i = 0; i < 2; i++) {
-      const plate = new Mesh(new BoxGeometry(0.15 - i * 0.03, 0.028, 0.1 - i * 0.02), chassisMat(accent, 0.05));
-      plate.position.set(side * (0.255 + i * 0.03), 0.16 - i * 0.045, 0.01 + i * 0.02);
-      plate.rotation.set(0.1, side * -0.25, side * -(0.2 + i * 0.2));
-      g.add(plate);
-    }
-    const edge = new Mesh(new BoxGeometry(0.148, 0.012, 0.012), glowMat(accent, 0.9));
-    edge.position.set(side * 0.255, 0.177, -0.038);
-    edge.rotation.set(0.1, side * -0.25, side * -0.2);
-    g.add(edge);
-    // Folded wing coverts: three plates LYING back over the shoulder top,
-    // shingled toward the spine — every one carrying a neon vane, so the
-    // folded wings read as banked fire from behind.
+    const base = new Mesh(new BoxGeometry(0.16, 0.07, 0.24), chassisMat(accent, 0.05));
+    base.position.set(side * 0.26, 0.12, 0);
+    base.rotation.z = side * -0.22;
+    g.add(base);
     for (let i = 0; i < 3; i++) {
-      const feather = new Mesh(new BoxGeometry(0.035, 0.13 - i * 0.015, 0.02), darkMat());
-      feather.position.set(side * (0.25 - i * 0.015), 0.155 - i * 0.012, 0.06 + i * 0.045);
-      feather.rotation.set(0.9 + i * 0.15, side * 0.2, side * -0.12);
+      const feather = new Mesh(new BoxGeometry(0.04, 0.14 - i * 0.02, 0.1), glowMat(accent, 0.5 + (2 - i) * 0.18));
+      feather.position.set(side * (0.3 + i * 0.05), 0.16 + i * 0.02, 0.02 + i * 0.03);
+      feather.rotation.set(0.2, side * 0.3, side * (0.5 + i * 0.1));
       g.add(feather);
-      const vane = new Mesh(new BoxGeometry(0.012, 0.12 - i * 0.015, 0.022), glowMat(accent, 0.65 - i * 0.15));
-      vane.position.set(side * (0.252 - i * 0.015), 0.159 - i * 0.012, 0.06 + i * 0.045);
-      vane.rotation.set(0.9 + i * 0.15, side * 0.2, side * -0.12);
-      g.add(vane);
     }
   }
-
-  // Wrapped neon instead of the old floating keel filament: a gorget band
-  // at the neck, a waist band at the taper, and a sternum CHEVRON seated on
-  // the breast where the collar bones meet — the raid-wing sigil.
-  g.add(glowBand(accent, 0.21, 0.15, 0.114, 0.022, 0.016, 0.85));
-  g.add(glowBand(accent, -0.28, 0.102, 0.086, -0.008, 0.014, 0.85));
-  // A DOUBLE chevron down the breast — rank stripes on the keel.
-  for (let row = 0; row < 2; row++) {
-    for (const side of [-1, 1]) {
-      const bar = new Mesh(new BoxGeometry(0.012, 0.07 - row * 0.012, 0.012), glowMat(accent, 1.1 - row * 0.3));
-      bar.position.set(side * (0.027 - row * 0.004), 0.075 - row * 0.07, -0.196 - row * 0.012);
-      bar.rotation.set(0.28, 0, side * 0.6);
-      g.add(bar);
-    }
+  const trunk = new Mesh(new CylinderGeometry(0.155, 0.08, 0.42, 8), darkMat());
+  trunk.scale.z = 0.72;
+  trunk.position.y = -0.13;
+  g.add(trunk);
+  for (let i = 0; i < 3; i++) {
+    const w = 0.26 - i * 0.05;
+    const plate = new Mesh(new BoxGeometry(w, 0.09, 0.06), chassisMat(accent, 0.05));
+    plate.position.set(0, 0.06 - i * 0.08, -0.12 - i * 0.005);
+    plate.rotation.x = -0.18;
+    g.add(plate);
   }
-
-  // The tail fan rides the lower back, spread down and out past the V —
-  // every feather vaned so the tail reads neon from behind, brightest in
-  // the middle. (It lived on the pelvis until the bodies went legless-V.)
-  for (let i = -2; i <= 2; i++) {
-    const feather = new Mesh(new BoxGeometry(0.04, 0.13, 0.02), darkMat());
-    feather.position.set(i * 0.034, -0.33, 0.065 + Math.abs(i) * 0.008);
-    feather.rotation.set(0.55, i * -0.12, i * 0.14);
-    g.add(feather);
-    const vane = new Mesh(new BoxGeometry(0.013, 0.12, 0.022), glowMat(accent, 0.7 - Math.abs(i) * 0.18));
-    vane.position.set(i * 0.034, -0.332, 0.065 + Math.abs(i) * 0.008);
-    vane.rotation.set(0.55, i * -0.12, i * 0.14);
-    g.add(vane);
+  const chevron = new Mesh(new BoxGeometry(0.16, 0.02, 0.05), glowMat(accent, 0.9));
+  chevron.position.set(0, -0.03, -0.16);
+  g.add(chevron);
+  for (let i = 0; i < 3; i++) {
+    const w = 0.16 - i * 0.03;
+    const ab = new Mesh(new BoxGeometry(w, 0.045, 0.07), chassisMat(accent, 0.04));
+    ab.position.set(0, -0.2 - i * 0.065, -0.1);
+    g.add(ab);
+  }
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.24, 0.2), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.13;
+    g.add(flank);
   }
   return g;
 }
@@ -922,15 +870,61 @@ function buildBearPelvis(_accent: number): Group {
   return taggedHead('cobalt');
 }
 
-/** PANTHER hips: NONE — clean V (see buildBearPelvis). */
-function buildPantherPelvis(_accent: number): Group {
-  return taggedHead('crimson');
+/** PANTHER hips: slim belt, a pointed guard, bladed glow-edged tassets —
+ *  the classic set, restored along with the old cuirass. */
+function buildPantherPelvis(accent: number): Group {
+  const g = taggedHead('crimson');
+  const belt = new Mesh(new BoxGeometry(0.19, 0.05, 0.15), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const buckle = new Mesh(new BoxGeometry(0.045, 0.045, 0.03), glowMat(accent, 1.1));
+  buckle.position.set(0, 0.05, -0.08);
+  g.add(buckle);
+  const guard = new Mesh(new ConeGeometry(0.08, 0.18, 5), chassisMat(accent, 0.03));
+  guard.rotation.x = Math.PI;
+  guard.position.set(0, -0.06, -0.03);
+  g.add(guard);
+  for (const side of [-1, 1]) {
+    const tasset = new Mesh(new BoxGeometry(0.055, 0.18, 0.12), chassisMat(accent, 0.04));
+    tasset.position.set(side * 0.1, -0.05, 0);
+    tasset.rotation.z = side * 0.34;
+    g.add(tasset);
+    const edge = new Mesh(new BoxGeometry(0.06, 0.013, 0.125), glowMat(accent, 0.4));
+    edge.position.set(side * 0.12, -0.13, 0);
+    edge.rotation.z = side * 0.34;
+    g.add(edge);
+  }
+  return g;
 }
 
-/** EAGLE hips: NONE — clean V; the tail fan now rides the chest's lower
- *  back (see buildEagleChest). */
-function buildEaglePelvis(_accent: number): Group {
-  return taggedHead('valkyrie');
+/** EAGLE hips: glow-trimmed belt, tapered guard, layered feathered tassets —
+ *  the classic set, restored along with the old cuirass. */
+function buildEaglePelvis(accent: number): Group {
+  const g = taggedHead('valkyrie');
+  const belt = new Mesh(new BoxGeometry(0.2, 0.05, 0.16), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const beltGlow = new Mesh(new BoxGeometry(0.205, 0.015, 0.165), glowMat(accent, 0.5));
+  beltGlow.position.y = 0.075;
+  g.add(beltGlow);
+  const guard = new Mesh(new CylinderGeometry(0.08, 0.03, 0.14, 6), chassisMat(accent, 0.03));
+  guard.position.set(0, -0.05, -0.02);
+  g.add(guard);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 2; i++) {
+      const t = new Mesh(
+        new BoxGeometry(0.05, 0.12 - i * 0.02, 0.11),
+        i === 0 ? chassisMat(accent, 0.04) : glowMat(accent, 0.4),
+      );
+      // Stagger the layers in DEPTH (z), not just XY — otherwise the glow plate
+      // and the chassis plate share a front plane where they overlap and the
+      // neon z-fights/flickers. The glow edge now sits proud in front.
+      t.position.set(side * (0.09 + i * 0.03), -0.04 - i * 0.04, -i * 0.022);
+      t.rotation.z = side * (0.28 + i * 0.1);
+      g.add(t);
+    }
+  }
+  return g;
 }
 
 /** KNIGHT → a CRUSADER great helm: a flat-topped steel barrel with a raised
