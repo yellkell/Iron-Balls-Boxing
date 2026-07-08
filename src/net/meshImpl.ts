@@ -91,6 +91,7 @@ export class MeshImpl {
       seats,
       names,
       hardcore: false,
+      goopliath: false,
       started: false,
       open: true,
       createdAt: serverTimestamp(),
@@ -156,6 +157,11 @@ export class MeshImpl {
   /** RAID host: flip the lobby's hardcore breaker (room doc mirrors it out). */
   setRaidHardcore(v: boolean): void {
     if (this.roomRef) void updateDoc(this.roomRef, { hardcore: v }).catch(() => {});
+  }
+
+  /** RAID host: throw the FIGHT GOOPLIATH breaker (room doc mirrors it out). */
+  setRaidGoopliath(v: boolean): void {
+    if (this.roomRef) void updateDoc(this.roomRef, { goopliath: v }).catch(() => {});
   }
 
   /** Host: lock the lobby and launch — members see `started` flip. */
@@ -238,6 +244,7 @@ export class MeshImpl {
         });
       }
       this.state.raidHardcore = snap.data().hardcore === true;
+      this.state.raidGoopliath = snap.data().goopliath === true;
       this.state.started = snap.data().started === true;
       if (this.state.full) this.state.onStatus('all players in — fight!');
       const occ = this.state.occupants; // masked — never (re)connect a dropped seat

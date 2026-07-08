@@ -685,3 +685,203 @@ export function saloonEntry(): void {
   tone({ freq: 1480, type: 'sine', dur: 0.18, gain: 0.12, delay: 0.12 });
   tone({ freq: 1970, type: 'sine', dur: 0.14, gain: 0.07, delay: 0.16 });
 }
+
+// --- GOOPLIATH: wet-gel foley ported from GOOP ------------------------------
+// The vendored gel creature (src/goopliath/) calls these. Same synth bus,
+// same helpers — the goo just brings its own primitives.
+
+/** Soft-saturation curve (tanh) — rounds transients into a crunchy, organic
+ *  edge instead of the clean click of a raw oscillator. Built once. */
+const SHAPE = (() => {
+  const n = 512;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * 2.2);
+  }
+  return curve;
+})();
+
+/**
+ * The wet-impact primitive: a burst of noise driven through a RESONANT
+ * low-pass whose cutoff sweeps downward, then lightly saturated. That sweep
+ * is what makes it read as a wet "thwuck" of gel rather than a synth beep.
+ * `q` controls how vocal/squelchy it is; higher = more of a resonant "bloop".
+ */
+function noiseHit(
+  dur: number,
+  gain: number,
+  cutFrom: number,
+  cutTo: number,
+  q = 0.7,
+  delay = 0,
+): void {
+  const c = ready();
+  if (!c) return;
+  const t0 = c.currentTime + delay;
+  const frames = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, frames, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < frames; i++) {
+    const p = i / frames;
+    data[i] = (Math.random() * 2 - 1) * (1 - p) ** 1.5; // fast, natural decay
+  }
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = q;
+  lp.frequency.setValueAtTime(cutFrom, t0);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(60, cutTo), t0 + dur * 0.75);
+  const sh = c.createWaveShaper();
+  sh.curve = SHAPE;
+  sh.oversample = '2x';
+  const g = c.createGain();
+  g.gain.value = gain;
+  src.connect(lp).connect(sh).connect(g).connect(c._master!);
+  src.start(t0);
+}
+
+/** One rising bubble 'blip' — the atom of goo. */
+function bubble(freq: number, gain = 0.08, delay = 0, dur = 0.07): void {
+  tone({ freq, to: freq * 1.45, type: 'sine', dur, gain, delay });
+}
+
+/** A wet downward 'blub' — the body of every impact. */
+function blub(freq: number, gain: number, dur: number, delay = 0): void {
+  tone({ freq, to: freq * 0.38, type: 'triangle', dur, gain, delay });
+  tone({ freq: freq * 0.55, to: freq * 0.22, type: 'sine', dur: dur * 1.2, gain: gain * 0.7, delay: delay + 0.008 });
+}
+
+/** A fireball landing in the gel. `intensity` 0..1 scales the meat of it. One
+ *  cohesive wet THWUCK — a bright slap crack on the front, a resonant gel body
+ *  that squelches down in pitch, and a sub you feel. */
+export function squelch(intensity = 0.6): void {
+  const i = Math.min(1, Math.max(0, intensity));
+  // Soft dull slap on the front — the impact arriving, not the star of the show.
+  noiseHit(0.035 + 0.02 * i, 0.14 + 0.1 * i, 3000, 900, 0.7);
+  // The GROSS part: three overlapping high-resonance squish sweeps, each with
+  // a random cutoff and a slightly different start — mud-and-gore foley. The
+  // stagger and detune is what makes it read as actual matter squeezing
+  // through fingers instead of one clean synth swoop.
+  for (let k = 0; k < 3; k++) {
+    noiseHit(
+      0.09 + Math.random() * 0.06,
+      0.13 + 0.11 * i,
+      800 + Math.random() * 900,
+      80 + Math.random() * 130,
+      6 + Math.random() * 3,
+      k * 0.02 + Math.random() * 0.012,
+    );
+  }
+  // Fat wet body under the squish.
+  noiseHit(0.14 + 0.08 * i, 0.2 + 0.2 * i, 950 + 200 * Math.random(), 130, 2.4);
+  // The sucking tail — goo pulling back off the impact (upward high-Q sweep).
+  noiseHit(0.14 + 0.06 * i, 0.09 + 0.08 * i, 240, 1100 + Math.random() * 500, 4.5, 0.05 + 0.02 * i);
+  blub(135 + 50 * Math.random(), 0.12 + 0.13 * i, 0.11 + 0.06 * i, 0.008); // liquify glug
+  tone({ freq: 80, to: 40, type: 'sine', dur: 0.12 + 0.06 * i, gain: 0.14 + 0.16 * i }); // felt sub
+  const pops = 2 + Math.round(i * 2);
+  for (let p = 0; p < pops; p++) {
+    bubble(360 + Math.random() * 520, 0.022 + 0.024 * i, 0.04 + Math.random() * 0.15);
+  }
+}
+
+/** A lump tearing clean OFF the body — squelch plus a stretchy rip. */
+export function tear(): void {
+  squelch(1);
+  whooshNoise(0.16, 0.14, 300, 1500, 0.02); // the taffy strand snapping upward
+  tone({ freq: 320, to: 900, type: 'sawtooth', dur: 0.09, gain: 0.045, delay: 0.03 });
+  bubble(700, 0.07, 0.12);
+}
+
+/** Goo landing on the floor. */
+export function splat(size = 0.5): void {
+  const s = Math.min(1, size);
+  whooshNoise(0.08 + 0.1 * s, 0.14 + 0.2 * s, 480, 110);
+  blub(110, 0.16 + 0.16 * s, 0.13 + 0.08 * s);
+  if (s > 0.4) bubble(240, 0.05, 0.09);
+}
+
+/** A lump slurping back into the body. */
+export function slurp(): void {
+  whooshNoise(0.22, 0.11, 190, 850);
+  tone({ freq: 130, to: 430, type: 'triangle', dur: 0.2, gain: 0.09 });
+  bubble(520, 0.07, 0.16);
+  bubble(760, 0.05, 0.22);
+}
+
+/** Idle jelly wobble (poked, or landing after a stagger). */
+export function gooWobble(intensity = 0.5): void {
+  const i = Math.min(1, intensity);
+  tone({ freq: 95 + 30 * i, to: 55, type: 'sawtooth', dur: 0.22, gain: 0.05 + 0.06 * i });
+  tone({ freq: 52, type: 'sine', dur: 0.26, gain: 0.1 + 0.1 * i });
+  bubble(300, 0.04 * i, 0.05);
+}
+
+/** The creature pulling itself up into its fighting shape — bubbling swell. */
+export function gooRise(): void {
+  whooshNoise(1.25, 0.15, 85, 420);
+  tone({ freq: 42, to: 95, type: 'sine', dur: 1.15, gain: 0.18 });
+  for (let i = 0; i < 6; i++) {
+    bubble(240 + i * 130 + Math.random() * 80, 0.05, 0.1 + i * 0.16, 0.08);
+  }
+}
+
+/** Collapsing back into the glob. */
+export function gooSink(): void {
+  whooshNoise(0.9, 0.13, 380, 90);
+  tone({ freq: 95, to: 40, type: 'sine', dur: 0.85, gain: 0.16 });
+  for (let i = 0; i < 4; i++) {
+    bubble(620 - i * 120, 0.04, 0.08 + i * 0.14, 0.07);
+  }
+  splat(0.7);
+}
+
+/** Attack telegraph — a rising bubbly whine ending exactly at the strike. */
+export function gooCharge(dur: number): void {
+  tone({ freq: 90, to: 640, type: 'sawtooth', dur, gain: 0.055 });
+  whooshNoise(dur, 0.05, 160, 1200);
+  for (let i = 0; i < 4; i++) {
+    bubble(300 + i * 180, 0.045, dur * (0.25 + i * 0.18), 0.06);
+  }
+}
+
+/** A gel limb whipping out. */
+export function gooWhoosh(): void {
+  whooshNoise(0.28, 0.24, 260, 1500);
+  tone({ freq: 150, to: 55, type: 'triangle', dur: 0.16, gain: 0.14 });
+}
+
+/** Its strike landing — a wet sledgehammer you feel in your teeth. */
+export function gooSlam(): void {
+  tone({ freq: 85, to: 22, type: 'sine', dur: 0.5, gain: 0.46 }); // deep gut sub, felt
+  noiseHit(0.22, 0.4, 1900, 100, 1.5); // the big wet body caving in
+  noiseHit(0.06, 0.2, 4200, 1300, 0.7); // duller front slap — weight, not sting
+  noiseHit(0.24, 0.16, 640, 100, 5.0, 0.015); // watery glug under the impact
+  tone({ freq: 140, to: 44, type: 'sine', dur: 0.22, gain: 0.22, delay: 0.005 }); // low thud
+}
+
+/** The spinning attack — a long sweeping rotor of air and slime. */
+export function spinWhoosh(): void {
+  whooshNoise(0.4, 0.22, 180, 1300);
+  whooshNoise(0.34, 0.14, 500, 2000, 0.08);
+  tone({ freq: 90, to: 240, type: 'sawtooth', dur: 0.32, gain: 0.06 });
+  bubble(340, 0.05, 0.2);
+}
+
+/** The kick — heavier, lower, a whole limb's worth of gel in flight. */
+export function kickWhoosh(): void {
+  whooshNoise(0.3, 0.28, 160, 900);
+  tone({ freq: 120, to: 45, type: 'triangle', dur: 0.24, gain: 0.18 });
+  blub(140, 0.1, 0.14, 0.05);
+}
+
+/** The KO collapse — everything lets go at once. */
+export function koSplat(): void {
+  splat(1);
+  blub(70, 0.3, 0.3, 0.02);
+  whooshNoise(0.5, 0.2, 300, 60, 0.02);
+  for (let i = 0; i < 8; i++) {
+    bubble(180 + Math.random() * 700, 0.05, 0.05 + Math.random() * 0.5);
+  }
+}

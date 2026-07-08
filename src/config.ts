@@ -419,6 +419,59 @@ export const RAID = {
   stateEcho: 0.3,
 };
 
+/**
+ * GOOPLIATH — the living tide. The gel creature from GOOP (vendored under
+ * src/goopliath/) blown up to titan scale and dropped into the pit as its own
+ * boss fight, separate from the titan gauntlet: a campaign entry beneath the
+ * line-up (sealed until all five titans are felled) and a raid lobby breaker
+ * that swaps the whole run for one long fight against him.
+ *
+ * Unlike the titans there are NO weak points — his whole body is the hitbox
+ * (every fireball that finds the gel counts), and the fight is scored in HITS,
+ * not damage: the health bar is a hit counter. The gel sim runs at its native
+ * man-size inside a scaled parent group, so every dent/lump/wobble keeps the
+ * exact proportions of the original creature.
+ */
+export const GOOPLIATH = {
+  /** Fireball hits to fell him. THE longest fight in the game by design. */
+  hitsCampaign: 75,
+  hitsRaid: 300,
+  /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign matches the
+   *  raid cut of GOLIATH (~7.3 m); the raid cut stands taller still. */
+  scaleCampaign: 3.95,
+  scaleRaid: 5.2,
+  /** Titan rigs stand ~1.85 m per scale unit; the gel sim is 1.78 m tall at
+   *  native size — this converts def.scale into the parent group's scale. */
+  titanHeightPerScale: 1.85,
+  /** The sim's clock runs this much slower than real time — a 4-5x giant
+   *  jiggling at man-sized frequency reads as a miniature; slowed, the same
+   *  dynamics read as tons of gel in motion. (Sounds stay real-time.) */
+  timeScale: 0.55,
+  /** Raymarch quality override (1 = the full step budget). The gel shader is
+   *  fill-rate bound and a boss this size covers a LOT of Quest pixels. */
+  quality: 0.85,
+  /** THE SEESAW — his signature: he floods one half of your platform, then
+   *  the other, with this many seconds between halves — enough time to hurl
+   *  yourself across the centreline, no more. As the fight progresses the
+   *  cascade grows more stages: left, right, left, right… */
+  seesawGap: 1.05,
+  /** Stages by health quarter: fresh he swings twice; in the last quarter the
+   *  platform seesaws five times per attack. */
+  seesawStages: [2, 3, 4, 5],
+  /** Forgiveness strip either side of the centreline (metres) — a body sphere
+   *  dead on the line is spared, so the jump across is never a coin flip. */
+  seesawSafeLip: 0.06,
+  /** Attack cooldowns multiply down to this as his health drains — the long
+   *  fight escalates instead of plateauing. */
+  finalHaste: 0.6,
+  /** How hard a fireball reads as a "fist" to the gel sim: reaction speed =
+   *  base + ball speed × gain, capped. Past ~2.5 the sim tears a LUMP out —
+   *  so only genuinely hard throws knock chunks off. */
+  punchBase: 1.5,
+  punchGain: 0.11,
+  punchMax: 3.4,
+};
+
 /** Match format: best-of rounds, Blaston-style pacing. */
 export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round

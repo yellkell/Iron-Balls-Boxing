@@ -8,6 +8,7 @@
  *   2 VULTURE    — an executioner's crosshair
  *   3 JUGGERNAUT    — a riveted fortress shield
  *   4 GOLIATH       — the king's crown
+ *   5 GOOPLIATH     — the gel dome itself, drip and all (the sealed sixth)
  *
  * Every glyph is drawn inside a circle of radius `r` centred on (cx, cy),
  * stroked in `color` — pass a dimmed colour for locked stages.
@@ -100,6 +101,38 @@ export function drawBossIcon(
       for (const [bx, by] of [[-19, -18], [19, -18], [0, 14]] as const) {
         ctx.beginPath();
         ctx.arc(bx, by, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case 5: {
+      // GOOPLIATH: the living tide — a slumped gel dome mid-drip, two hard
+      // little eyes, and a lump splatting off beside it.
+      ctx.beginPath();
+      ctx.moveTo(-38, 30);
+      // The dome, drawn lopsided — poured, not built.
+      ctx.bezierCurveTo(-44, -6, -26, -38, 2, -36);
+      ctx.bezierCurveTo(30, -34, 42, -8, 36, 30);
+      ctx.closePath();
+      ctx.stroke();
+      // A drip budding off the crown.
+      ctx.beginPath();
+      ctx.arc(20, -40, 6, 0, Math.PI * 2);
+      ctx.fill();
+      // The floor puddle line it sits in.
+      ctx.beginPath();
+      ctx.moveTo(-46, 30);
+      ctx.lineTo(44, 30);
+      ctx.stroke();
+      // A torn-off lump resting beside the body.
+      ctx.beginPath();
+      ctx.arc(-42, 22, 8, 0, Math.PI * 2);
+      ctx.fill();
+      // The eyes — small, level, unblinking.
+      ctx.lineWidth = 0;
+      for (const ex of [-10, 14]) {
+        ctx.beginPath();
+        ctx.arc(ex, -10, 5.5, 0, Math.PI * 2);
         ctx.fill();
       }
       break;

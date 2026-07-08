@@ -24,6 +24,7 @@ interface MeshImplApi {
   hostLobby(mode: ArcadeMode, name: string): Promise<void>;
   joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean>;
   setRaidHardcore(v: boolean): void;
+  setRaidGoopliath(v: boolean): void;
   startLobby(): void;
   send(msg: PeerMessage): void;
   dropSeat(seat: number): void;
@@ -55,9 +56,12 @@ class Mesh {
   /** Room closed to new joiners — full, or the host locked a short-handed FFA. */
   locked = false;
   joined = false;
-  /** Lobby state, mirrored live from the room doc. `hardcore` is raid-only
-   *  (2v2/ffa leave it false); `started` flips for every mode at launch. */
+  /** Lobby state, mirrored live from the room doc. `hardcore` and `goopliath`
+   *  are raid-only (2v2/ffa leave them false); `started` flips for every mode
+   *  at launch. */
   raidHardcore = false;
+  /** RAID: this lobby fights GOOPLIATH instead of running the titans. */
+  raidGoopliath = false;
   started = false;
   /** Status sink for the lobby panel. */
   onStatus: (s: string) => void = () => {};
@@ -108,6 +112,11 @@ class Mesh {
     this.impl?.setRaidHardcore(v);
   }
 
+  /** RAID host: throw the FIGHT GOOPLIATH breaker (mirrored to everyone). */
+  setRaidGoopliath(v: boolean): void {
+    this.impl?.setRaidGoopliath(v);
+  }
+
   /** Host: lock the lobby and launch — every member sees `started` flip. */
   startLobby(): void {
     this.impl?.startLobby();
@@ -134,6 +143,7 @@ class Mesh {
     this.full = false;
     this.locked = false;
     this.raidHardcore = false;
+    this.raidGoopliath = false;
     this.started = false;
     this.inbox.length = 0;
     this.mySeat = 0;

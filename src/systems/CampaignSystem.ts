@@ -36,7 +36,10 @@ import {
   Object3D,
   PointLight,
 } from 'three';
-import { BOSSES, buildTitan, raidBoss, type AttackKind, type BossDef, type TitanRig } from '../campaign/bosses.js';
+import { BOSSES, buildTitan, goopliathBoss, raidBoss, type AttackKind, type BossDef, type TitanRig } from '../campaign/bosses.js';
+import { GelCreature } from '../goopliath/GelCreature.js';
+import { GooFx } from '../goopliath/splats.js';
+import { CREATURE as GOOP_BODY } from '../goopliath/goopConfig.js';
 import {
   campaign,
   campaignProgress,
@@ -48,6 +51,7 @@ import {
 import {
   beamTelegraph,
   circleTelegraph,
+  halfTelegraph,
   novaTelegraph,
   sweepTelegraph,
   type Telegraph,
@@ -81,6 +85,8 @@ import {
   ARENA_GAP,
   CAMPAIGN,
   COMBAT,
+  FIREBALL,
+  GOOPLIATH,
   MODE_LAYOUT,
   OCTAGON_HALF_DEPTH,
   OCTAGON_HALF_WIDTH,
@@ -102,7 +108,10 @@ type Zone =
   /** One volley shot: launches from the pod on `side` when its stagger hits. */
   | { kind: 'shot'; side: -1 | 1 }
   /** GOLIATH's nova: everything burns EXCEPT the safe wedge at `angle`. */
-  | { kind: 'nova'; angle: number; halfAngle: number };
+  | { kind: 'nova'; angle: number; halfAngle: number }
+  /** GOOPLIATH's seesaw: the whole platform half on `side`'s sign of local x
+   *  floods — be across the centreline when it lands. */
+  | { kind: 'half'; side: -1 | 1 };
 
 /** A weak point a pattern can light. The crown circuit uses all five. */
 type WeakSpot = 'head' | 'core' | 'low' | 'shoulderL' | 'shoulderR';
@@ -185,6 +194,21 @@ export class CampaignSystem extends createSystem({
   private time = 0; // global clock for shader pulses
   private def: BossDef = BOSSES[0];
   private rig?: TitanRig;
+
+  // --- GOOPLIATH state ------------------------------------------------------
+  /** The gel boss (def.style 'goop'): the vendored creature replaces the
+   *  titan rig outright — same phases/attacks/netcode, different body. */
+  private goop?: GelCreature;
+  private goopFx?: GooFx;
+  /** Scaled parent group: the sim stays man-sized inside it, so every dent,
+   *  lump and wobble keeps the original creature's exact proportions. */
+  private goopRoot?: Group;
+  private goopScale = 1;
+  /** Per-ball "was inside the gel last frame" — hits fire on the ENTRY edge,
+   *  so a squadmate's rendered ball splashes once, not every frame. */
+  private goopInside = new Map<Entity, boolean>();
+  /** Last frame's world position per ball — the swept segment's start. */
+  private goopPrev = new Map<Entity, Vector3>();
 
   // Boss weak-point spheres (created once, repositioned per stage/frame).
   private boxes: {
@@ -286,6 +310,7 @@ export class CampaignSystem extends createSystem({
     }
 
     if (this.rig) this.animateTitan(delta);
+    else if (this.goop) this.animateGoop(delta);
     this.placeHitboxes();
     this.refreshHud(delta);
   }
@@ -293,7 +318,14 @@ export class CampaignSystem extends createSystem({
   // --- lifecycle -------------------------------------------------------------
 
   private runMode(): boolean {
-    return app.campaignMode !== 'single';
+    // GOOPLIATH is one marquee fight, not a chained run — full ceremony, no
+    // speedrun clock (raids keep their own run flow regardless of boss).
+    return app.campaignMode !== 'single' && app.campaignMode !== 'goopliath';
+  }
+
+  /** Is this bout GOOPLIATH — the solo entry, or a raid with the breaker on? */
+  private goopMode(): boolean {
+    return app.campaignMode === 'goopliath' || (app.campaignMode === 'raid' && app.raidGoopliath);
   }
 
   // --- RAID plumbing -----------------------------------------------------------
@@ -478,7 +510,7 @@ export class CampaignSystem extends createSystem({
       this.faceSeat = mesh.mySeat;
       applyRoster();
       applyArenaLayout(this.scene);
-      this.stageSetup(true, 'the raid begins');
+      this.stageSetup(true, this.goopMode() ? 'the pit is flooding' : 'the raid begins');
       return;
     }
     // Stamp the classic 1v1 platforms/roster (the last bout may have been an
@@ -486,7 +518,7 @@ export class CampaignSystem extends createSystem({
     app.arcade = '1v1';
     applyRoster();
     applyArenaLayout(this.scene);
-    this.stageSetup(true, 'a titan approaches the pit');
+    this.stageSetup(true, this.goopMode() ? 'something stirs beneath the pit' : 'a titan approaches the pit');
   }
 
   /** Chain to the next titan mid-run — no lobby, straight into its intro. */
@@ -500,17 +532,28 @@ export class CampaignSystem extends createSystem({
 
   /** Everything one titan bout needs: rig, pools, weak points, intro cue. */
   private stageSetup(healPlayer: boolean, warning: string): void {
-    const base = BOSSES[clamp(app.campaignStage, 0, BOSSES.length - 1)];
-    this.def = this.raid() ? raidBoss(base, app.campaignStage) : base;
+    const goopMode = this.goopMode();
+    if (goopMode) {
+      this.def = goopliathBoss(this.raid());
+    } else {
+      const base = BOSSES[clamp(app.campaignStage, 0, BOSSES.length - 1)];
+      this.def = this.raid() ? raidBoss(base, app.campaignStage) : base;
+    }
     this.p2 = false;
     this.rig?.dispose();
-    this.rig = buildTitan(this.def);
-    // The rig's face (visor/core) sits on local −Z, same as the duel boxer —
-    // yaw the whole machine to face the player across the gap. Each chassis
-    // then stages its OWN entrance mark (the pit, the sky, the flank, the
-    // dark): entrancePose(0) parks it there until the klaxon ends.
-    this.rig.root.rotation.set(0, Math.PI, 0);
-    this.scene.add(this.rig.root);
+    this.rig = undefined;
+    this.disposeGoop();
+    if (goopMode) {
+      this.buildGoop();
+    } else {
+      this.rig = buildTitan(this.def);
+      // The rig's face (visor/core) sits on local −Z, same as the duel boxer —
+      // yaw the whole machine to face the player across the gap. Each chassis
+      // then stages its OWN entrance mark (the pit, the sky, the flank, the
+      // dark): entrancePose(0) parks it there until the klaxon ends.
+      this.rig.root.rotation.set(0, Math.PI, 0);
+      this.scene.add(this.rig.root);
+    }
     this.introStep = 0;
     this.entrancePose(0);
 
@@ -529,7 +572,8 @@ export class CampaignSystem extends createSystem({
     }
     this.lastBossHp = this.def.health;
 
-    this.ensureHitboxes();
+    if (goopMode) this.parkHitboxes(); // no weak points — the SDF is the hitbox
+    else this.ensureHitboxes();
     this.disposeShots();
     this.disposeAttack();
     this.cycleIdx = 0; // every pattern opens on the head
@@ -549,13 +593,57 @@ export class CampaignSystem extends createSystem({
     match.resetCount += 1; // park the fireballs at your fists
 
     this.light.color.setHex(this.def.accent);
-    this.light.position.set(0, this.rig.height * 0.8 + 1, this.bossZ() + 1.2);
+    this.light.position.set(0, this.bossHeight() * 0.8 + 1, this.bossZ() + 1.2);
     this.light.intensity = 0;
 
     this.phase = 'intro';
     this.t = 0;
     this.hud.title('WARNING', warning, '#ffb000');
     sfx.klaxon();
+  }
+
+  // --- GOOPLIATH body -----------------------------------------------------------
+
+  /** Full standing height of whichever body is in the pit (world metres). */
+  private bossHeight(): number {
+    return this.rig ? this.rig.height : GOOP_BODY.height * this.goopScale;
+  }
+
+  /** Where the boss's feet are — the titan rig's root or the gel's parent.
+   *  Only meaningful once a stage is set up (one of the two always exists). */
+  private bossRootPos(): Vector3 {
+    return this.rig ? this.rig.root.position : this.goopRoot!.position;
+  }
+
+  /**
+   * Build the gel boss: the vendored creature at native man-size inside a
+   * scaled parent. The scale conversion keeps him honest against the titans
+   * — def.scale is in TITAN units, the sim is 1.78 m tall.
+   */
+  private buildGoop(): void {
+    this.goopFx = new GooFx();
+    this.scene.add(this.goopFx.group);
+    this.goop = new GelCreature(this.goopFx);
+    // The man-sized distance LOD reads garbage inside a scaled parent — and a
+    // boss that fills the view is never "far". Pin the step budget instead.
+    this.goop.qualityOverride = GOOPLIATH.quality;
+    this.goopScale = (this.def.scale * GOOPLIATH.titanHeightPerScale) / GOOP_BODY.height;
+    this.goopRoot = new Group();
+    this.goopRoot.scale.setScalar(this.goopScale);
+    this.goopRoot.position.set(0, 0, this.bossZ());
+    this.goopRoot.add(this.goop.group);
+    this.scene.add(this.goopRoot);
+  }
+
+  private disposeGoop(): void {
+    this.goop?.dispose();
+    this.goop = undefined;
+    this.goopFx?.dispose();
+    this.goopFx = undefined;
+    this.goopRoot?.removeFromParent();
+    this.goopRoot = undefined;
+    this.goopInside.clear();
+    this.goopPrev.clear();
   }
 
   /** Tear down the live attack: telegraphs AND any ghost hammer markers. */
@@ -586,6 +674,7 @@ export class CampaignSystem extends createSystem({
     this.strikes = [];
     this.rig?.dispose();
     this.rig = undefined;
+    this.disposeGoop();
     this.light.visible = false;
     this.hud.setVisible(false);
     this.hud.title('', '');
@@ -630,7 +719,8 @@ export class CampaignSystem extends createSystem({
     if (this.t >= riseStart && this.t < riseStart + riseTime + 0.2) {
       if (this.t - delta < riseStart) {
         this.introStep = 0;
-        if (this.def.style === 'vulture') sfx.sweepWhoosh();
+        if (this.def.style === 'goop') sfx.gooWobble(1);
+        else if (this.def.style === 'vulture') sfx.sweepWhoosh();
         else sfx.titanRise();
       }
       const k = clamp((this.t - riseStart) / riseTime, 0, 1);
@@ -664,7 +754,14 @@ export class CampaignSystem extends createSystem({
 
       this.emberTimer -= delta;
       if (this.emberTimer <= 0 && k < 1) {
-        if (this.def.style === 'vulture') {
+        if (this.def.style === 'goop') {
+          // The pit BUBBLES as the tide swells up out of it — green droplets,
+          // not sparks: he was always liquid.
+          this.emberTimer = 0.18;
+          _v.set(rand(-0.5, 0.5) * this.def.scale, 0.15, this.bossZ() + rand(-0.6, 0.6));
+          _p.set(rand(-0.3, 0.3), 1, rand(-0.3, 0.3)).normalize();
+          this.goopFx?.burst(_v, _p, 4, 1.6);
+        } else if (this.def.style === 'vulture') {
           // Sparks stream off the banking wing on the way in.
           this.emberTimer = 0.22;
           _v.set(
@@ -718,6 +815,17 @@ export class CampaignSystem extends createSystem({
    * from any mid-entrance pose lands clean via startFight's reset.
    */
   private entrancePose(k: number): void {
+    if (this.def.style === 'goop') {
+      // GOOPLIATH doesn't climb out of the pit — he FILLS it and keeps
+      // coming: the mass swells from a puddle's worth of gel to full boss
+      // volume, and pulls itself up into the fighter late in the rise.
+      const root = this.goopRoot!;
+      const e = k * k * (3 - 2 * k);
+      root.position.set(0, 0, this.bossZ());
+      root.scale.setScalar(this.goopScale * (0.12 + 0.88 * e));
+      if (k > 0.55) this.goop!.setFormTarget(1); // gooRise fires inside
+      return;
+    }
     const rig = this.rig!;
     const h = rig.height;
     const z = this.bossZ();
@@ -793,10 +901,16 @@ export class CampaignSystem extends createSystem({
     this.phase = 'fight';
     this.t = 0;
     // Snap to the rest pose — a trigger-skip can land mid-swoop/mid-stroke.
-    const root = this.rig!.root;
-    root.position.set(0, 0, this.bossZ());
-    root.rotation.set(0, Math.PI, 0);
-    root.scale.setScalar(1);
+    if (this.rig) {
+      const root = this.rig.root;
+      root.position.set(0, 0, this.bossZ());
+      root.rotation.set(0, Math.PI, 0);
+      root.scale.setScalar(1);
+    } else if (this.goopRoot) {
+      this.goopRoot.position.set(0, 0, this.bossZ());
+      this.goopRoot.scale.setScalar(this.goopScale);
+      this.goop?.setFormTarget(1); // a skip can land before the form-up cue
+    }
     match.phase = 'playing';
     this.hud.title('', '');
     this.cardTimer = 0;
@@ -810,6 +924,8 @@ export class CampaignSystem extends createSystem({
    *  second-life crown (raid GOLIATH) walks the ring in REVERSE. */
   private litPoints(): WeakSpot[] {
     switch (this.def.weakPattern) {
+      case 'body':
+        return []; // GOOPLIATH: nothing blinks — the whole body takes hits
       case 'both':
         return ['head', 'core']; // any order, all fight
       case 'triple':
@@ -836,6 +952,7 @@ export class CampaignSystem extends createSystem({
     }
 
     this.updateShots(delta);
+    if (this.goopMode()) this.goopBalls();
 
     // Watch the health pools. LOCAL hp drops are MY landed hits (only my
     // balls collide on my sim): route them through the ONE authoritative
@@ -874,7 +991,7 @@ export class CampaignSystem extends createSystem({
     ) {
       this.enraged = true;
       this.flinch = 0.35;
-      this.hud.title('ENRAGED', '', this.accentCss());
+      this.hud.title(this.goopMode() ? 'THE TIDE RISES' : 'ENRAGED', '', this.accentCss());
       this.cardTimer = 1.3;
       sfx.bossRoar(this.def.scale * 1.1);
     }
@@ -922,6 +1039,16 @@ export class CampaignSystem extends createSystem({
     const boss = this.ensureBoss();
     const max = boss.getValue(Health, 'max') ?? 1;
     let hp = boss.getValue(Health, 'current') ?? 0;
+    if (this.def.weakPattern === 'body') {
+      // GOOPLIATH: the bar IS a hit counter — every landed ball is one notch,
+      // whoever threw it, wherever it landed. 300 in a raid, 75 solo.
+      if (spot !== 'body') return;
+      this.hudTimer = 0;
+      hp = Math.max(0, hp - Math.max(1, Math.round(pts)));
+      boss.setValue(Health, 'current', hp);
+      this.lastBossHp = hp;
+      return;
+    }
     const lit = this.litPoints() as string[];
     const podShot = spot === 'pod' && this.attack?.kind === 'volley';
     if (!lit.includes(spot) && !podShot) return;
@@ -961,6 +1088,109 @@ export class CampaignSystem extends createSystem({
       }
     }
     this.lastBossHp = hp;
+  }
+
+  // --- GOOPLIATH: ball-vs-gel collision -------------------------------------------
+
+  /**
+   * The whole body is the hitbox: every fireball is swept against the gel's
+   * OWN signed-distance field — the same field the shader draws, so what you
+   * see is exactly what you hit. Contact triggers the full GOOP reaction
+   * (verlet shove + carved dent + surface roil, lumps torn loose by the
+   * hardest throws) plus the wet foley. MY balls are spent and score one hit
+   * through the one authoritative path; a squadmate's RENDERED ball splashes
+   * cosmetically (their own client scores it) — entry-edge detection keeps
+   * it to one splash per pass.
+   */
+  private goopBalls(): void {
+    const goop = this.goop;
+    const root = this.goopRoot;
+    if (!goop || !root) return;
+    const S = this.goopScale;
+    const bound = S * 2.4; // generous sphere around the whole sim AABB
+    // Destroyed transient shards leave orphan map entries — sweep them out
+    // before they pile up over a 300-hit fight.
+    if (this.goopPrev.size > 24) {
+      const live = new Set(this.queries.balls.entities);
+      for (const key of this.goopPrev.keys()) if (!live.has(key)) this.goopPrev.delete(key);
+      for (const key of this.goopInside.keys()) if (!live.has(key)) this.goopInside.delete(key);
+    }
+    for (const ball of this.queries.balls.entities) {
+      const obj = ball.object3D;
+      if (!obj || !obj.visible) {
+        this.goopInside.delete(ball);
+        continue;
+      }
+      const state = ball.getValue(Fireball, 'state') ?? 0;
+      const returning = state === BallState.Returning;
+      if ((state !== BallState.Flying && !returning) || (returning && (ball.getValue(Fireball, 'returnHit') ?? 0) === 1)) {
+        this.goopInside.delete(ball);
+        this.goopPrev.delete(ball);
+        continue;
+      }
+      obj.getWorldPosition(_p);
+      let prev = this.goopPrev.get(ball);
+      if (!prev) {
+        prev = new Vector3().copy(_p);
+        this.goopPrev.set(ball, prev);
+      }
+      // Broad phase before any SDF sampling.
+      if (_p.distanceTo(root.position) > bound) {
+        this.goopInside.set(ball, false);
+        prev.copy(_p);
+        continue;
+      }
+      const radius = ball.getValue(Fireball, 'radius') ?? FIREBALL.radius;
+      const skin = (radius + 0.05) / S; // contact threshold in the sim's native metres
+      // Sweep this frame's path so a fast ball can't tunnel through a limb.
+      const dist = prev.distanceTo(_p);
+      const steps = Math.min(8, 1 + Math.ceil(dist / 0.12));
+      let inside = false;
+      for (let i = steps; i >= 1; i--) {
+        _v.copy(prev).lerp(_p, i / steps);
+        if (goop.fieldAtWorld(_v) <= skin) {
+          inside = true;
+          break;
+        }
+      }
+      const wasInside = this.goopInside.get(ball) === true;
+      this.goopInside.set(ball, inside);
+      prev.copy(_p);
+      if (!inside || wasInside) continue;
+
+      // Contact (_v holds the hit sample): the gel takes the ball like a
+      // punch, scaled by throw speed — only genuinely hard throws tear lumps.
+      const v = ball.getVectorView(Fireball, 'velocity');
+      const speed = Math.hypot(v[0], v[1], v[2]);
+      if (speed > 1e-3) _head.set(v[0] / speed, v[1] / speed, v[2] / speed);
+      else _head.set(0, 0, -1);
+      const punch = Math.min(GOOPLIATH.punchMax, GOOPLIATH.punchBase + speed * GOOPLIATH.punchGain);
+      const res = goop.receivePunchWorld(_v, _head, punch);
+      sfx.squelch(0.45 + res.strength * 0.55);
+      this.goopFx?.flash(_v, 0x8cff70, 0.5 + res.strength * 0.6);
+
+      if ((ball.getValue(Fireball, 'owner') ?? 0) !== 0) continue; // a squadmate's — theirs to score
+      const hand = (ball.getValue(Fireball, 'hand') ?? 0) as 0 | 1;
+      pulseHand(this.world.session, hand === 0 ? 'left' : 'right', 0.5, 60);
+      if (returning) ball.setValue(Fireball, 'returnHit', 1);
+      else this.spendGoopBall(ball);
+      if (this.isAuthority()) this.applyBossDamage('body', 1);
+      else mesh.send({ k: 'rdmg', spot: 'body', pts: 1 });
+    }
+  }
+
+  /** Same law as CollisionSystem.spendBall — the gel keeps what it catches. */
+  private spendGoopBall(ball: Entity): void {
+    if ((ball.getValue(Fireball, 'transient') ?? 0) === 1) {
+      ball.destroy();
+      return;
+    }
+    ball.setValue(Fireball, 'state', BallState.Dead);
+    ball.setValue(Fireball, 'recallLock', FIREBALL.recallLockout);
+    const v = ball.getVectorView(Fireball, 'velocity');
+    v[0] = 0;
+    v[1] = 0;
+    v[2] = 0;
   }
 
   // --- the volley: blockable fireballs -----------------------------------------
@@ -1105,7 +1335,9 @@ export class CampaignSystem extends createSystem({
       const canonical = MODE_LAYOUT[app.arcade];
       return seats.slice().sort((a, b) => (canonical[a]?.yaw ?? 0) - (canonical[b]?.yaw ?? 0));
     };
-    if (kind === 'sweep' || kind === 'decree') return arcOrder(alive);
+    // The seesaw is squad-wide like the sweep: every platform rocks at once,
+    // each starting on the half its own raider stands on.
+    if (kind === 'sweep' || kind === 'decree' || kind === 'seesaw') return arcOrder(alive);
     const stage = app.campaignStage;
     if (stage <= 0 || alive.length === 1) {
       // Stage I: one raider at a time — never the same one twice while
@@ -1149,7 +1381,7 @@ export class CampaignSystem extends createSystem({
       return;
     }
 
-    const kinds: AttackKind[] = ['slam', 'sweep', 'beam', 'volley', 'nova'];
+    const kinds: AttackKind[] = ['slam', 'sweep', 'beam', 'volley', 'nova', 'seesaw'];
     let total = 0;
     const pool: Array<[AttackKind, number]> = [];
     for (const k of kinds) {
@@ -1189,6 +1421,12 @@ export class CampaignSystem extends createSystem({
       } else if (kind === 'nova') {
         const playerAng = Math.hypot(_head.x, _head.z) > 0.15 ? Math.atan2(_head.x, _head.z) : rand(-Math.PI, Math.PI);
         params.a.push(playerAng + Math.PI + rand(-0.5, 0.5));
+      } else if (kind === 'seesaw') {
+        // First flood the half the target STANDS on — they must cross. One
+        // signed value per seat: |a| is the stage count (grows as he drains),
+        // its sign the first doomed half.
+        const side = _head.x >= 0 ? 1 : -1;
+        params.a.push(side * this.seesawStages());
       }
     }
 
@@ -1321,6 +1559,30 @@ export class CampaignSystem extends createSystem({
           this.aimBeam(zone, tg, offset, seat); // initial aim (tracking re-aims)
         }
       });
+    } else if (kind === 'seesaw') {
+      // GOOPLIATH'S SEESAW: one half of the platform floods, then the other,
+      // `stages` times over — every pane is up from the start (the whole
+      // sequence reads ahead), each filling on its own clock, so the player
+      // hurls themselves across the centreline on the beat: left, right,
+      // left… More stages as he drains (see GOOPLIATH.seesawStages).
+      seats.forEach((seat, ti) => {
+        const enc = params.a?.[ti] ?? params.a?.[0] ?? 2;
+        const stages = clamp(Math.round(Math.abs(enc)), 2, 8);
+        let side: -1 | 1 = enc < 0 ? -1 : 1;
+        for (let i = 0; i < stages; i++) {
+          zones.push({ kind: 'half', side });
+          zoneSeats.push(seat);
+          const tg = halfTelegraph(side, OCTAGON_HALF_WIDTH + 0.35, OCTAGON_HALF_DEPTH * 2 + 0.3);
+          this.seatPoint(seat, 0, CAMPAIGN.decalY, 0, _v);
+          tg.group.position.copy(_v);
+          tg.group.rotation.y = this.seatYawDelta(seat);
+          this.scene.add(tg.group);
+          telegraphs.push(tg);
+          staggers.push(i * GOOPLIATH.seesawGap);
+          markers.push(null);
+          side = side === 1 ? -1 : 1;
+        }
+      });
     } else if (kind === 'nova') {
       // GOLIATH's nova: everything burns EXCEPT one safe wedge — and each
       // wedge opens roughly OPPOSITE where its raider stands, so everyone
@@ -1449,8 +1711,9 @@ export class CampaignSystem extends createSystem({
     // one (their strip still lands beside them — the exact axis is cosmetic).
     const px = seat === this.mySeatId() ? clamp(_head.x + offset, -OCTAGON_HALF_WIDTH, OCTAGON_HALF_WIDTH) : _head.x + offset;
     const pz = seat === this.mySeatId() ? clamp(_head.z, -OCTAGON_HALF_DEPTH + 0.1, OCTAGON_HALF_DEPTH - 0.1) : _head.z;
-    // Direction from the titan through that point, flattened to XZ.
-    _v.set(px - this.rig!.root.position.x, 0, pz - this.rig!.root.position.z).normalize();
+    // Direction from the boss through that point, flattened to XZ.
+    const rootPos = this.bossRootPos();
+    _v.set(px - rootPos.x, 0, pz - rootPos.z).normalize();
     zone.x = px;
     zone.z = pz;
     zone.dx = _v.x;
@@ -1522,7 +1785,27 @@ export class CampaignSystem extends createSystem({
     if (this.def.weakPattern === 'crown') {
       mult *= Math.pow(CAMPAIGN.crownHaste, Math.floor(this.cycleIdx / CROWN_RING.length));
     }
+    if (this.def.weakPattern === 'body') {
+      // GOOPLIATH escalates with damage, not loops — the 300-hit fight winds
+      // itself up continuously toward finalHaste instead of plateauing.
+      mult *= GOOPLIATH.finalHaste + (1 - GOOPLIATH.finalHaste) * this.bossHpFrac();
+    }
     return rand(this.def.cooldownMin, this.def.cooldownMax) * mult;
+  }
+
+  /** Live boss health fraction (0..1). */
+  private bossHpFrac(): number {
+    const boss = this.ensureBoss();
+    return (boss.getValue(Health, 'current') ?? 1) / (boss.getValue(Health, 'max') ?? 1);
+  }
+
+  /** How many halves the seesaw floods this swing — grows by health quarter:
+   *  fresh he rocks the platform twice; in the last quarter, five times. */
+  private seesawStages(): number {
+    const table = GOOPLIATH.seesawStages;
+    const frac = this.bossHpFrac();
+    const idx = frac > 0.75 ? 0 : frac > 0.5 ? 1 : frac > 0.25 ? 2 : 3;
+    return table[Math.min(idx, table.length - 1)] ?? 2;
   }
 
   /** A zone goes off: strike visual + sound on the TARGET's platform, and
@@ -1544,6 +1827,9 @@ export class CampaignSystem extends createSystem({
     } else if (kind === 'sweep') {
       sfx.sweepWhoosh();
       if (zone.kind === 'sweep') this.spawnBladeSweep(zone.y, this.attack!.arm, seat);
+      // GOOPLIATH's sweep IS the spin attack: the whole gel body coils and
+      // whips through a spinning kick while the blade travels.
+      if (this.goop) this.goopFlavourSwing('spinkick', seat);
       this.strikeSwing[this.attack!.arm] = 0.6;
       // The squad sweep: the titan whips through a FULL TURN while the blade
       // cascades around the arc — re-armed per landing so the spin carries
@@ -1559,6 +1845,15 @@ export class CampaignSystem extends createSystem({
       sfx.beamBlast();
       sfx.slamImpact();
       if (zone.kind === 'nova') this.spawnNovaWave(zone.angle, zone.halfAngle, seat);
+      // GOOPLIATH claps the wave out of himself — flavour, not hit logic.
+      if (this.goop) this.goopFlavourSwing('clap', seat);
+    } else if (kind === 'seesaw') {
+      sfx.gooSlam();
+      if (zone.kind === 'half') {
+        this.spawnHalfFlood(zone.side, seat);
+        // The tide slams that half with the matching gel limb.
+        this.goopFlavourSwing(zone.side === 1 ? 'overhand' : 'hook', seat);
+      }
     } else {
       if (zone.kind === 'shot') this.launchShot(zone.side, seat);
     }
@@ -1597,6 +1892,11 @@ export class CampaignSystem extends createSystem({
         if (Math.hypot(perpX, perpZ) <= zone.halfW + r * 0.7) return true;
       } else if (zone.kind === 'sweep') {
         if (Math.abs(_p.y - zone.y) <= CAMPAIGN.sweepThickness + r * 0.6) return true;
+      } else if (zone.kind === 'half') {
+        // The seesaw: any body sphere on the doomed half burns, with a thin
+        // forgiveness strip on the centreline so the jump is never a coin
+        // flip. (The player origin IS the platform centre.)
+        if (_p.x * zone.side > GOOPLIATH.seesawSafeLip) return true;
       }
     }
     return false;
@@ -1608,9 +1908,9 @@ export class CampaignSystem extends createSystem({
     me.setValue(Health, 'current', Math.max(0, (me.getValue(Health, 'current') ?? 0) - amount));
     sfx.hitTaken();
     feedback.playerHitFlash = 1;
-    // The blow came from the titan's side of the arena.
+    // The blow came from the boss's side of the arena.
     this.playerHead(_p);
-    _v.set(this.rig!.root.position.x - _p.x, 0.4, this.bossZ() - _p.z).normalize();
+    _v.set(this.bossRootPos().x - _p.x, 0.4, this.bossZ() - _p.z).normalize();
     feedback.srcX = _v.x;
     feedback.srcY = _v.y;
     feedback.srcZ = _v.z;
@@ -1731,9 +2031,10 @@ export class CampaignSystem extends createSystem({
   }
 
   private spawnBeamColumn(zone: Zone & { kind: 'beam' }): void {
-    // A blinding column from the titan's visor raking down the strip.
-    const rig = this.rig!;
-    rig.head.getWorldPosition(_v);
+    // A blinding column from the boss's eyes raking down the strip — the
+    // titan's visor, or the gel's own hot amber stare.
+    if (this.rig) this.rig.head.getWorldPosition(_v);
+    else this.goop!.headWorld(_v);
     const from = _v.clone();
     const to = new Vector3(zone.x - zone.dx * 1.2, 0.05, zone.z - zone.dz * 1.2);
     const far = new Vector3(zone.x + zone.dx * 1.6, 0.05, zone.z + zone.dz * 1.6);
@@ -1827,6 +2128,78 @@ export class CampaignSystem extends createSystem({
         ring.removeFromParent();
       },
     });
+  }
+
+  /** The seesaw lands: a green tide floods the doomed half — a slab of gel
+   *  light, fire along the deck, and wet splats stamped where it hit. All
+   *  target-local, transformed to the marked seat's platform. */
+  private spawnHalfFlood(side: -1 | 1, seat: number): void {
+    this.seatPoint(seat, 0, 0, 0, _v);
+    const cx = _v.x;
+    const cz = _v.z;
+    const yd = this.seatYawDelta(seat);
+    const cos = Math.cos(yd);
+    const sin = Math.sin(yd);
+    const w = OCTAGON_HALF_WIDTH + 0.35;
+    const d = OCTAGON_HALF_DEPTH * 2 + 0.3;
+    const slab = new Mesh(
+      new BoxGeometry(w, 0.5, d),
+      new MeshBasicMaterial({
+        color: this.def.accent,
+        transparent: true,
+        opacity: 0.55,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    slab.rotation.y = yd;
+    const lx = (side * w) / 2;
+    slab.position.set(cx + lx * cos, 0.26, cz - lx * sin);
+    this.scene.add(slab);
+    const world = this.world;
+    const fx = this.goopFx;
+    let burstClock = 0;
+    let splatted = false;
+    this.strikes.push({
+      age: 0,
+      life: 0.5,
+      update(age) {
+        const k = Math.min(1, age / 0.42);
+        (slab.material as MeshBasicMaterial).opacity = 0.55 * (1 - k * k);
+        slab.scale.y = 1 - 0.7 * k; // the wave settles into the deck
+        if (!splatted) {
+          // Wet evidence stamped once, where the tide came down.
+          splatted = true;
+          for (let i = 0; i < 3; i++) {
+            const sx = side * rand(0.15, w - 0.2);
+            const sz = rand(-OCTAGON_HALF_DEPTH * 0.8, OCTAGON_HALF_DEPTH * 0.8);
+            _v.set(cx + sx * cos + sz * sin, 0.02, cz - sx * sin + sz * cos);
+            fx?.splat(_v, rand(0.3, 0.55));
+          }
+        }
+        if (age > burstClock) {
+          burstClock = age + 0.06;
+          const sx = side * rand(0.1, w - 0.2);
+          const sz = rand(-OCTAGON_HALF_DEPTH, OCTAGON_HALF_DEPTH);
+          _v.set(cx + sx * cos + sz * sin, 0.12, cz - sx * sin + sz * cos);
+          emberBurst(_v, 5, true);
+          if (k > 0.3 && k < 0.6) spawnFireImpact(world, _v, 1, 0.7);
+        }
+      },
+      dispose() {
+        slab.geometry.dispose();
+        (slab.material as MeshBasicMaterial).dispose();
+        slab.removeFromParent();
+      },
+    });
+  }
+
+  /** A gel limb thrown WITH a detonation — pure theatre, aimed at the marked
+   *  seat; the floor zones own the actual damage. Skipped mid-swing. */
+  private goopFlavourSwing(name: 'overhand' | 'hook' | 'clap' | 'spinkick', seat: number): void {
+    if (!this.goop) return;
+    this.seatPoint(seat, 0, 1.5, 0, _v);
+    this.goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', _v);
   }
 
   private updateStrikes(delta: number): void {
@@ -2004,6 +2377,41 @@ export class CampaignSystem extends createSystem({
     }
   }
 
+  // --- GOOPLIATH animation --------------------------------------------------------
+
+  /**
+   * Drive the gel boss: face the hunted seat, tick the sim on its slowed
+   * giant clock (GOOPLIATH.timeScale — a 4-5x body jiggling at man-speed
+   * reads as a miniature), and keep the mess pools breathing. The creature's
+   * own idle motion, hit reactions and flavour swings do the rest — no
+   * chassis choreography needed.
+   */
+  private animateGoop(delta: number): void {
+    const goop = this.goop!;
+    const root = this.goopRoot!;
+    this.goopFx?.update(delta);
+    const fighting = this.phase === 'fight';
+
+    // Square up to whoever he's hunting. The steering APIs live in the scaled
+    // parent's space (the parent never rotates — the creature owns its yaw).
+    this.playerHeadOf(fighting ? this.faceSeat : this.mySeatId(), _head);
+    _p.copy(_head).sub(root.position).divideScalar(root.scale.x || 1);
+    goop.faceToward(_p);
+
+    goop.update(delta * GOOPLIATH.timeScale, _head);
+
+    if (fighting) {
+      // Aim assist rides the head — cosmetic help only; ANY landing counts.
+      goop.headWorld(campaign.aimPoint);
+      campaign.coreOpen = false;
+      // The arena key light surges while a laser cooks (the titan version
+      // of this lives in animateTitan).
+      const a = this.attack;
+      const beamCharging = a?.kind === 'beam' ? clamp(a.time / a.chargeTime, 0, 1) : 0;
+      this.light.intensity = 5 + beamCharging * 8;
+    }
+  }
+
   // --- weak-point hitboxes -------------------------------------------------------
 
   private ensureHitboxes(): void {
@@ -2145,14 +2553,23 @@ export class CampaignSystem extends createSystem({
 
     app.stats.wins += 1;
     saveStats();
-    const lastStage = app.campaignStage === BOSSES.length - 1;
+    // GOOPLIATH is always his own finale — one fight, no next titan.
+    const goopMode = this.goopMode();
+    const lastStage = goopMode || app.campaignStage === BOSSES.length - 1;
     const run = this.runMode();
 
     // Coins + XP at the flat per-game rate — DOUBLE on a titan's first fell.
     // Raid fells don't touch the SOLO stage unlocks; a full raid clear has
-    // its own first-time double instead.
+    // its own first-time double instead. GOOPLIATH keeps his own two flags.
     let firstClear = false;
-    if (this.raid()) {
+    if (goopMode) {
+      firstClear = this.raid() ? !campaignProgress.raidGoopliathCleared : !campaignProgress.goopliathCleared;
+      if (firstClear) {
+        if (this.raid()) campaignProgress.raidGoopliathCleared = true;
+        else campaignProgress.goopliathCleared = true;
+        saveCampaignProgress();
+      }
+    } else if (this.raid()) {
       firstClear = lastStage && !campaignProgress.raidCleared;
       if (firstClear) {
         campaignProgress.raidCleared = true;
@@ -2168,8 +2585,9 @@ export class CampaignSystem extends createSystem({
     reportCampaign(true, firstClear);
 
     // Felling the king crowns you: the CHAMPION pad joins your locker.
-    // (Also granted retroactively to saves that beat GOLIATH pre-reward.)
-    const crowned = lastStage && !platformOwned('champion');
+    // (Also granted retroactively to saves that beat GOLIATH pre-reward.
+    // The tide crowns no one — that pad is the KING's bounty.)
+    const crowned = lastStage && !goopMode && !platformOwned('champion');
     if (crowned) {
       ownPlatform('champion');
       setPlatformSkin('champion');
@@ -2188,15 +2606,20 @@ export class CampaignSystem extends createSystem({
     }
 
     if (this.raid() && lastStage) {
-      // Both of GOLIATH's lives spent: the raid is BEATEN. The HOST posts the
-      // ONE run record for the whole squad — every raider's callsign on it,
-      // the group ranked together on their collective fight time.
-      if (this.isAuthority()) {
+      // The raid is BEATEN. The HOST posts the ONE run record for the whole
+      // squad — every raider's callsign on it, the group ranked together on
+      // their collective fight time. (GOOPLIATH raids have no titan-run board
+      // to post to — the fell itself is the trophy.)
+      if (this.isAuthority() && !goopMode) {
         reportRun(app.raidHardcore ? 'raidHardcore' : 'raid', this.runClock, this.squadNames());
       }
       this.hud.title(
-        'RAID CLEARED',
-        app.raidHardcore ? `HARDCORE · ${fmtRunTime(this.runClock)}` : fmtRunTime(this.runClock),
+        goopMode ? 'THE TIDE RECEDES' : 'RAID CLEARED',
+        goopMode
+          ? `GOOPLIATH FELLED · ${fmtRunTime(this.runClock)}`
+          : app.raidHardcore
+            ? `HARDCORE · ${fmtRunTime(this.runClock)}`
+            : fmtRunTime(this.runClock),
         '#d9a832',
       );
     } else if (run && lastStage) {
@@ -2216,11 +2639,16 @@ export class CampaignSystem extends createSystem({
       );
     } else {
       // No payout readout — just the fell (and the one-time crown unlock).
-      this.hud.title('TITAN FELLED', crowned ? 'CHAMPION PLATFORM UNLOCKED' : '', this.accentCss());
+      this.hud.title(
+        goopMode ? 'GOOPLIATH FELLED' : 'TITAN FELLED',
+        goopMode ? 'the tide recedes' : crowned ? 'CHAMPION PLATFORM UNLOCKED' : '',
+        this.accentCss(),
+      );
     }
     playVictory(); // stops the battle score and rings the end-of-game sting
     sfx.matchEnd(true);
-    sfx.bossRoar(this.def.scale * 1.0); // the death bellow
+    // The gel's own KO splat (deathPose → setKo) is the tide's death bellow.
+    if (!goopMode) sfx.bossRoar(this.def.scale * 1.0);
   }
 
   private toDefeat(): void {
@@ -2235,7 +2663,10 @@ export class CampaignSystem extends createSystem({
     app.stats.losses += 1;
     saveStats();
     reportCampaign(false, false); // the consolation rate, same as a bot loss
-    if (this.raid()) {
+    if (this.goopMode()) {
+      // The tide takes everyone eventually.
+      this.hud.title('DISSOLVED', this.raid() ? 'the squad is spent' : '', '#e8352a');
+    } else if (this.raid()) {
       // The WIPE: every raider down. The titan stands over the squad.
       this.hud.title('RAID OVER', `${app.campaignStage} of ${BOSSES.length}`, '#e8352a');
     } else if (this.runMode()) {
@@ -2357,21 +2788,32 @@ export class CampaignSystem extends createSystem({
   }
 
   private outro(delta: number): void {
-    const rig = this.rig!;
     if (this.phase === 'victory') {
-      // Each chassis dies its own death (see deathPose), shedding fire.
+      // Each chassis dies its own death (see deathPose), shedding fire — the
+      // gel sheds DROPLETS instead: goo, not sparks, to the very end.
       const k = clamp(this.t / Math.min(3.2, this.victoryDelay), 0, 1);
       this.deathPose(k);
       this.emberTimer -= delta;
       if (this.emberTimer <= 0 && k < 1) {
-        this.emberTimer = 0.16;
-        _v.set(
-          rig.root.position.x + rand(-0.6, 0.6) * this.def.scale,
-          rand(0.4, 1.4) * this.def.scale,
-          this.bossZ() + rand(-0.3, 0.3),
-        );
-        emberBurst(_v, 12, true);
-        spawnFireImpact(this.world, _v, 1);
+        if (this.def.style === 'goop') {
+          this.emberTimer = 0.14;
+          _v.set(
+            this.bossRootPos().x + rand(-0.7, 0.7) * this.def.scale,
+            rand(0.1, 0.5) * this.def.scale,
+            this.bossZ() + rand(-0.5, 0.5),
+          );
+          _p.set(rand(-0.5, 0.5), 1, rand(-0.5, 0.5)).normalize();
+          this.goopFx?.burst(_v, _p, 5, 2.2);
+        } else {
+          this.emberTimer = 0.16;
+          _v.set(
+            this.bossRootPos().x + rand(-0.6, 0.6) * this.def.scale,
+            rand(0.4, 1.4) * this.def.scale,
+            this.bossZ() + rand(-0.3, 0.3),
+          );
+          emberBurst(_v, 12, true);
+          spawnFireImpact(this.world, _v, 1);
+        }
       }
       this.light.intensity = Math.max(0, 5 * (1 - k));
       if (this.t >= this.victoryDelay) {
@@ -2399,6 +2841,12 @@ export class CampaignSystem extends createSystem({
    * blow caught it at — so the wreck drops where it STOOD, no centre snap.
    */
   private deathPose(k: number): void {
+    if (this.def.style === 'goop') {
+      // The tide lets go: one KO splat and the body POURS itself flat — the
+      // gel sim owns the whole collapse, no transform choreography needed.
+      if (k > 0.02 && this.goop && !this.goop.isKo) this.goop.setKo(true);
+      return;
+    }
     const rig = this.rig!;
     const h = rig.height;
     const z = this.bossZ();

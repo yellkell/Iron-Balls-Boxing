@@ -32,7 +32,7 @@ import {
   MeshStandardMaterial,
   SphereGeometry,
 } from 'three';
-import { PALETTE, RAID } from '../config.js';
+import { GOOPLIATH, PALETTE, RAID } from '../config.js';
 
 /**
  * 'volley' is the one attack aimed at YOU instead of the floor: the shoulder
@@ -41,7 +41,7 @@ import { PALETTE, RAID } from '../config.js';
  * marked safe wedge — the only telegraph in the game that says "stand HERE"
  * instead of "get out".
  */
-export type AttackKind = 'slam' | 'sweep' | 'beam' | 'volley' | 'nova';
+export type AttackKind = 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'seesaw';
 
 /**
  * How a titan's slam lands — its melee signature:
@@ -53,8 +53,10 @@ export type AttackKind = 'slam' | 'sweep' | 'beam' | 'volley' | 'nova';
  */
 export type SlamStyle = 'single' | 'rehit' | 'march';
 
-/** Which bespoke chassis buildTitan assembles. */
-export type TitanStyle = 'hook' | 'piston' | 'vulture' | 'fortress' | 'king';
+/** Which bespoke chassis buildTitan assembles. 'goop' is the odd one out:
+ *  GOOPLIATH is no machine — CampaignSystem builds the vendored gel creature
+ *  (src/goopliath/) instead of a TitanRig, so buildTitan never sees it. */
+export type TitanStyle = 'hook' | 'piston' | 'vulture' | 'fortress' | 'king' | 'goop';
 
 /**
  * How a titan's weak points open up. No prompts — whatever is vulnerable
@@ -67,8 +69,11 @@ export type TitanStyle = 'hook' | 'piston' | 'vulture' | 'fortress' | 'king';
  *                  core → right shoulder → low — walked THREE full loops to
  *                  kill (the health bar steps down per ring hit, so it is
  *                  exactly fifteen hits no matter what you throw).
+ *  - 'body'      : GOOPLIATH's law — no weak points at all. His WHOLE BODY is
+ *                  the hitbox (the gel's own distance field judges contact)
+ *                  and every landed fireball steps the bar down one hit.
  */
-export type WeakPattern = 'both' | 'alternate' | 'double' | 'triple' | 'crown';
+export type WeakPattern = 'both' | 'alternate' | 'double' | 'triple' | 'crown' | 'body';
 
 export interface BossDef {
   name: string;
@@ -119,8 +124,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.2,
     cooldownMin: 2.6,
     cooldownMax: 3.6,
-    charge: { slam: 1.9, sweep: 2.1, beam: 1.7, volley: 2.0, nova: 2.2 },
-    weights: { slam: 5, sweep: 0, beam: 3, volley: 0, nova: 0 },
+    charge: { slam: 1.9, sweep: 2.1, beam: 1.7, volley: 2.0, nova: 2.2, seesaw: 1.7 },
+    weights: { slam: 5, sweep: 0, beam: 3, volley: 0, nova: 0, seesaw: 0 },
     volleyCount: 3,
     beams: 1,
     swayAmp: 0.4,
@@ -140,8 +145,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.3,
     cooldownMin: 2.2,
     cooldownMax: 3.2,
-    charge: { slam: 1.6, sweep: 1.9, beam: 1.6, volley: 1.9, nova: 2.2 },
-    weights: { slam: 4, sweep: 3, beam: 2, volley: 0, nova: 0 },
+    charge: { slam: 1.6, sweep: 1.9, beam: 1.6, volley: 1.9, nova: 2.2, seesaw: 1.7 },
+    weights: { slam: 4, sweep: 3, beam: 2, volley: 0, nova: 0, seesaw: 0 },
     volleyCount: 3,
     beams: 1,
     swayAmp: 0.5,
@@ -161,8 +166,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.45,
     cooldownMin: 1.9,
     cooldownMax: 2.8,
-    charge: { slam: 1.45, sweep: 1.7, beam: 1.55, volley: 1.7, nova: 2.2 },
-    weights: { slam: 3, sweep: 4, beam: 4, volley: 2, nova: 0 },
+    charge: { slam: 1.45, sweep: 1.7, beam: 1.55, volley: 1.7, nova: 2.2, seesaw: 1.7 },
+    weights: { slam: 3, sweep: 4, beam: 4, volley: 2, nova: 0, seesaw: 0 },
     volleyCount: 4,
     beams: 1,
     swayAmp: 0.6,
@@ -182,8 +187,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.6,
     cooldownMin: 1.6,
     cooldownMax: 2.4,
-    charge: { slam: 1.3, sweep: 1.5, beam: 1.25, volley: 2.0, nova: 2.2 },
-    weights: { slam: 3, sweep: 2, beam: 4, volley: 5, nova: 0 },
+    charge: { slam: 1.3, sweep: 1.5, beam: 1.25, volley: 2.0, nova: 2.2, seesaw: 1.7 },
+    weights: { slam: 3, sweep: 2, beam: 4, volley: 5, nova: 0, seesaw: 0 },
     volleyCount: 3,
     beams: 2,
     swayAmp: 0.45,
@@ -207,8 +212,8 @@ export const BOSSES: BossDef[] = [
     // to one safe wedge needs more read time than a single dodge. The beam
     // (laser) cooks 0.4s longer than its raw pace too, for a fairer dodge on
     // the fastest titan's tracking shot.
-    charge: { slam: 1.15, sweep: 1.35, beam: 1.6, volley: 1.8, nova: 2.6 },
-    weights: { slam: 3, sweep: 3, beam: 3, volley: 3, nova: 4 },
+    charge: { slam: 1.15, sweep: 1.35, beam: 1.6, volley: 1.8, nova: 2.6, seesaw: 1.7 },
+    weights: { slam: 3, sweep: 3, beam: 3, volley: 3, nova: 4, seesaw: 0 },
     volleyCount: 4,
     beams: 2,
     swayAmp: 0.35,
@@ -239,6 +244,58 @@ export function raidBoss(def: BossDef, stage: number): BossDef {
     health: Math.round(def.health * RAID.healthMult),
     cooldownMin: def.cooldownMin * cd,
     cooldownMax: def.cooldownMax * cd,
+    charge,
+  };
+}
+
+/**
+ * GOOPLIATH — the living tide. Not a machine and not a gauntlet stage: the
+ * gel creature from GOOP at titan scale, his own fight on both boards (the
+ * sealed campaign entry beneath the line-up; the raid lobby's second
+ * breaker). `health` is a HIT COUNT, not damage — his whole body is the
+ * hitbox and every landed ball steps the bar one notch (weakPattern 'body').
+ * The moveset: the horizontal sweep (with the full-turn lash in raids), the
+ * tracking eye beams, GOLIATH's safe-wedge nova — and the SEESAW, his alone:
+ * one half of the platform floods, then the other, and the cascade grows
+ * legs as he drains (GOOPLIATH.seesawStages).
+ */
+export const GOOPLIATH_DEF: BossDef = {
+  name: 'GOOPLIATH',
+  epithet: 'the living tide',
+  accent: 0x36e05a,
+  style: 'goop',
+  scale: GOOPLIATH.scaleCampaign,
+  health: GOOPLIATH.hitsCampaign,
+  zOffset: 0.9,
+  // Deliberately unhurried openers for THE longest fight in the game — the
+  // escalation comes from GOOPLIATH.finalHaste as his health drains, not
+  // from a frantic opening.
+  cooldownMin: 2.3,
+  cooldownMax: 3.3,
+  charge: { slam: 1.6, sweep: 1.7, beam: 1.75, volley: 1.8, nova: 2.6, seesaw: 1.8 },
+  weights: { slam: 0, sweep: 3, beam: 3, volley: 0, nova: 3, seesaw: 5 },
+  volleyCount: 0,
+  beams: 2,
+  swayAmp: 0, // the gel sim carries its own idle motion
+  slamStyle: 'single',
+  slamCount: 1,
+  beamTracks: true,
+  enrageAt: 0.35,
+  weakPattern: 'body',
+};
+
+/** The RAID cut of GOOPLIATH: taller than any raid titan, four fists' worth
+ *  of hits, and slightly snappier telegraphs (same law as raidBoss). */
+export function goopliathBoss(raid: boolean): BossDef {
+  if (!raid) return GOOPLIATH_DEF;
+  const charge = { ...GOOPLIATH_DEF.charge };
+  for (const k of Object.keys(charge) as AttackKind[]) charge[k] *= RAID.chargeMult;
+  return {
+    ...GOOPLIATH_DEF,
+    scale: GOOPLIATH.scaleRaid,
+    health: GOOPLIATH.hitsRaid,
+    cooldownMin: GOOPLIATH_DEF.cooldownMin * 0.85,
+    cooldownMax: GOOPLIATH_DEF.cooldownMax * 0.85,
     charge,
   };
 }
@@ -294,6 +351,7 @@ const STYLE_PAINT: Record<TitanStyle, { chassis: number; trim: number }> = {
   vulture: { chassis: 0x2e3428, trim: 0x171b14 }, // olive plumage steel
   fortress: { chassis: 0x342e40, trim: 0x1b1724 }, // bruised violet plate
   king: { chassis: 0x17181d, trim: 0x0c0d10 }, // near-black royal plate
+  goop: { chassis: 0x14602f, trim: 0x0a2e18 }, // bottle-green gel (never built as a rig)
 };
 
 const GOLD = 0xd9a832;
@@ -477,6 +535,7 @@ export function buildTitan(def: BossDef): TitanRig {
     vulture: [0, 0.14, -1.12],
     fortress: [0, 0.1, -1.05],
     king: [0, 0.06, -0.95],
+    goop: [0, 0.06, -0.95], // never built — the gel creature has real eyes
   };
   const [ax, ay, az] = EYE_ANCHOR[def.style];
   eyeFx.position.set(ax * headR, ay * headR, az * headR);

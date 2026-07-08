@@ -31,6 +31,9 @@ export interface LobbyRoom {
   cap: number;
   /** The lobby's hardcore breaker (raid only), so joiners know the stakes. */
   hardcore: boolean;
+  /** The lobby's FIGHT GOOPLIATH breaker (raid only) — this squad skips the
+   *  titans and takes on the living tide. */
+  goopliath: boolean;
 }
 
 type ListListener = (rooms: LobbyRoom[]) => void;
@@ -83,6 +86,7 @@ export function startLobbyWatch(mode: ArcadeMode, onRooms: ListListener): void {
               count,
               cap: (data.capacity as number | undefined) ?? seats.length ?? 4,
               hardcore: data.hardcore === true,
+              goopliath: data.goopliath === true,
             });
           });
           list.sort((a, b) => a.id.localeCompare(b.id)); // stable rows

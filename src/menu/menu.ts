@@ -32,6 +32,7 @@ import {
   campaignProgress,
   fmtRunTime,
   gauntletUnlocked,
+  goopliathUnlocked,
   stageUnlocked,
 } from '../campaign/campaignState.js';
 import { ATTACH, GAME_TITLE, hueToColor, type ArcadeMode } from '../config.js';
@@ -93,6 +94,8 @@ export type MenuAction =
   | 'campaign-close'
   | 'campaign-speedrun'
   | 'campaign-hardcore'
+  /** The sealed entry beneath the line-up: GOOPLIATH's own fight. */
+  | 'campaign-goopliath'
   | `campaign-${number}`
   /** Open the shared arcade lobby modal for a networked mode (2v2 / ffa / raid). */
   | 'open-raid'
@@ -102,6 +105,8 @@ export type MenuAction =
   | 'lobby-host'
   | 'lobby-vsbots'
   | 'lobby-hardcore'
+  /** RAID host breaker: swap the titan run for the GOOPLIATH fight. */
+  | 'lobby-goopliath'
   | 'lobby-start'
   | 'lobby-leave'
   | `lobby-join-${string}`
@@ -2018,6 +2023,9 @@ const CARD_Y = 96;
 const CARDS_X = (CAMP_W - (CARD_W * 5 + CARD_GAP * 4)) / 2;
 const RUN_BTN = { x: 48, y: 386, w: 320, h: 54 } as const;
 const HARD_BTN = { x: 48, y: 452, w: 320, h: 54 } as const;
+/** The sealed sixth emblem BENEATH the line-up — GOOPLIATH's own fight. */
+const GOOP_BTN = { x: 48, y: 518, w: 320, h: 54 } as const;
+const GOOP_GREEN = '#36e05a';
 const CAMP_CLOSE = { x: CAMP_W - 48 - 170, y: 536, w: 170, h: 54 } as const;
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 
@@ -2151,6 +2159,39 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     hoverAction === 'campaign-hardcore',
   );
 
+  // GOOPLIATH — the something-else beneath the titan line-up. Its emblem is
+  // no machine glyph: the gel creature itself, sealed until the gauntlet is
+  // cleared, FELLED once he's been put down.
+  {
+    const open = goopliathUnlocked();
+    const felled = campaignProgress.goopliathCleared;
+    const hot = hoverAction === 'campaign-goopliath';
+    buttonPlate(
+      ctx, GOOP_BTN.x, GOOP_BTN.y, GOOP_BTN.w, GOOP_BTN.h,
+      open ? 'FIGHT GOOPLIATH' : 'SOMETHING STIRS', open ? GOOP_GREEN : UI.steelDim, hot && open,
+    );
+    // The emblem beside the plate — the sixth symbol, beneath the five.
+    const ix = GOOP_BTN.x + GOOP_BTN.w + 46;
+    const iy = GOOP_BTN.y + GOOP_BTN.h / 2;
+    drawBossIcon(ctx, 5, ix, iy, 24, felled ? UI.emberBright : open ? GOOP_GREEN : UI.steelDim);
+    if (!open) padlock(ctx, ix, iy, 0.6);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 24px system-ui, sans-serif';
+    const tx = ix + 44;
+    const ty = iy + 1;
+    if (felled) {
+      ctx.fillStyle = UI.emberBright;
+      ctx.fillText('FELLED ✓ — fight it again', tx, ty);
+    } else if (open) {
+      ctx.fillStyle = GOOP_GREEN;
+      ctx.fillText('it waits beneath the pit', tx, ty);
+    } else {
+      ctx.fillStyle = UI.steelDim;
+      ctx.fillText('fell all five titans', tx, ty);
+    }
+  }
+
   ctx.textAlign = 'center';
   buttonPlate(ctx, CAMP_CLOSE.x, CAMP_CLOSE.y, CAMP_CLOSE.w, CAMP_CLOSE.h, 'CLOSE', UI.amber, hoverAction === 'campaign-close');
 }
@@ -2163,6 +2204,7 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   if (inBtn(CAMP_CLOSE)) return 'campaign-close';
   if (inBtn(RUN_BTN) && gauntletUnlocked()) return 'campaign-speedrun';
   if (inBtn(HARD_BTN) && campaignProgress.hardcoreUnlocked) return 'campaign-hardcore';
+  if (inBtn(GOOP_BTN) && goopliathUnlocked()) return 'campaign-goopliath';
   if (y >= CARD_Y - 6 && y <= CARD_Y + CARD_H + 6) {
     for (let i = 0; i < 5; i++) {
       const sx = CARDS_X + i * (CARD_W + CARD_GAP);
@@ -2183,7 +2225,10 @@ function hitCampaign(u: number, v: number): MenuAction | null {
 // RANKED's server browser: hosting makes a VISIBLE room others can find.
 
 const RAID_W = 640;
-const RAID_H = 560;
+// Tall enough for TWO host breakers in a raid lobby (hardcore + goopliath)
+// with clear air before the status line — the panel's world height scales
+// with this at registration, so the layout just breathes.
+const RAID_H = 620;
 const RAID_ROW_Y0 = 150;
 const RAID_ROW_H = 58;
 const RAID_ROW_GAP = 10;
@@ -2197,6 +2242,8 @@ const RAID_SLOT_Y0 = 148;
 const RAID_SLOT_H = 52;
 const RAID_SLOT_GAP = 10;
 const RAID_HC_Y = 398;
+/** The second raid breaker: FIGHT GOOPLIATH — swap the titans for the tide. */
+const RAID_GOOP_Y = 444;
 // Status line over the bottom controls. In a joined lobby the FFA host also
 // gets a START button (short-handed launch) tucked left of LEAVE. Sits well
 // clear of the HARDCORE row above (its text + toggle plate) — the two used to
@@ -2282,11 +2329,16 @@ function drawRaid(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null)
     ctx.font = '800 22px system-ui, sans-serif';
     ctx.fillStyle = room.count >= room.cap ? UI.danger : UI.coolBright;
     ctx.fillText(`${room.count}/${room.cap}`, RAID_W - 92, ry + RAID_ROW_H / 2 + 2);
-    if (room.hardcore) {
-      ctx.font = '800 15px system-ui, sans-serif';
-      ctx.fillStyle = UI.danger;
-      ctx.fillText('HARDCORE', RAID_W - 150, ry + RAID_ROW_H / 2 + 2);
-    }
+    // Stakes tags: one sits on the midline; both stack into two short lines.
+    const tags: Array<[string, string]> = [];
+    if (room.goopliath) tags.push(['GOOPLIATH', GOOP_GREEN]);
+    if (room.hardcore) tags.push(['HARDCORE', UI.danger]);
+    ctx.font = '800 15px system-ui, sans-serif';
+    tags.forEach(([tag, colour], t) => {
+      ctx.fillStyle = colour;
+      const ty = tags.length > 1 ? ry + RAID_ROW_H / 2 - 8 + t * 20 : ry + RAID_ROW_H / 2 + 2;
+      ctx.fillText(tag, RAID_W - 150, ty);
+    });
     ctx.textAlign = 'center';
   });
 
@@ -2333,25 +2385,31 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     ctx.textAlign = 'center';
   }
 
-  // The HARDCORE breaker (raid only) — the host throws it; all see where it sits.
+  // The host breakers (raid only) — the host throws them; all see where they
+  // sit. HARDCORE keeps the stakes; FIGHT GOOPLIATH swaps the whole run for
+  // one long fight against the tide.
   if (mode === 'raid') {
-    ctx.textAlign = 'left';
-    ctx.font = '700 21px system-ui, sans-serif';
-    ctx.fillStyle = hoverAction === 'lobby-hardcore' && host ? UI.danger : UI.textDim;
-    ctx.fillText('hardcore — no healing between titans', 92, RAID_HC_Y + 23);
-    const pw = 96;
-    const ph = 34;
-    const px = RAID_W - 92 - pw;
-    plate(ctx, px, RAID_HC_Y, pw, ph, {
-      cut: 10,
-      fill: mesh.raidHardcore ? 'rgba(232,53,42,0.25)' : 'rgba(150,150,170,0.12)',
-      stroke: mesh.raidHardcore ? UI.danger : host && hoverAction === 'lobby-hardcore' ? UI.danger : UI.steelDim,
-      rivets: false,
-    });
-    ctx.fillStyle = mesh.raidHardcore ? UI.danger : UI.steelDim;
-    const kw = pw / 2 - 10;
-    ctx.fillRect(mesh.raidHardcore ? px + pw - kw - 6 : px + 6, RAID_HC_Y + 6, kw, ph - 12);
-    ctx.textAlign = 'center';
+    const breaker = (y: number, label: string, on: boolean, action: MenuAction, accent: string): void => {
+      ctx.textAlign = 'left';
+      ctx.font = '700 21px system-ui, sans-serif';
+      ctx.fillStyle = hoverAction === action && host ? accent : UI.textDim;
+      ctx.fillText(label, 92, y + 23);
+      const pw = 96;
+      const ph = 34;
+      const px = RAID_W - 92 - pw;
+      plate(ctx, px, y, pw, ph, {
+        cut: 10,
+        fill: on ? hexToRgba(accent, 0.25) : 'rgba(150,150,170,0.12)',
+        stroke: on ? accent : host && hoverAction === action ? accent : UI.steelDim,
+        rivets: false,
+      });
+      ctx.fillStyle = on ? accent : UI.steelDim;
+      const kw = pw / 2 - 10;
+      ctx.fillRect(on ? px + pw - kw - 6 : px + 6, y + 6, kw, ph - 12);
+      ctx.textAlign = 'center';
+    };
+    breaker(RAID_HC_Y, 'hardcore — no healing between titans', mesh.raidHardcore, 'lobby-hardcore', UI.danger);
+    breaker(RAID_GOOP_Y, 'fight goopliath — the tide, not the titans', mesh.raidGoopliath, 'lobby-goopliath', GOOP_GREEN);
   }
 
   // Launch status. 2v2 + raid auto-launch when full; FFA can go short-handed.
@@ -2387,6 +2445,7 @@ function hitRaid(u: number, v: number): MenuAction | null {
 
   if (app.lobbyView === 'lobby') {
     if (mode === 'raid' && mesh.isHost() && y >= RAID_HC_Y - 4 && y <= RAID_HC_Y + 40 && x >= 70 && x <= RAID_W - 70) return 'lobby-hardcore';
+    if (mode === 'raid' && mesh.isHost() && y >= RAID_GOOP_Y - 4 && y <= RAID_GOOP_Y + 40 && x >= 70 && x <= RAID_W - 70) return 'lobby-goopliath';
     const count = mesh.occupants.filter(Boolean).length;
     if (mode === 'ffa' && mesh.isHost() && count >= 2 && count < (mesh.capacity || 4)) {
       if (inBtn(LOBBY_START_BTN)) return 'lobby-start';
@@ -2445,6 +2504,12 @@ interface PanRect {
   y: number;
   w: number;
   h: number;
+}
+
+/** A CSS hex colour ('#rrggbb') at the given alpha — breaker fill washes. */
+function hexToRgba(css: string, a: number): string {
+  const n = parseInt(css.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 function hexCss(color: number): string {

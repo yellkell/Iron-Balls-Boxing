@@ -125,6 +125,34 @@ const NOVA_FRAG = /* glsl */ `
   }
 `;
 
+/**
+ * Half-platform flood (GOOPLIATH's seesaw): one side of the deck fills with
+ * warning while a hard rail burns along the centreline — the honest border —
+ * and chevrons march toward the SAFE half: jump. uDir is the local-x
+ * direction of escape (−side), so the arrows always point off the doomed half.
+ */
+const HALF_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    vec3 col = warnColor();
+    float a = 0.0;
+    // The flood: the whole half fills as the wave charges. Alpha rides the
+    // FILL hard (a seesaw stacks several of these panes per side, each on its
+    // own clock) so the stage landing NEXT is always the bright one and the
+    // far-future stages stay faint.
+    a += 0.03 + 0.55 * uFill * uFill;
+    // The centreline rail — the honest border you must be across. The mesh is
+    // authored with u = 0 on the centreline, u = 1 at the outer rim.
+    a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.15 + 0.85 * uFill);
+    // Bands marching toward the centreline — CROSS HERE, the other half lives.
+    float lane = fract(vUv.x * 5.0 + uTime * 2.4);
+    float band = step(0.72, lane) * step(abs(fract(vUv.y * 3.0) - 0.5), 0.32);
+    a += band * 0.3 * uFill;
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
 /** Blade: a horizontal slice hanging in the air — bright core line, soft body. */
 const BLADE_FRAG = /* glsl */ `
   ${COMMON}
@@ -186,6 +214,25 @@ export function novaTelegraph(radius: number, angle: number, halfAngle: number):
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);
+}
+
+/**
+ * GOOPLIATH's seesaw: ONE HALF of the platform floods with warning — the
+ * centreline burns as a hard rail and bands march toward it: get across.
+ * `side` is the doomed half's local-x sign; `halfWidth`/`depth` span the
+ * platform. Place the group at the platform centre on the floor (the side
+ * flip is baked in here — no extra rotation needed beyond the seat yaw).
+ */
+export function halfTelegraph(side: -1 | 1, halfWidth: number, depth: number): Telegraph {
+  const mat = warnMat(HALF_FRAG);
+  const pane = new Mesh(new PlaneGeometry(halfWidth, depth), mat);
+  pane.rotation.x = -Math.PI / 2;
+  // Authored for the +x half (u = 0 at the centreline); the −x half is the
+  // same pane mirrored in place. The flip lives on the MESH — the group's
+  // rotation stays free for the caller's seat yaw.
+  pane.position.x = (side * halfWidth) / 2;
+  pane.scale.x = side;
+  return makeTelegraph([pane], [mat]);
 }
 
 /** A slam / mortar footprint. Place the group at the zone centre, y≈floor. */

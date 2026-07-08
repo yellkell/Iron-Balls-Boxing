@@ -103,7 +103,7 @@ export type PeerMessage =
    */
   | {
       k: 'ratk';
-      kind: 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'decree';
+      kind: 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'decree' | 'seesaw';
       seats: number[];
       x?: number[];
       z?: number[];

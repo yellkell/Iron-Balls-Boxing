@@ -557,6 +557,9 @@ export class MenuSystem extends createSystem({}) {
       case 'lobby-hardcore':
         if (mesh.isHost()) mesh.setRaidHardcore(!mesh.raidHardcore);
         break;
+      case 'lobby-goopliath':
+        if (mesh.isHost()) mesh.setRaidGoopliath(!mesh.raidGoopliath);
+        break;
       case 'lobby-start':
         // FFA host launching short-handed — flip the room's started flag; the
         // lifecycle block above carries everyone (host + guests) into the bout.
@@ -572,6 +575,15 @@ export class MenuSystem extends createSystem({}) {
         // line-up's hitTest already gates sealed runs, so just launch.
         app.mode = 'campaign';
         app.campaignMode = action === 'campaign-hardcore' ? 'hardcore' : 'gauntlet';
+        app.campaignStage = 0;
+        app.arcade = '1v1';
+        app.state = 'playing';
+        break;
+      case 'campaign-goopliath':
+        // The sealed entry beneath the line-up: GOOPLIATH's own single, very
+        // long fight. hitTest gates it until the gauntlet is cleared.
+        app.mode = 'campaign';
+        app.campaignMode = 'goopliath';
         app.campaignStage = 0;
         app.arcade = '1v1';
         app.state = 'playing';
@@ -1146,6 +1158,7 @@ export class MenuSystem extends createSystem({}) {
       app.mode = 'campaign';
       app.campaignMode = 'raid';
       app.raidHardcore = mesh.raidHardcore;
+      app.raidGoopliath = mesh.raidGoopliath;
       app.campaignStage = 0;
     } else {
       // A live mesh brawl: seat 0 is match authority. MeshSystem's net rising

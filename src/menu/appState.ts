@@ -131,9 +131,11 @@ export const app: {
   /**
    * How the campaign is being played: one titan ('single'), the timed
    * back-to-back GAUNTLET RUN (health refills between titans), HARDCORE
-   * (same run, no healing), or the four-player RAID (always a full run).
+   * (same run, no healing), the four-player RAID (always a full run), or
+   * GOOPLIATH — the gel boss's own single long fight (sealed until the
+   * gauntlet is cleared; raids swap to him via raidGoopliath instead).
    */
-  campaignMode: 'single' | 'gauntlet' | 'hardcore' | 'raid';
+  campaignMode: 'single' | 'gauntlet' | 'hardcore' | 'raid' | 'goopliath';
   /**
    * Which arcade LOBBY modal is open over the lobby, or null when none. One
    * shared browser/seats/voice modal now serves every networked arcade mode:
@@ -144,9 +146,12 @@ export const app: {
   /** Which face the lobby modal shows: the room browser, or a joined squad. */
   lobbyView: 'browser' | 'lobby';
   /** Open rooms for the browser (live from lobbyWatch, for `lobbyMode`). */
-  lobbyRooms: { id: string; host: string; count: number; cap: number; hardcore: boolean }[];
+  lobbyRooms: { id: string; host: string; count: number; cap: number; hardcore: boolean; goopliath: boolean }[];
   /** The launched raid runs hardcore (host's lobby toggle, stamped at start). */
   raidHardcore: boolean;
+  /** The launched raid is the GOOPLIATH fight instead of the titan run
+   *  (host's lobby breaker, stamped at start — same law as raidHardcore). */
+  raidGoopliath: boolean;
   /** Which backdrop the arena renders — held across every mode. */
   environment: AppEnvironment;
   /** Player's chosen avatar-accent hue (0..1 around the colour wheel). */
@@ -202,6 +207,7 @@ export const app: {
   lobbyView: 'browser',
   lobbyRooms: [],
   raidHardcore: false,
+  raidGoopliath: false,
   environment: ((): AppEnvironment => {
     const e = localStorage.getItem('ff-env');
     // First-ever launch (nothing stored) opens in the desert arena; after that

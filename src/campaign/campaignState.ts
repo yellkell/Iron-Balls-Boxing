@@ -49,6 +49,10 @@ export interface CampaignProgress {
   hardcoreUnlocked: boolean;
   /** True once a RAID has been fully beaten (GOLIATH's second life included). */
   raidCleared: boolean;
+  /** True once GOOPLIATH has been felled solo (the campaign's sealed entry). */
+  goopliathCleared: boolean;
+  /** True once a GOOPLIATH raid (the lobby breaker) has been beaten. */
+  raidGoopliathCleared: boolean;
 }
 
 const KEY = 'ff-campaign';
@@ -60,6 +64,8 @@ function fresh(): CampaignProgress {
     runTimesHardcore: [],
     hardcoreUnlocked: false,
     raidCleared: false,
+    goopliathCleared: false,
+    raidGoopliathCleared: false,
   };
 }
 
@@ -97,6 +103,12 @@ export function stageUnlocked(stage: number): boolean {
 /** The gauntlet run opens once every titan has been felled at least once. */
 export function gauntletUnlocked(): boolean {
   return campaignProgress.cleared.every((c) => c === true);
+}
+
+/** GOOPLIATH's campaign entry unseals with the gauntlet: fell all five
+ *  titans and something worse stirs beneath the line-up. */
+export function goopliathUnlocked(): boolean {
+  return gauntletUnlocked();
 }
 
 /**
