@@ -29,7 +29,7 @@ const battleUrls = Object.values(
 // louder 0.42 "to carry over the titan SFX", which just made the battle
 // scores wildly uneven: the fight's SFX are the foreground, the music is
 // the floor, everywhere.
-const BATTLE_VOLUME = 0.2;
+const BATTLE_VOLUME = 0.12;
 export const BOSS_BATTLE_VOLUME = BATTLE_VOLUME;
 const VICTORY_VOLUME = 0.26;
 

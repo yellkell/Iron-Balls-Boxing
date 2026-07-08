@@ -11,7 +11,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { CanvasTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
+import { AdditiveBlending, CanvasTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
 import { localLayout } from '../combat/layout.js';
 import { match } from '../combat/matchState.js';
 import { app } from '../menu/appState.js';
@@ -28,12 +28,26 @@ const BEAT_STYLE: Record<string, { fill: string; glow: string }> = {
   FIGHT: { fill: '#ff3b1e', glow: 'rgba(255,60,20,0.95)' },
 };
 
+/** The aura tint behind each beat — the HUD plates' reads: 3 and 2 arc-light
+ *  blue, 1 hot amber, FIGHT danger red. */
+const BEAT_ACCENT: Record<string, number> = {
+  '3': 0x9fd4ff,
+  '2': 0x9fd4ff,
+  '1': 0xffb62e,
+  FIGHT: 0xff3b1e,
+};
+
+function easeOutCubic(x: number): number {
+  return 1 - Math.pow(1 - x, 3);
+}
+
 export class CountdownSystem extends createSystem({}) {
   private board!: Mesh;
+  private glow!: Mesh;
   private canvas!: HTMLCanvasElement;
   private texture!: CanvasTexture;
   private shown = ''; // the message currently drawn on the canvas
-  private pop = 0; // 1 → 0 settle animation after each new figure
+  private beatStart = 0; // performance.now() when the current figure landed
 
   init(): void {
     this.canvas = document.createElement('canvas');
@@ -48,9 +62,37 @@ export class CountdownSystem extends createSystem({}) {
     );
     this.board.visible = false;
     this.scene.add(this.board);
+
+    // The accent aura behind the plate — the HUD verdict's soft radial glow,
+    // rebuilt at arena size. A child of the board, so the slam-in spring
+    // carries it; its own scale adds the impact swell on top.
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = 128;
+    const g = glowCanvas.getContext('2d')!;
+    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+    grad.addColorStop(0.45, 'rgba(255,255,255,0.32)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    const glowTex = new CanvasTexture(glowCanvas);
+    glowTex.minFilter = LinearFilter;
+    this.glow = new Mesh(
+      new PlaneGeometry(3.6, 2.1),
+      new MeshBasicMaterial({
+        map: glowTex,
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        opacity: 0,
+      }),
+    );
+    this.glow.position.z = -0.03;
+    this.glow.renderOrder = -1;
+    this.board.add(this.glow);
   }
 
-  update(delta: number): void {
+  update(): void {
     const msg = match.message;
     const style = BEAT_STYLE[msg];
     const active = app.state === 'playing' && !!style;
@@ -68,14 +110,13 @@ export class CountdownSystem extends createSystem({}) {
     if (key !== this.shown) {
       const newBeat = !this.shown.startsWith(`${msg}|`);
       this.shown = key;
-      if (newBeat) this.pop = 1; // pop on a new figure, not on the art swap-in
+      if (newBeat) this.beatStart = performance.now(); // slam on a new figure, not the art swap-in
       this.draw(msg, art, style.fill, style.glow);
     }
-    this.pop = Math.max(0, this.pop - delta * 4);
 
     // Hang over the centre of the bout: the mean of every platform in MY
     // frame (1v1 → mid-gap, FFA → the cross centre, 2v2 → between the lines),
-    // turned upright to face me. The pop eases each figure in oversized.
+    // turned upright to face me.
     const roster = localLayout();
     let cx = 0;
     let cz = 0;
@@ -85,11 +126,26 @@ export class CountdownSystem extends createSystem({}) {
     }
     cx /= roster.length;
     cz /= roster.length;
-    this.board.position.set(cx, 1.75, cz);
+
+    // The HUD verdict's animation, at arena scale: each figure SLAMS in with
+    // a quick overshoot that springs to rest, then breathes; the aura flashes
+    // bright on arrival and decays into a steady pulse in the beat's colour.
+    const now = performance.now();
+    const t = (now - this.beatStart) / 1000;
+    const spring = 1 + 0.6 * Math.exp(-t * 8) * Math.cos(t * 17);
+    const breathe = 1 + 0.02 * Math.sin(now * 0.0042);
+    this.board.position.set(cx, 1.75 + 0.012 * Math.sin(now * 0.0032), cz);
     this.board.rotation.set(0, Math.atan2(-cx, -cz), 0); // +z normal turned to face the origin (me)
-    const ease = this.pop * this.pop;
-    this.board.scale.setScalar(1 + ease * 0.35);
-    (this.board.material as MeshBasicMaterial).opacity = 1 - ease * 0.55;
+    this.board.scale.setScalar(Math.max(0.25, spring * breathe));
+    (this.board.material as MeshBasicMaterial).opacity = 1;
+
+    const glowMat = this.glow.material as MeshBasicMaterial;
+    glowMat.color.setHex(BEAT_ACCENT[msg] ?? 0xffffff);
+    const intro = easeOutCubic(Math.min(1, t / 0.25));
+    const flash = 0.55 * Math.exp(-t * 5);
+    const pulse = 0.26 + 0.12 * Math.sin(now * 0.005);
+    glowMat.opacity = Math.min(0.95, intro * pulse + flash);
+    this.glow.scale.setScalar(1 + 0.18 * Math.exp(-t * 6) + 0.05 * Math.sin(now * 0.005));
   }
 
   private draw(text: string, art: HTMLImageElement | null, fill: string, glow: string): void {

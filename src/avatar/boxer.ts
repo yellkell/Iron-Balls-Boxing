@@ -704,9 +704,8 @@ function buildBearChest(accent: number): Group {
   const g = taggedHead('cobalt');
   // A REAL neck: tall dark column rising well clear of the yoke to meet the
   // head, so the skull doesn't sit swallowed in the shoulders.
-  const neck = new Mesh(new CylinderGeometry(0.075, 0.105, 0.22, 10), darkMat());
-  neck.position.y = 0.25;
-  g.add(neck);
+  // (No neck post: its flat cylinder cap peeked out behind the head from
+  // above/behind and read as a chopped cone — the open join looks cleaner.)
 
   // The torso core: a vertical loft, shoulders → waist. The first ring tilts
   // back-up into the shoulder HUMP; the barrel is deepest at the pecs and
@@ -793,9 +792,8 @@ function buildPantherChest(accent: number): Group {
   const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
   collar.position.y = 0.11;
   g.add(collar);
-  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.2, 8), darkMat());
-  neck.position.y = 0.22;
-  g.add(neck);
+  // (No neck post: its flat cylinder cap peeked out behind the head from
+  // above/behind and read as a chopped cone — the open join looks cleaner.)
   for (const side of [-1, 1]) {
     const pad = new Mesh(new BoxGeometry(0.19, 0.07, 0.26), chassisMat(accent, 0.05));
     pad.position.set(side * 0.27, 0.12, 0);
@@ -852,9 +850,8 @@ function buildEagleChest(accent: number): Group {
   const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
   collar.position.y = 0.11;
   g.add(collar);
-  const neck = new Mesh(new CylinderGeometry(0.06, 0.08, 0.26, 8), darkMat());
-  neck.position.y = 0.27;
-  g.add(neck);
+  // (No neck post: its flat cylinder cap peeked out behind the head from
+  // above/behind and read as a chopped cone — the open join looks cleaner.)
   const crest = new Mesh(new BoxGeometry(0.05, 0.07, 0.04), glowMat(accent, 1.2));
   crest.position.set(0, 0.2, -0.06);
   crest.rotation.z = Math.PI / 4;
@@ -1039,9 +1036,8 @@ function buildKnightChest(accent: number): Group {
   const gorget = new Mesh(new CylinderGeometry(0.12, 0.16, 0.17, 16), chassisMat(accent, 0.05));
   gorget.position.y = 0.12;
   g.add(gorget);
-  const neck = new Mesh(new CylinderGeometry(0.07, 0.085, 0.08, 8), darkMat());
-  neck.position.y = 0.2;
-  g.add(neck);
+  // (No neck post: its flat cylinder cap peeked out behind the head from
+  // above/behind and read as a chopped cone — the open join looks cleaner.)
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const stud = new Mesh(new SphereGeometry(0.011, 6, 5), chassisMat(accent, 0.07));
@@ -1397,9 +1393,8 @@ function buildStallionChest(accent: number): Group {
   const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
   collar.position.y = 0.11;
   g.add(collar);
-  const neck = new Mesh(new CylinderGeometry(0.065, 0.085, 0.1, 8), darkMat());
-  neck.position.y = 0.17;
-  g.add(neck);
+  // (No neck post: its flat cylinder cap peeked out behind the head from
+  // above/behind and read as a chopped cone — the open join looks cleaner.)
 
   // Sleek swept shoulder plates with a glow lip.
   for (const side of [-1, 1]) {

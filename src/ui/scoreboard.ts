@@ -446,8 +446,18 @@ export function createScoreboard(scene: Scene): Scoreboard {
       // and a knockout loss (KO'D) is suppressed the same way: only the winner
       // ever sees a verdict plate (WIN, or the dramatic KNOCKOUT). The KO'D token
       // still rides the wire so a guest who lands the KO flips it back to KO.
-      const verdict =
-        state.message === 'LOSS' || state.message === 'YOU LOSE' || state.message === "KO'D" ? '' : state.message;
+      // The 3-2-1-FIGHT ritual is NOT a HUD verdict any more: it plays out
+      // in-world between the platforms (CountdownSystem, with this same
+      // slam + glow) — showing it in both places read as clutter.
+      const suppressed =
+        state.message === 'LOSS' ||
+        state.message === 'YOU LOSE' ||
+        state.message === "KO'D" ||
+        state.message === '3' ||
+        state.message === '2' ||
+        state.message === '1' ||
+        state.message === 'FIGHT';
+      const verdict = suppressed ? '' : state.message;
       drawCentre(verdict, '');
       animateVerdict(verdict);
     },
