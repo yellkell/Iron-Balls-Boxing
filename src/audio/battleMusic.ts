@@ -24,11 +24,13 @@ const battleUrls = Object.values(
   >,
 );
 
-const BATTLE_VOLUME = 0.18; // quiet background, well under the lobby music (0.5)
-// Titan bouts run over a wall of SFX (klaxons, roars, slams, beams) — the
-// quiet 0.18 background vanishes under it, so boss fights get a louder score
-// that actually reads as MUSIC through the fight.
-export const BOSS_BATTLE_VOLUME = 0.42;
+// ONE battle level for every score — duels, boss fights, the finale anthem —
+// sitting clearly under the lobby music (0.5). Boss bouts used to run a far
+// louder 0.42 "to carry over the titan SFX", which just made the battle
+// scores wildly uneven: the fight's SFX are the foreground, the music is
+// the floor, everywhere.
+const BATTLE_VOLUME = 0.2;
+export const BOSS_BATTLE_VOLUME = BATTLE_VOLUME;
 const VICTORY_VOLUME = 0.26;
 
 // Post-match handoff timings.

@@ -335,23 +335,36 @@ export function ignite(): void {
   tone({ freq: 70, to: 46, type: 'sine', dur: 0.22, gain: 0.16 }); // sub thump
 }
 
-/** A punched ball leaving the fist — piston release into a hard whoosh. */
+/**
+ * A punched ball leaving the fist. Throw and recall are designed as
+ * OPPOSITES so they never blur mid-fight: the throw is percussive and
+ * FALLING — a hard crack off the knuckles, departing air dropping away in
+ * pitch, a launch kick in the chest. (The recall is its tonal, RISING
+ * mirror below.)
+ */
 export function throwWhoosh(): void {
-  clank(620, 0.06, 0.09); // piston knock
-  whooshNoise(0.42, 0.28, 280, 1600);
-  tone({ freq: 210, to: 70, type: 'triangle', dur: 0.18, gain: 0.18 });
+  noiseHit(0.045, 0.3, 5200, 1600, 0.8); // the crack off the knuckles
+  whooshNoise(0.34, 0.26, 1500, 240); // departing air — pitch falls away
+  tone({ freq: 300, to: 62, type: 'sawtooth', dur: 0.16, gain: 0.09 }); // hot tail dropping
+  tone({ freq: 96, to: 40, type: 'sine', dur: 0.16, gain: 0.22 }); // launch kick
 }
 
-/** Recall pulled — a winch servo spools the ball back in. */
+/** Recall pulled — the throw's mirror: a tonal, RISING pull. Two detuned
+ *  partials sweep UP like an approaching doppler over air rushing back IN,
+ *  with the winch servo spooling underneath. No crack, no kick — magnetic,
+ *  not percussive. */
 export function recall(): void {
-  servo(150, 520, 0.35, 0.09);
-  whooshNoise(0.32, 0.16, 1200, 300);
-  clank(880, 0.04, 0.06, 0.05);
+  tone({ freq: 220, to: 980, type: 'sine', dur: 0.3, gain: 0.13 }); // the pull — rising
+  tone({ freq: 331, to: 1470, type: 'sine', dur: 0.3, gain: 0.06, delay: 0.02 }); // shimmer above
+  whooshNoise(0.36, 0.13, 260, 1900); // air rushing IN — the throw reversed
+  servo(180, 700, 0.24, 0.06);
 }
 
-/** The ball clamps back into the gauntlet. */
+/** The ball clamps back into the gauntlet — ARRIVAL, not another whoosh:
+ *  a bright latch over a leather slap and a damped thud. Full stop. */
 export function catchBall(): void {
   clank(430, 0.15, 0.14);
+  noiseHit(0.05, 0.14, 3400, 900, 0.7); // glove slap under the latch
   tone({ freq: 140, to: 88, type: 'triangle', dur: 0.08, gain: 0.18 });
 }
 
