@@ -13,7 +13,7 @@
  */
 
 import { Vector3 } from 'three';
-import { ARENA_GAP, CAMPAIGN } from '../config.js';
+import { ARENA_GAP, CAMPAIGN, type Difficulty } from '../config.js';
 import type { PeerMessage } from '../net/protocol.js';
 
 export const campaign = {
@@ -53,6 +53,10 @@ export interface CampaignProgress {
   goopliathCleared: boolean;
   /** True once a GOOPLIATH raid (the lobby breaker) has been beaten. */
   raidGoopliathCleared: boolean;
+  /** HARD difficulty unlocks by clearing any run on Normal-or-higher. */
+  hardUnlocked: boolean;
+  /** BLAZING unlocks by clearing any run on Hard-or-higher. */
+  blazingUnlocked: boolean;
 }
 
 const KEY = 'ff-campaign';
@@ -66,6 +70,8 @@ function fresh(): CampaignProgress {
     raidCleared: false,
     goopliathCleared: false,
     raidGoopliathCleared: false,
+    hardUnlocked: false,
+    blazingUnlocked: false,
   };
 }
 
@@ -109,6 +115,30 @@ export function gauntletUnlocked(): boolean {
  *  titans and something worse stirs beneath the line-up. */
 export function goopliathUnlocked(): boolean {
   return gauntletUnlocked();
+}
+
+/** Whether a difficulty tier can be picked. Easy and Normal are always open;
+ *  Hard needs a Normal-or-higher run cleared, Blazing needs a Hard one. */
+export function difficultyUnlocked(diff: Difficulty): boolean {
+  if (diff === 'easy' || diff === 'normal') return true;
+  if (diff === 'hard') return campaignProgress.hardUnlocked;
+  return campaignProgress.blazingUnlocked;
+}
+
+/** Bank a run/raid clear: clearing on Normal opens Hard, clearing on Hard
+ *  opens Blazing. Returns the tier newly unlocked (for a card), or null. */
+export function bankDifficultyClear(diff: Difficulty): Difficulty | null {
+  if (diff === 'normal' && !campaignProgress.hardUnlocked) {
+    campaignProgress.hardUnlocked = true;
+    saveCampaignProgress();
+    return 'hard';
+  }
+  if (diff === 'hard' && !campaignProgress.blazingUnlocked) {
+    campaignProgress.blazingUnlocked = true;
+    saveCampaignProgress();
+    return 'blazing';
+  }
+  return null;
 }
 
 /**

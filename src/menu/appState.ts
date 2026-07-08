@@ -17,7 +17,20 @@ export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
  *  pose bus, no bot, no net) and GameStateSystem stands down. */
 export type AppMode = 'bot' | 'net' | 'campaign';
 export type { ArcadeMode } from '../config.js';
-import type { ArcadeMode } from '../config.js';
+import type { ArcadeMode, Difficulty } from '../config.js';
+import { DIFFICULTY_ORDER } from '../config.js';
+
+/** The player's last-picked run difficulty, remembered across sessions and
+ *  clamped to a valid tier on load. */
+function loadDifficulty(): Difficulty {
+  try {
+    const v = localStorage.getItem('ff-difficulty');
+    if (v && (DIFFICULTY_ORDER as string[]).includes(v)) return v as Difficulty;
+  } catch {
+    /* private mode — default */
+  }
+  return 'normal';
+}
 /** The arena backdrop: bare AR passthrough, the papercraft desert, the salt
  *  flats, or the (shelved) factory. */
 export type AppEnvironment = 'ar' | 'desert' | 'saltflats' | 'factory';
@@ -152,6 +165,10 @@ export const app: {
   /** The launched raid is the GOOPLIATH fight instead of the titan run
    *  (host's lobby breaker, stamped at start — same law as raidHardcore). */
   raidGoopliath: boolean;
+  /** Difficulty for the current RUN (gauntlet/hardcore/raid). Single stages
+   *  and the solo GOOPLIATH fight ignore it (always Normal). Persisted; a
+   *  raid stamps the host's pick here at launch. */
+  difficulty: Difficulty;
   /** Which backdrop the arena renders — held across every mode. */
   environment: AppEnvironment;
   /** Player's chosen avatar-accent hue (0..1 around the colour wheel). */
@@ -208,6 +225,7 @@ export const app: {
   lobbyRooms: [],
   raidHardcore: false,
   raidGoopliath: false,
+  difficulty: loadDifficulty(),
   environment: ((): AppEnvironment => {
     const e = localStorage.getItem('ff-env');
     // First-ever launch (nothing stored) opens in the desert arena; after that
@@ -250,6 +268,14 @@ export function saveOnlyBots(): void {
 export function saveShootBack(): void {
   try {
     localStorage.setItem('ff-shootback', app.shootBack ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function saveDifficulty(): void {
+  try {
+    localStorage.setItem('ff-difficulty', app.difficulty);
   } catch {
     /* ignore */
   }

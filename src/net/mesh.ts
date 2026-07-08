@@ -12,7 +12,7 @@
  * peers. It never runs for the duel or bot bouts.
  */
 
-import type { ArcadeMode } from '../config.js';
+import type { ArcadeMode, Difficulty } from '../config.js';
 import type { PeerMessage } from './protocol.js';
 
 export interface MeshInbox {
@@ -25,6 +25,7 @@ interface MeshImplApi {
   joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean>;
   setRaidHardcore(v: boolean): void;
   setRaidGoopliath(v: boolean): void;
+  setRaidDifficulty(v: Difficulty): void;
   startLobby(): void;
   send(msg: PeerMessage): void;
   dropSeat(seat: number): void;
@@ -62,6 +63,8 @@ class Mesh {
   raidHardcore = false;
   /** RAID: this lobby fights GOOPLIATH instead of running the titans. */
   raidGoopliath = false;
+  /** RAID: the difficulty the host has set for the run (mirrored to all). */
+  raidDifficulty: Difficulty = 'normal';
   started = false;
   /** Status sink for the lobby panel. */
   onStatus: (s: string) => void = () => {};
@@ -117,6 +120,11 @@ class Mesh {
     this.impl?.setRaidGoopliath(v);
   }
 
+  /** RAID host: set the run difficulty (mirrored to everyone). */
+  setRaidDifficulty(v: Difficulty): void {
+    this.impl?.setRaidDifficulty(v);
+  }
+
   /** Host: lock the lobby and launch — every member sees `started` flip. */
   startLobby(): void {
     this.impl?.startLobby();
@@ -144,6 +152,7 @@ class Mesh {
     this.locked = false;
     this.raidHardcore = false;
     this.raidGoopliath = false;
+    this.raidDifficulty = 'normal';
     this.started = false;
     this.inbox.length = 0;
     this.mySeat = 0;

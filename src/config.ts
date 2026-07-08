@@ -492,6 +492,39 @@ export const GOOPLIATH = {
   punchMax: 3.6,
 };
 
+/**
+ * DIFFICULTY — the four tiers the RUN modes (gauntlet, hardcore, raid, raid
+ * hardcore) are played at. Single campaign stages and the solo GOOPLIATH
+ * fight always run NORMAL. Normal is the default; EASY is always open; HARD
+ * unlocks by clearing a run on Normal-or-higher, BLAZING by clearing one on
+ * Hard-or-higher.
+ *
+ *  - health   : boss HP / hit-count multiplier.
+ *  - charge   : telegraph windup multiplier (>1 = slower, easier to read).
+ *  - cooldown : gap-between-attacks multiplier (>1 = slower).
+ *  - stun     : landed hits stagger the boss (EASY only — see BOSS_STUN).
+ *  - elite    : every boss can also use the nova, the seesaw and the surge —
+ *               the fanciest attacks spread to the whole roster (HARD+).
+ */
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'blazing';
+
+export const DIFFICULTY: Record<
+  Difficulty,
+  { label: string; blurb: string; accent: number; health: number; charge: number; cooldown: number; stun: boolean; elite: boolean }
+> = {
+  easy: { label: 'EASY', blurb: 'slow attacks · frail · stuns', accent: 0x6fd66f, health: 0.6, charge: 1.3, cooldown: 1.5, stun: true, elite: false },
+  normal: { label: 'NORMAL', blurb: 'the standard fight', accent: 0xffb000, health: 1.0, charge: 1.0, cooldown: 1.0, stun: false, elite: false },
+  hard: { label: 'HARD', blurb: 'new attacks & mechanics', accent: 0xff7a18, health: 1.0, charge: 1.0, cooldown: 1.0, stun: false, elite: true },
+  blazing: { label: 'BLAZING', blurb: 'hard · tanky · relentless', accent: 0xff3b6e, health: 1.6, charge: 0.85, cooldown: 0.6, stun: false, elite: true },
+};
+
+/** Selector order + the unlock chain (easy/normal always open). */
+export const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'normal', 'hard', 'blazing'];
+
+/** EASY only: land this many hits inside the decay window and the boss REELS
+ *  — its attacks stop for `duration` s while it shakes the stagger off. */
+export const BOSS_STUN = { hits: 5, decayPerSec: 1.2, duration: 2.6 };
+
 /** Match format: best-of rounds, Blaston-style pacing. */
 export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round

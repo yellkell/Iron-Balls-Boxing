@@ -25,7 +25,9 @@ import {
   Vector3,
   type Intersection,
 } from 'three';
-import { app, DEFAULT_ACCENT_HUE, DEFAULT_ACCENT_LIGHT, saveAccentHue, saveAccentLight, saveEnvironment, saveOnlyBots, saveShootBack, type AppState, type ArcadeMode } from '../menu/appState.js';
+import { app, DEFAULT_ACCENT_HUE, DEFAULT_ACCENT_LIGHT, saveAccentHue, saveAccentLight, saveDifficulty, saveEnvironment, saveOnlyBots, saveShootBack, type AppState, type ArcadeMode } from '../menu/appState.js';
+import { DIFFICULTY_ORDER, type Difficulty } from '../config.js';
+import { difficultyUnlocked } from '../campaign/campaignState.js';
 import {
   accentBarHue,
   accentBarLight,
@@ -832,6 +834,22 @@ export class MenuSystem extends createSystem({}) {
         saveAccentLight();
         break;
       default:
+        // diff-<tier>: the campaign difficulty picker sets the run difficulty
+        // (persisted). raiddiff-<tier>: the raid host mirrors it to the squad.
+        // hitTest only returns unlocked tiers, so no re-check is needed.
+        if (action.startsWith('raiddiff-')) {
+          const tier = action.slice('raiddiff-'.length) as Difficulty;
+          if (mesh.isHost() && (DIFFICULTY_ORDER as string[]).includes(tier)) mesh.setRaidDifficulty(tier);
+          break;
+        }
+        if (action.startsWith('diff-')) {
+          const tier = action.slice('diff-'.length) as Difficulty;
+          if ((DIFFICULTY_ORDER as string[]).includes(tier) && difficultyUnlocked(tier)) {
+            app.difficulty = tier;
+            saveDifficulty();
+          }
+          break;
+        }
         // campaign-N: a single titan bout at stage N (sealed cards never
         // hit-test, so any N that lands here is unlocked).
         if (action.startsWith('campaign-')) {
@@ -1159,6 +1177,7 @@ export class MenuSystem extends createSystem({}) {
       app.campaignMode = 'raid';
       app.raidHardcore = mesh.raidHardcore;
       app.raidGoopliath = mesh.raidGoopliath;
+      app.difficulty = mesh.raidDifficulty; // the host's pick, mirrored to all
       app.campaignStage = 0;
     } else {
       // A live mesh brawl: seat 0 is match authority. MeshSystem's net rising

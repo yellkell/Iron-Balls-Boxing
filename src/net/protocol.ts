@@ -103,7 +103,7 @@ export type PeerMessage =
    */
   | {
       k: 'ratk';
-      kind: 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'decree' | 'seesaw';
+      kind: 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'decree' | 'seesaw' | 'surge';
       seats: number[];
       x?: number[];
       z?: number[];
@@ -130,6 +130,8 @@ export type PeerMessage =
       hits: number;
       enr: 0 | 1;
       p2: 0 | 1;
+      /** EASY: the boss is reeling (attacks suspended). Guests show the card. */
+      stn: 0 | 1;
     };
 
 /** Client → relay server envelope. */

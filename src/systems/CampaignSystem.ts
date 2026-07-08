@@ -23,7 +23,7 @@
  * stands down: a titan bout is one long round with no timer.
  */
 
-import { createSystem, InputComponent, Vector3, type Entity } from '@iwsdk/core';
+import { createSystem, Vector3, type Entity } from '@iwsdk/core';
 import {
   AdditiveBlending,
   BoxGeometry,
@@ -36,11 +36,12 @@ import {
   Object3D,
   PointLight,
 } from 'three';
-import { BOSSES, buildTitan, goopliathBoss, raidBoss, type AttackKind, type BossDef, type TitanRig } from '../campaign/bosses.js';
+import { BOSSES, GOOPLIATH_DEF, buildTitan, goopliathBoss, raidBoss, runLineup, type AttackKind, type BossDef, type RunStage, type TitanRig } from '../campaign/bosses.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { GooFx } from '../goopliath/splats.js';
 import { ATTACKS as GOOP_ATTACKS, CREATURE as GOOP_BODY, type AttackName as GoopAttackName } from '../goopliath/goopConfig.js';
 import {
+  bankDifficultyClear,
   campaign,
   campaignProgress,
   fmtRunTime,
@@ -66,6 +67,7 @@ import { applyRoster, fighterAt } from '../combat/setup.js';
 import { localIndexOf, peerPos, worldToPeer } from '../combat/layout.js';
 import { opponents } from '../combat/opponentBus.js';
 import { applyArenaLayout, platformName, tintPlatform } from '../arena/arena.js';
+import { teamColor } from '../config.js';
 import { app, saveStats } from '../menu/appState.js';
 import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customization.js';
 import { addCoins } from '../menu/wallet.js';
@@ -84,11 +86,14 @@ import * as sfx from '../audio/sfx.js';
 import { createCampaignHud, type CampaignHud } from '../ui/campaignHud.js';
 import {
   ARENA_GAP,
+  BOSS_STUN,
   CAMPAIGN,
   COMBAT,
   CURRENCY,
+  DIFFICULTY,
   FIREBALL,
   GOOPLIATH,
+  type Difficulty,
   MODE_LAYOUT,
   OCTAGON_HALF_DEPTH,
   OCTAGON_HALF_WIDTH,
@@ -112,9 +117,10 @@ type Zone =
   | { kind: 'shot'; side: -1 | 1 }
   /** GOLIATH's nova: everything burns EXCEPT the safe wedge at `angle`. */
   | { kind: 'nova'; angle: number; halfAngle: number }
-  /** GOOPLIATH's seesaw: the whole platform half on `side`'s sign of local x
-   *  floods — be across the centreline when it lands. */
-  | { kind: 'half'; side: -1 | 1 };
+  /** The seesaw / surge flood: the platform half on `side`'s sign of the
+   *  `axis` (0 = local x, left/right seesaw; 1 = local z, front/back surge)
+   *  burns — be across the centreline when it lands. */
+  | { kind: 'half'; side: -1 | 1; axis: 0 | 1 };
 
 /** A weak point a pattern can light. The crown circuit uses all five. */
 type WeakSpot = 'head' | 'core' | 'low' | 'shoulderL' | 'shoulderR';
@@ -212,6 +218,20 @@ export class CampaignSystem extends createSystem({
   private goopInside = new Map<Entity, boolean>();
   /** Last frame's world position per ball — the swept segment's start. */
   private goopPrev = new Map<Entity, Vector3>();
+  /** True while the CURRENT stage's boss is the gel (solo, breaker, or a
+   *  blazing run passing through GOOPLIATH's slot). Drives all body behaviour. */
+  private goopStage = false;
+
+  // --- DIFFICULTY state -----------------------------------------------------
+  /** The active tier's knobs (health/charge/cooldown/stun/elite). */
+  private diff = DIFFICULTY.normal;
+  /** Bosses in THIS run (blazing wedges GOOPLIATH in); length drives the
+   *  "last stage" / "X of Y" logic instead of BOSSES.length. */
+  private runLen = BOSSES.length;
+  /** EASY stun: a decaying hit counter; cross BOSS_STUN.hits and the boss
+   *  reels (attacks suspended) for `stunTimer` seconds. */
+  private stunTimer = 0;
+  private stunMeter = 0;
 
   // Boss weak-point spheres (created once, repositioned per stage/frame).
   private boxes: {
@@ -326,9 +346,44 @@ export class CampaignSystem extends createSystem({
     return app.campaignMode !== 'single' && app.campaignMode !== 'goopliath';
   }
 
-  /** Is this bout GOOPLIATH — the solo entry, or a raid with the breaker on? */
-  private goopMode(): boolean {
+  /** The DEDICATED gel fight — the sealed solo campaign entry, or a raid with
+   *  the breaker thrown. (Distinct from a blazing RUN merely PASSING THROUGH a
+   *  goop stage — that's goopStage, set per stage in stageSetup.) */
+  private goopSolo(): boolean {
     return app.campaignMode === 'goopliath' || (app.campaignMode === 'raid' && app.raidGoopliath);
+  }
+
+  /** The active RUN difficulty. Single stages and the solo GOOPLIATH fight
+   *  always run NORMAL; the run modes (gauntlet/hardcore/raid) honour the
+   *  player's / host's pick. */
+  private activeDifficulty(): Difficulty {
+    const m = app.campaignMode;
+    if (m === 'gauntlet' || m === 'hardcore' || m === 'raid') return app.difficulty;
+    return 'normal';
+  }
+
+  /** The RUN lineup for the active difficulty (blazing wedges GOOPLIATH in);
+   *  the five titans otherwise. Used for stage → boss resolution off the
+   *  bout floor (names, cleared flags). */
+  private lineup(): RunStage[] {
+    return this.runMode() ? runLineup(this.activeDifficulty()) : BOSSES.map((_, i) => ({ kind: 'titan', index: i }));
+  }
+
+  /** The boss at run stage `i` — its display name for the FELLED card. */
+  private stageName(i: number): string {
+    const l = this.lineup();
+    const rs = l[clamp(i, 0, l.length - 1)];
+    return rs.kind === 'goop' ? GOOPLIATH_DEF.name : BOSSES[rs.index].name;
+  }
+
+  /** HARD+ spreads the fanciest attacks to the whole roster — every boss can
+   *  also throw the safe-wedge nova, the left/right seesaw and the front/back
+   *  surge. (A returned COPY; the shared BOSSES data is never mutated.) */
+  private applyElite(def: BossDef): BossDef {
+    if (!this.diff.elite) return def;
+    const weights = { ...def.weights };
+    for (const k of ['nova', 'seesaw', 'surge'] as AttackKind[]) weights[k] = Math.max(weights[k], 3);
+    return { ...def, weights };
   }
 
   // --- RAID plumbing -----------------------------------------------------------
@@ -413,7 +468,10 @@ export class CampaignSystem extends createSystem({
   }
 
   private crownTargetHits(): number {
-    return CROWN_RING.length * this.crownLoopsNow() * this.crownPerStop();
+    // Difficulty scales the required ring hits too, so GOLIATH is frail on
+    // EASY and a wall on BLAZING like every other boss (min one loop's worth).
+    const base = CROWN_RING.length * this.crownLoopsNow() * this.crownPerStop();
+    return Math.max(CROWN_RING.length, Math.round(base * this.diff.health));
   }
 
   /** Drain the raid wire; host echoes state; host watches for the squad wipe. */
@@ -432,7 +490,7 @@ export class CampaignSystem extends createSystem({
     // Host: echo the authoritative boss state on a cadence and on any change.
     this.stateTimer -= delta;
     const rst = this.buildRst();
-    const key = `${rst.ph}|${rst.stage}|${rst.hp}|${rst.cyc}|${rst.hits}|${rst.enr}|${rst.p2}`;
+    const key = `${rst.ph}|${rst.stage}|${rst.hp}|${rst.cyc}|${rst.hits}|${rst.enr}|${rst.p2}|${rst.stn}`;
     if (this.stateTimer <= 0 || key !== this.lastRstKey) {
       this.stateTimer = RAID.stateEcho;
       this.lastRstKey = key;
@@ -455,20 +513,32 @@ export class CampaignSystem extends createSystem({
       hits: this.hitsOnPoint,
       enr: this.enraged ? 1 : 0,
       p2: this.p2 ? 1 : 0,
+      stn: this.stunTimer > 0 ? 1 : 0,
     };
   }
 
   /** Guest: adopt the host's authoritative boss state (pattern, hp, phase). */
   private applyRaidState(msg: Extract<PeerMessage, { k: 'rst' }>): void {
-    // A stage change first — the host advanced to the next titan.
-    if (msg.stage !== app.campaignStage && msg.stage < BOSSES.length) {
+    // A stage change first — the host advanced to the next boss. The lineup
+    // (blazing wedges GOOPLIATH in) is derived from the synced difficulty, so
+    // host and guests resolve the same boss for a given stage index.
+    const lineLen = runLineup(this.activeDifficulty()).length;
+    if (msg.stage !== app.campaignStage && msg.stage < lineLen) {
       app.campaignStage = msg.stage;
-      this.stageSetup(!app.raidHardcore, 'the next titan approaches');
+      this.stageSetup(!app.raidHardcore, 'the next boss approaches');
     }
     this.p2 = msg.p2 === 1;
     this.cycleIdx = msg.cyc;
     this.hitsOnPoint = msg.hits;
     this.enraged = msg.enr === 1;
+    // Mirror the reeling state so guests freeze the boss + show the card.
+    if (msg.stn === 1 && this.stunTimer <= 0) {
+      this.stunTimer = BOSS_STUN.duration;
+      this.hud.title('STUNNED', '', this.accentCss());
+      this.cardTimer = 1.2;
+    } else if (msg.stn === 0 && this.stunTimer > 0) {
+      this.stunTimer = 0;
+    }
     this.syncedHp = msg.hp;
     const boss = this.ensureBoss();
     boss.setValue(Health, 'max', msg.max);
@@ -513,7 +583,7 @@ export class CampaignSystem extends createSystem({
       this.faceSeat = mesh.mySeat;
       applyRoster();
       applyArenaLayout(this.scene);
-      this.stageSetup(true, this.goopMode() ? 'the pit is flooding' : 'the raid begins');
+      this.stageSetup(true, this.goopSolo() ? 'the pit is flooding' : 'the raid begins');
       return;
     }
     // Stamp the classic 1v1 platforms/roster (the last bout may have been an
@@ -521,7 +591,7 @@ export class CampaignSystem extends createSystem({
     app.arcade = '1v1';
     applyRoster();
     applyArenaLayout(this.scene);
-    this.stageSetup(true, this.goopMode() ? 'something stirs beneath the pit' : 'a titan approaches the pit');
+    this.stageSetup(true, this.goopSolo() ? 'something stirs beneath the pit' : 'a titan approaches the pit');
   }
 
   /** Chain to the next titan mid-run — no lobby, straight into its intro. */
@@ -535,18 +605,41 @@ export class CampaignSystem extends createSystem({
 
   /** Everything one titan bout needs: rig, pools, weak points, intro cue. */
   private stageSetup(healPlayer: boolean, warning: string): void {
-    const goopMode = this.goopMode();
-    if (goopMode) {
+    // Difficulty first — it decides the run lineup (blazing wedges GOOPLIATH
+    // in), the health/pacing knobs, and whether the elite attacks are shared.
+    this.diff = DIFFICULTY[this.activeDifficulty()];
+    let goopStage = false;
+    if (this.goopSolo()) {
+      // The dedicated gel fight — solo entry or raid breaker.
       this.def = goopliathBoss(this.raid());
+      this.runLen = 1;
+      goopStage = true;
+    } else if (this.runMode()) {
+      // A full run: resolve this stage from the lineup (a blazing run has a
+      // GOOPLIATH slot 2nd-to-last).
+      const lineup = runLineup(this.activeDifficulty());
+      this.runLen = lineup.length;
+      const rs = lineup[clamp(app.campaignStage, 0, lineup.length - 1)];
+      if (rs.kind === 'goop') {
+        this.def = goopliathBoss(this.raid());
+        goopStage = true;
+      } else {
+        const base = BOSSES[rs.index];
+        this.def = this.raid() ? raidBoss(base, app.campaignStage) : base;
+      }
     } else {
-      const base = BOSSES[clamp(app.campaignStage, 0, BOSSES.length - 1)];
-      this.def = this.raid() ? raidBoss(base, app.campaignStage) : base;
+      // A single campaign stage.
+      this.def = BOSSES[clamp(app.campaignStage, 0, BOSSES.length - 1)];
+      this.runLen = BOSSES.length;
     }
+    // HARD+ shares the elite attacks (nova / seesaw / surge) to every boss.
+    this.def = this.applyElite(this.def);
+    this.goopStage = goopStage;
     this.p2 = false;
     this.rig?.dispose();
     this.rig = undefined;
     this.disposeGoop();
-    if (goopMode) {
+    if (goopStage) {
       this.buildGoop();
     } else {
       this.rig = buildTitan(this.def);
@@ -565,24 +658,32 @@ export class CampaignSystem extends createSystem({
     // (Combatant.active 0 parks OpponentSystem's rig and hitboxes); in a RAID
     // slot 1 is a real raider, so the roster is left alone.
     const boss = this.ensureBoss();
-    boss.setValue(Health, 'max', this.def.health);
-    boss.setValue(Health, 'current', this.def.health);
-    this.syncedHp = this.def.health;
+    // Difficulty scales the pool (EASY frail, BLAZING tanky). For GOLIATH the
+    // bar is a crown-hit counter (see crownTargetHits, also scaled) — the raw
+    // max here still drives the HUD fraction.
+    const hp = Math.max(1, Math.round(this.def.health * this.diff.health));
+    boss.setValue(Health, 'max', hp);
+    boss.setValue(Health, 'current', hp);
+    this.syncedHp = hp;
     if (!this.raid()) fighterAt(1)?.setValue(Combatant, 'active', 0);
     if (healPlayer) {
       const me = fighterAt(0);
       me?.setValue(Health, 'current', me.getValue(Health, 'max') ?? COMBAT.playerHealth);
     }
-    this.lastBossHp = this.def.health;
+    this.lastBossHp = hp;
 
-    if (goopMode) this.parkHitboxes(); // no weak points — the SDF is the hitbox
+    if (goopStage) this.parkHitboxes(); // no weak points — the SDF is the hitbox
     else this.ensureHitboxes();
     // GOOPLIATH's ground runs goop-green: the raid pit pedestal, or the far
-    // pedestal his solo fight looms behind. (Titans keep their tints —
-    // teardown puts the pit back in danger red.)
-    if (goopMode) {
+    // pedestal his fight looms behind. Titans re-tint their own pads, so a
+    // blazing run flips the pit green for his slot and back to danger red for
+    // GOLIATH after. (Teardown also restores danger red as a backstop.)
+    {
       const pad = this.scene.getObjectByName(this.raid() ? 'raid-boss-platform' : platformName(1));
-      if (pad) tintPlatform(pad, this.def.accent);
+      if (pad) {
+        const back = this.raid() ? PALETTE.danger : teamColor(1); // the pad's non-goop colour
+        tintPlatform(pad, goopStage ? this.def.accent : back);
+      }
     }
     this.disposeShots();
     this.disposeAttack();
@@ -590,6 +691,8 @@ export class CampaignSystem extends createSystem({
     this.hitsOnPoint = 0;
     this.invuln = 0;
     this.spinT = 0;
+    this.stunTimer = 0;
+    this.stunMeter = 0;
     this.enraged = false;
     this.cardTimer = 0;
     this.cooldown = this.attackCooldown() + 0.8;
@@ -819,10 +922,9 @@ export class CampaignSystem extends createSystem({
       this.hud.title('FIGHT', '', '#ffc04d');
     }
 
-    // Trigger-skip is a SOLO courtesy — a raid squad shares the host's clock,
-    // so everyone sits the (condensed) ceremony out together.
-    const skip = !this.raid() && this.triggerDown();
-    if (this.t >= fightStart + fightCardTime || skip) {
+    // The intro ceremony plays out in full — no trigger-skip. Every boss gets
+    // its entrance (a raid squad always shared the host's clock anyway).
+    if (this.t >= fightStart + fightCardTime) {
       this.startFight();
     }
   }
@@ -906,13 +1008,6 @@ export class CampaignSystem extends createSystem({
     }
   }
 
-  private triggerDown(): boolean {
-    for (const hand of ['left', 'right'] as const) {
-      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) return true;
-    }
-    return false;
-  }
-
   /** The bell. `finale` keeps the resurrection anthem rolling instead of
    *  restarting the regular battle loop (raid GOLIATH's second life). */
   private startFight(finale = false): void {
@@ -970,7 +1065,9 @@ export class CampaignSystem extends createSystem({
     }
 
     this.updateShots(delta);
-    if (this.goopMode()) this.goopBalls();
+    if (this.goopStage) this.goopBalls();
+    if (this.stunTimer > 0) this.stunTimer -= delta;
+    if (this.stunMeter > 0) this.stunMeter = Math.max(0, this.stunMeter - BOSS_STUN.decayPerSec * delta);
 
     // Watch the health pools. LOCAL hp drops are MY landed hits (only my
     // balls collide on my sim): route them through the ONE authoritative
@@ -1009,7 +1106,7 @@ export class CampaignSystem extends createSystem({
     ) {
       this.enraged = true;
       this.flinch = 0.35;
-      this.hud.title(this.goopMode() ? 'THE TIDE RISES' : 'ENRAGED', '', this.accentCss());
+      this.hud.title(this.goopStage ? 'THE TIDE RISES' : 'ENRAGED', '', this.accentCss());
       this.cardTimer = 1.3;
       sfx.bossRoar(this.def.scale * 1.1);
     }
@@ -1017,7 +1114,7 @@ export class CampaignSystem extends createSystem({
     // Endings are the AUTHORITY's call (guests follow the echo): the kill —
     // or, for a raid GOLIATH not yet on his second life, the false kill.
     if (this.isAuthority() && bossHp <= 0) {
-      if (this.raid() && app.campaignStage === BOSSES.length - 1 && !this.p2) this.toResurrect();
+      if (this.raid() && !this.goopStage && app.campaignStage === this.runLen - 1 && !this.p2) this.toResurrect();
       else this.toVictory();
       return;
     }
@@ -1036,8 +1133,10 @@ export class CampaignSystem extends createSystem({
     }
 
     // Attack scheduling is the authority's; everyone advances the live copy.
+    // A REELING boss (EASY stun) holds its fire — the cooldown clock only
+    // ticks once it shakes the stagger off.
     if (!this.attack) {
-      if (this.isAuthority()) {
+      if (this.isAuthority() && this.stunTimer <= 0) {
         this.cooldown -= delta;
         if (this.cooldown <= 0) this.startAttack();
       }
@@ -1065,11 +1164,13 @@ export class CampaignSystem extends createSystem({
       hp = Math.max(0, hp - Math.max(1, Math.round(pts)));
       boss.setValue(Health, 'current', hp);
       this.lastBossHp = hp;
+      this.tallyStun();
       return;
     }
     const lit = this.litPoints() as string[];
     const podShot = spot === 'pod' && this.attack?.kind === 'volley';
     if (!lit.includes(spot) && !podShot) return;
+    this.tallyStun();
 
     this.flinch = 0.35;
     this.hudTimer = 0;
@@ -1367,7 +1468,7 @@ export class CampaignSystem extends createSystem({
     };
     // The seesaw is squad-wide like the sweep: every platform rocks at once,
     // each starting on the half its own raider stands on.
-    if (kind === 'sweep' || kind === 'decree' || kind === 'seesaw') return arcOrder(alive);
+    if (kind === 'sweep' || kind === 'decree' || kind === 'seesaw' || kind === 'surge') return arcOrder(alive);
     const stage = app.campaignStage;
     if (stage <= 0 || alive.length === 1) {
       // Stage I: one raider at a time — never the same one twice while
@@ -1411,7 +1512,7 @@ export class CampaignSystem extends createSystem({
       return;
     }
 
-    const kinds: AttackKind[] = ['slam', 'sweep', 'beam', 'volley', 'nova', 'seesaw'];
+    const kinds: AttackKind[] = ['slam', 'sweep', 'beam', 'volley', 'nova', 'seesaw', 'surge'];
     let total = 0;
     const pool: Array<[AttackKind, number]> = [];
     for (const k of kinds) {
@@ -1451,11 +1552,13 @@ export class CampaignSystem extends createSystem({
       } else if (kind === 'nova') {
         const playerAng = Math.hypot(_head.x, _head.z) > 0.15 ? Math.atan2(_head.x, _head.z) : rand(-Math.PI, Math.PI);
         params.a.push(playerAng + Math.PI + rand(-0.5, 0.5));
-      } else if (kind === 'seesaw') {
+      } else if (kind === 'seesaw' || kind === 'surge') {
         // First flood the half the target STANDS on — they must cross. One
         // signed value per seat: |a| is the stage count (grows as he drains),
-        // its sign the first doomed half.
-        const side = _head.x >= 0 ? 1 : -1;
+        // its sign the first doomed half. Seesaw splits left/right (x), surge
+        // front/back (z).
+        const along = kind === 'surge' ? _head.z : _head.x;
+        const side = along >= 0 ? 1 : -1;
         params.a.push(side * this.seesawStages());
       }
     }
@@ -1484,7 +1587,8 @@ export class CampaignSystem extends createSystem({
     // The windup is SACRED whatever the phase — enrage and GOOPLIATH's haste
     // compress the cooldown between attacks (attackCooldown), never the
     // telegraph itself: a late-fight laser reads exactly like the first one.
-    const chargeTime = kind === 'decree' ? RAID.decreeCharge : this.def.charge[kind];
+    // Difficulty stretches (EASY) or tightens (BLAZING) the windup.
+    const chargeTime = (kind === 'decree' ? RAID.decreeCharge : this.def.charge[kind]) * this.diff.charge;
     const zones: Zone[] = [];
     const zoneSeats: number[] = [];
     const telegraphs: (Telegraph | null)[] = [];
@@ -1589,23 +1693,29 @@ export class CampaignSystem extends createSystem({
           this.aimBeam(zone, tg, offset, seat); // initial aim (tracking re-aims)
         }
       });
-    } else if (kind === 'seesaw') {
-      // GOOPLIATH'S SEESAW: one half of the platform floods, then the other,
-      // `stages` times over — every pane is up from the start (the whole
-      // sequence reads ahead), each filling on its own clock, so the player
-      // hurls themselves across the centreline on the beat: left, right,
-      // left… More stages as he drains (see GOOPLIATH.seesawStages).
+    } else if (kind === 'seesaw' || kind === 'surge') {
+      // THE SEESAW (x, left/right) and its SURGE cousin (z, front/back): one
+      // half of the platform floods, then the other, `stages` times over —
+      // every pane is up from the start (the whole sequence reads ahead),
+      // each filling on its own clock, so the player hurls themselves across
+      // the centreline on the beat. More stages as the boss drains.
+      const axis: 0 | 1 = kind === 'surge' ? 1 : 0;
+      // The z-split reuses the x-split pane, turned a quarter turn (the group
+      // yaw carries the seat rotation plus this), so the flood runs the other
+      // way. The pane's own extents swap to keep the platform covered.
+      const halfW = (axis ? OCTAGON_HALF_DEPTH : OCTAGON_HALF_WIDTH) + 0.35;
+      const depth = (axis ? OCTAGON_HALF_WIDTH : OCTAGON_HALF_DEPTH) * 2 + 0.3;
       seats.forEach((seat, ti) => {
         const enc = params.a?.[ti] ?? params.a?.[0] ?? 2;
         const stages = clamp(Math.round(Math.abs(enc)), 2, 8);
         let side: -1 | 1 = enc < 0 ? -1 : 1;
         for (let i = 0; i < stages; i++) {
-          zones.push({ kind: 'half', side });
+          zones.push({ kind: 'half', side, axis });
           zoneSeats.push(seat);
-          const tg = halfTelegraph(side, OCTAGON_HALF_WIDTH + 0.35, OCTAGON_HALF_DEPTH * 2 + 0.3);
+          const tg = halfTelegraph(side, halfW, depth);
           this.seatPoint(seat, 0, CAMPAIGN.decalY, 0, _v);
           tg.group.position.copy(_v);
-          tg.group.rotation.y = this.seatYawDelta(seat);
+          tg.group.rotation.y = this.seatYawDelta(seat) + (axis ? Math.PI / 2 : 0);
           this.scene.add(tg.group);
           telegraphs.push(tg);
           staggers.push(i * GOOPLIATH.seesawGap);
@@ -1871,7 +1981,32 @@ export class CampaignSystem extends createSystem({
       // itself up continuously toward finalHaste instead of plateauing.
       mult *= GOOPLIATH.finalHaste + (1 - GOOPLIATH.finalHaste) * this.bossHpFrac();
     }
+    // Difficulty is the outer multiplier: EASY dawdles, BLAZING presses. The
+    // pressure lives in the GAP, never the windup (chargeTime is its own knob).
+    mult *= this.diff.cooldown;
     return rand(this.def.cooldownMin, this.def.cooldownMax) * mult;
+  }
+
+  /** EASY: tally a landed hit toward the stun meter; cross the threshold and
+   *  the boss reels — its charging attack drops and its fire holds for a beat.
+   *  Authority-side only; guests learn of it from the rst `stn` flag. */
+  private tallyStun(): void {
+    if (!this.diff.stun || this.phase !== 'fight' || this.stunTimer > 0) return;
+    this.stunMeter += 1;
+    if (this.stunMeter < BOSS_STUN.hits) return;
+    this.stunMeter = 0;
+    this.stunTimer = BOSS_STUN.duration;
+    this.disposeAttack(); // whatever was charging, it reels NOW
+    this.cooldown = this.attackCooldown() + 0.3;
+    this.flinch = 0.6;
+    this.hud.title('STUNNED', '', this.accentCss());
+    this.cardTimer = 1.2;
+    if (this.goopStage) {
+      if (this.goop) this.goop.sim.agitation = 1;
+      sfx.gooWobble(1);
+    } else {
+      sfx.armorClank();
+    }
   }
 
   /** Live boss health fraction (0..1). */
@@ -1926,12 +2061,13 @@ export class CampaignSystem extends createSystem({
       sfx.slamImpact();
       if (zone.kind === 'nova') this.spawnNovaWave(zone.angle, zone.halfAngle, seat);
       // (GOOPLIATH's uppercut telegraph surges the wave out on this beat.)
-    } else if (kind === 'seesaw') {
-      sfx.gooSlam();
-      // The opening clap (his telegraph) is the ONLY swing the seesaw gets —
-      // per-half limb slams re-ballooned the raymarch bounds on every beat
-      // and read as random punching; the flood visual carries the landings.
-      if (zone.kind === 'half') this.spawnHalfFlood(zone.side, seat);
+    } else if (kind === 'seesaw' || kind === 'surge') {
+      if (this.goop) sfx.gooSlam();
+      else sfx.slamImpact();
+      // The opening gesture (the telegraph) is the ONLY swing these get — per-
+      // half limb slams re-ballooned the raymarch bounds on every beat and read
+      // as random punching; the flood visual carries the landings.
+      if (zone.kind === 'half') this.spawnHalfFlood(zone.side, seat, zone.axis);
     } else {
       if (zone.kind === 'shot') this.launchShot(zone.side, seat);
     }
@@ -1971,10 +2107,12 @@ export class CampaignSystem extends createSystem({
       } else if (zone.kind === 'sweep') {
         if (Math.abs(_p.y - zone.y) <= CAMPAIGN.sweepThickness + r * 0.6) return true;
       } else if (zone.kind === 'half') {
-        // The seesaw: any body sphere on the doomed half burns, with a thin
+        // Seesaw/surge: any body sphere on the doomed half burns, with a thin
         // forgiveness strip on the centreline so the jump is never a coin
-        // flip. (The player origin IS the platform centre.)
-        if (_p.x * zone.side > GOOPLIATH.seesawSafeLip) return true;
+        // flip. (The player origin IS the platform centre.) Seesaw judges x,
+        // surge judges z.
+        const along = zone.axis === 1 ? _p.z : _p.x;
+        if (along * zone.side > GOOPLIATH.seesawSafeLip) return true;
       }
     }
     return false;
@@ -2208,18 +2346,22 @@ export class CampaignSystem extends createSystem({
     });
   }
 
-  /** The seesaw lands: a green tide floods the doomed half — a slab of gel
-   *  light, fire along the deck, and wet splats stamped where it hit. All
-   *  target-local, transformed to the marked seat's platform. */
-  private spawnHalfFlood(side: -1 | 1, seat: number): void {
+  /** The seesaw/surge lands: a tide floods the doomed half — a slab of light,
+   *  fire along the deck, and wet splats stamped where it hit. All target-
+   *  local, transformed to the marked seat's platform. `axis` 0 = x split
+   *  (seesaw), 1 = z split (surge) — the whole show turns a quarter turn. */
+  private spawnHalfFlood(side: -1 | 1, seat: number, axis: 0 | 1): void {
     this.seatPoint(seat, 0, 0, 0, _v);
     const cx = _v.x;
     const cz = _v.z;
-    const yd = this.seatYawDelta(seat);
+    const yd = this.seatYawDelta(seat) + (axis ? Math.PI / 2 : 0);
     const cos = Math.cos(yd);
     const sin = Math.sin(yd);
-    const w = OCTAGON_HALF_WIDTH + 0.35;
-    const d = OCTAGON_HALF_DEPTH * 2 + 0.3;
+    // Extents in the (pre-rotation) local frame: w spans the SPLIT axis, d the
+    // other — swapped for a surge so the platform stays covered after the turn.
+    const w = (axis ? OCTAGON_HALF_DEPTH : OCTAGON_HALF_WIDTH) + 0.35;
+    const halfOther = axis ? OCTAGON_HALF_WIDTH : OCTAGON_HALF_DEPTH;
+    const d = halfOther * 2 + 0.3;
     const slab = new Mesh(
       new BoxGeometry(w, 0.5, d),
       new MeshBasicMaterial({
@@ -2250,17 +2392,17 @@ export class CampaignSystem extends createSystem({
           splatted = true;
           for (let i = 0; i < 3; i++) {
             const sx = side * rand(0.15, w - 0.2);
-            const sz = rand(-OCTAGON_HALF_DEPTH * 0.8, OCTAGON_HALF_DEPTH * 0.8);
+            const sz = rand(-halfOther * 0.8, halfOther * 0.8);
             _v.set(cx + sx * cos + sz * sin, 0.02, cz - sx * sin + sz * cos);
             fx?.splat(_v, rand(0.3, 0.55));
           }
         }
         if (age > burstClock) {
-          // Kept lean — the seesaw is the boss's busiest beat, and particle
-          // spam here stacks on top of the gel's own swing cost.
+          // Kept lean — this is the boss's busiest beat, and particle spam
+          // here stacks on top of the gel's own swing cost.
           burstClock = age + 0.09;
           const sx = side * rand(0.1, w - 0.2);
-          const sz = rand(-OCTAGON_HALF_DEPTH, OCTAGON_HALF_DEPTH);
+          const sz = rand(-halfOther, halfOther);
           _v.set(cx + sx * cos + sz * sin, 0.12, cz - sx * sin + sz * cos);
           emberBurst(_v, 4, true);
           if (k > 0.3 && k < 0.55) spawnFireImpact(world, _v, 1, 0.7);
@@ -2419,8 +2561,9 @@ export class CampaignSystem extends createSystem({
       // of marked platforms, or the wide double wind-out that precedes the
       // squad sweep's full-turn lash. One target keeps the single-arm tell.
       const bothArms = !!a && a.seats.length > 1;
-      if (a && a.kind === 'nova') {
-        // The nova: BOTH arms hoist together — the whole machine coils.
+      if (a && (a.kind === 'nova' || a.kind === 'seesaw' || a.kind === 'surge')) {
+        // The nova and the flood attacks: BOTH arms hoist together and the
+        // whole machine coils over the platform before it comes down.
         const fill = clamp(a.time / a.chargeTime, 0, 1);
         targetX = arm.restX - 2.2 * fill;
         targetZ = arm.restZ * (1 + fill);
@@ -2630,81 +2773,96 @@ export class CampaignSystem extends createSystem({
 
     app.stats.wins += 1;
     saveStats();
-    // GOOPLIATH is always his own finale — one fight, no next titan.
-    const goopMode = this.goopMode();
-    const lastStage = goopMode || app.campaignStage === BOSSES.length - 1;
+    const solo = this.goopSolo(); // the DEDICATED gel fight (breaker / sealed entry)
+    const stageGoop = this.goopStage; // THIS boss is the gel (incl. a blazing run's slot)
     const run = this.runMode();
+    const lastStage = !run || app.campaignStage === this.runLen - 1;
 
-    // Coins + XP at the flat per-game rate — DOUBLE on a titan's first fell.
-    // Raid fells don't touch the SOLO stage unlocks; a full raid clear has
-    // its own first-time double instead. GOOPLIATH keeps his own two flags.
+    // Coins + XP at the flat per-game rate — DOUBLE on a first fell. The
+    // dedicated GOOPLIATH fights stay OFF every board (coins only, own flags);
+    // a blazing run merely PASSING THROUGH his slot marks him felled too but
+    // still reports the run like any stage.
     let firstClear = false;
-    if (goopMode) {
+    if (solo) {
       firstClear = this.raid() ? !campaignProgress.raidGoopliathCleared : !campaignProgress.goopliathCleared;
       if (firstClear) {
         if (this.raid()) campaignProgress.raidGoopliathCleared = true;
         else campaignProgress.goopliathCleared = true;
         saveCampaignProgress();
       }
+      addCoins(CURRENCY.perGame * (firstClear ? 2 : 1));
     } else if (this.raid()) {
       firstClear = lastStage && !campaignProgress.raidCleared;
       if (firstClear) {
         campaignProgress.raidCleared = true;
         saveCampaignProgress();
       }
+      reportCampaign(true, firstClear);
     } else {
-      firstClear = campaignProgress.cleared[app.campaignStage] !== true;
-      if (firstClear) {
-        campaignProgress.cleared[app.campaignStage] = true;
-        saveCampaignProgress();
+      // A solo campaign run or single stage: mark the felled boss. Titan stages
+      // set their card's cleared flag; a blazing run's goop slot sets his.
+      const rs = this.lineup()[clamp(app.campaignStage, 0, this.lineup().length - 1)];
+      if (stageGoop) {
+        firstClear = !campaignProgress.goopliathCleared;
+        if (firstClear) {
+          campaignProgress.goopliathCleared = true;
+          saveCampaignProgress();
+        }
+        addCoins(CURRENCY.perGame * (firstClear ? 2 : 1)); // off the boards
+      } else {
+        const ti = rs.kind === 'titan' ? rs.index : app.campaignStage;
+        firstClear = campaignProgress.cleared[ti] !== true;
+        if (firstClear) {
+          campaignProgress.cleared[ti] = true;
+          saveCampaignProgress();
+        }
+        reportCampaign(true, firstClear);
       }
     }
-    // GOOPLIATH stays OFF every board: no XP write, no run record — the
-    // fight pays plain coins locally and that's all. Titans report as ever.
-    if (goopMode) addCoins(CURRENCY.perGame * (firstClear ? 2 : 1));
-    else reportCampaign(true, firstClear);
+
+    // Clearing a RUN opens the next difficulty (Normal→Hard→Blazing).
+    const unlocked = run && lastStage ? bankDifficultyClear(this.activeDifficulty()) : null;
 
     // Felling the king crowns you: the CHAMPION pad joins your locker.
-    // (Also granted retroactively to saves that beat GOLIATH pre-reward.
-    // The tide crowns no one — that pad is the KING's bounty.)
-    const crowned = lastStage && !goopMode && !platformOwned('champion');
+    // (Also granted retroactively to saves that beat GOLIATH pre-reward. The
+    // tide crowns no one — that pad is the KING's bounty.)
+    const crowned = lastStage && !stageGoop && !platformOwned('champion');
     if (crowned) {
       ownPlatform('champion');
       setPlatformSkin('champion');
       playCash();
     }
 
-    // Mid-run fells chain straight to the next titan after a short collapse.
+    // Mid-run fells chain straight to the next boss after a short collapse.
     this.advanceAfterVictory = run && !lastStage;
     this.victoryDelay = this.advanceAfterVictory ? CAMPAIGN.runVictoryDelay : CAMPAIGN.victoryDelay;
 
     if (this.advanceAfterVictory) {
-      this.hud.title('FELLED', BOSSES[app.campaignStage + 1].name, this.accentCss());
+      this.hud.title('FELLED', this.stageName(app.campaignStage + 1), this.accentCss());
       sfx.roundEnd(true); // the full fanfare waits for the end of the run
-      sfx.bossRoar(this.def.scale * 1.0);
+      if (!stageGoop) sfx.bossRoar(this.def.scale * 1.0);
       return;
     }
 
+    const unlockTag = unlocked ? ` · ${DIFFICULTY[unlocked].label} UNLOCKED` : '';
     if (this.raid() && lastStage) {
       // The raid is BEATEN. The HOST posts the ONE run record for the whole
-      // squad — every raider's callsign on it, the group ranked together on
-      // their collective fight time. (GOOPLIATH raids have no titan-run board
-      // to post to — the fell itself is the trophy.)
-      if (this.isAuthority() && !goopMode) {
+      // squad. (A dedicated GOOPLIATH raid has no titan-run board — the fell
+      // itself is the trophy.)
+      if (this.isAuthority() && !solo) {
         reportRun(app.raidHardcore ? 'raidHardcore' : 'raid', this.runClock, this.squadNames());
       }
       this.hud.title(
-        goopMode ? 'THE TIDE RECEDES' : 'RAID CLEARED',
-        goopMode
+        solo ? 'THE TIDE RECEDES' : 'RAID CLEARED',
+        (solo
           ? `GOOPLIATH FELLED · ${fmtRunTime(this.runClock)}`
           : app.raidHardcore
             ? `HARDCORE · ${fmtRunTime(this.runClock)}`
-            : fmtRunTime(this.runClock),
+            : fmtRunTime(this.runClock)) + unlockTag,
         '#d9a832',
       );
     } else if (run && lastStage) {
-      // The run is complete: the clock goes on the boards — the local best on
-      // the line-up buttons AND the online run-time board.
+      // The run is complete: the clock goes on the boards.
       const hardcore = app.campaignMode === 'hardcore';
       const record = recordRunTime(hardcore, this.runClock);
       reportRun(hardcore ? 'hardcore' : 'gauntlet', this.runClock, [myName()]);
@@ -2714,21 +2872,21 @@ export class CampaignSystem extends createSystem({
       }
       this.hud.title(
         hardcore ? 'HARDCORE' : 'GAUNTLET',
-        `${fmtRunTime(this.runClock)}${record ? ' · NEW RECORD' : ''}`,
+        `${fmtRunTime(this.runClock)}${record ? ' · NEW RECORD' : ''}${unlockTag}`,
         this.accentCss(),
       );
     } else {
-      // No payout readout — just the fell (and the one-time crown unlock).
+      // A single stage: no payout readout — just the fell (and the crown).
       this.hud.title(
-        goopMode ? 'GOOPLIATH FELLED' : 'TITAN FELLED',
-        goopMode ? 'the tide recedes' : crowned ? 'CHAMPION PLATFORM UNLOCKED' : '',
+        stageGoop ? 'GOOPLIATH FELLED' : 'TITAN FELLED',
+        stageGoop ? 'the tide recedes' : crowned ? 'CHAMPION PLATFORM UNLOCKED' : '',
         this.accentCss(),
       );
     }
     playVictory(); // stops the battle score and rings the end-of-game sting
     sfx.matchEnd(true);
     // The gel's own KO splat (deathPose → setKo) is the tide's death bellow.
-    if (!goopMode) sfx.bossRoar(this.def.scale * 1.0);
+    if (!stageGoop) sfx.bossRoar(this.def.scale * 1.0);
   }
 
   private toDefeat(): void {
@@ -2742,24 +2900,24 @@ export class CampaignSystem extends createSystem({
 
     app.stats.losses += 1;
     saveStats();
-    // GOOPLIATH stays off every board — the consolation is coins only.
-    if (this.goopMode()) addCoins(CURRENCY.perGame);
+    // A dedicated GOOPLIATH fight stays off the boards — coins only.
+    if (this.goopSolo()) addCoins(CURRENCY.perGame);
     else reportCampaign(false, false); // the consolation rate, same as a bot loss
-    if (this.goopMode()) {
+    if (this.goopStage) {
       // The tide takes everyone eventually.
       this.hud.title('DISSOLVED', this.raid() ? 'the squad is spent' : '', '#e8352a');
     } else if (this.raid()) {
       // The WIPE: every raider down. The titan stands over the squad.
-      this.hud.title('RAID OVER', `${app.campaignStage} of ${BOSSES.length}`, '#e8352a');
+      this.hud.title('RAID OVER', `${app.campaignStage} of ${this.runLen}`, '#e8352a');
     } else if (this.runMode()) {
       // A run dies where you do — no continues, back to the line-up.
-      this.hud.title('RUN OVER', `${app.campaignStage} of ${BOSSES.length}`, '#e8352a');
+      this.hud.title('RUN OVER', `${app.campaignStage} of ${this.runLen}`, '#e8352a');
     } else {
       this.hud.title('SCRAPPED', '', '#e8352a');
     }
     playVictory(); // stops the battle score and rings the end sting
     sfx.matchEnd(false);
-    sfx.bossRoar(this.def.scale * 1.2); // it laughs, kind of
+    if (!this.goopStage) sfx.bossRoar(this.def.scale * 1.2); // it laughs, kind of
   }
 
   /**

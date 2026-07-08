@@ -1120,6 +1120,42 @@ function buildKnightChest(accent: number): Group {
     flank.rotation.z = side * 0.12;
     g.add(flank);
   }
+
+  // THE BACK SHIELD — a heater shield slung across the knight's back (+z is
+  // behind him; the head/cross face −z), bearing the same raised Templar
+  // cross as the helm. A boxed body + a 4-sided point for the classic
+  // rounded-top, tapered-bottom silhouette, a dark bevel behind so it never
+  // reads flat, then the glowing cross proud of the face.
+  const shield = new Group();
+  shield.position.set(0, 0.0, 0.155);
+  shield.rotation.x = -0.08; // canted to sit on the back's slope
+  g.add(shield);
+  const bevel = new Mesh(new BoxGeometry(0.3, 0.34, 0.03), darkMat());
+  bevel.position.set(0, 0.02, -0.012);
+  shield.add(bevel);
+  const body = new Mesh(new BoxGeometry(0.28, 0.3, 0.04), chassisMat(accent, 0.05));
+  body.position.set(0, 0.05, 0);
+  shield.add(body);
+  const tip = new Mesh(new ConeGeometry(0.16, 0.2, 4), chassisMat(accent, 0.05));
+  tip.scale.set(1, 1, 0.28);
+  tip.rotation.set(Math.PI, Math.PI / 4, 0); // apex pointing DOWN
+  tip.position.set(0, -0.12, 0.002);
+  shield.add(tip);
+  // Riveted rim studs up the two long edges.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const stud = new Mesh(new SphereGeometry(0.011, 6, 5), chassisMat(accent, 0.07));
+      stud.position.set(side * 0.12, 0.13 - i * 0.07, 0.022);
+      shield.add(stud);
+    }
+  }
+  // The raised Templar cross on the boss of the shield (same look as the helm).
+  const svbar = new Mesh(new BoxGeometry(0.05, 0.28, 0.03), glowMat(accent, 0.85));
+  svbar.position.set(0, 0.04, 0.03);
+  shield.add(svbar);
+  const shbar = new Mesh(new BoxGeometry(0.2, 0.05, 0.03), glowMat(accent, 0.85));
+  shbar.position.set(0, 0.09, 0.03);
+  shield.add(shbar);
   return g;
 }
 

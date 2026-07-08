@@ -32,7 +32,7 @@ import {
   MeshStandardMaterial,
   SphereGeometry,
 } from 'three';
-import { GOOPLIATH, PALETTE, RAID } from '../config.js';
+import { GOOPLIATH, PALETTE, RAID, type Difficulty } from '../config.js';
 
 /**
  * 'volley' is the one attack aimed at YOU instead of the floor: the shoulder
@@ -41,7 +41,7 @@ import { GOOPLIATH, PALETTE, RAID } from '../config.js';
  * marked safe wedge — the only telegraph in the game that says "stand HERE"
  * instead of "get out".
  */
-export type AttackKind = 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'seesaw';
+export type AttackKind = 'slam' | 'sweep' | 'beam' | 'volley' | 'nova' | 'seesaw' | 'surge';
 
 /**
  * How a titan's slam lands — its melee signature:
@@ -124,8 +124,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.2,
     cooldownMin: 2.6,
     cooldownMax: 3.6,
-    charge: { slam: 1.9, sweep: 2.1, beam: 1.7, volley: 2.0, nova: 2.2, seesaw: 1.7 },
-    weights: { slam: 5, sweep: 0, beam: 3, volley: 0, nova: 0, seesaw: 0 },
+    charge: { slam: 1.9, sweep: 2.1, beam: 1.7, volley: 2.0, nova: 2.2, seesaw: 1.7, surge: 1.8 },
+    weights: { slam: 5, sweep: 0, beam: 3, volley: 0, nova: 0, seesaw: 0, surge: 0 },
     volleyCount: 3,
     beams: 1,
     swayAmp: 0.4,
@@ -145,8 +145,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.3,
     cooldownMin: 2.2,
     cooldownMax: 3.2,
-    charge: { slam: 1.6, sweep: 1.9, beam: 1.6, volley: 1.9, nova: 2.2, seesaw: 1.7 },
-    weights: { slam: 4, sweep: 3, beam: 2, volley: 0, nova: 0, seesaw: 0 },
+    charge: { slam: 1.6, sweep: 1.9, beam: 1.6, volley: 1.9, nova: 2.2, seesaw: 1.7, surge: 1.8 },
+    weights: { slam: 4, sweep: 3, beam: 2, volley: 0, nova: 0, seesaw: 0, surge: 0 },
     volleyCount: 3,
     beams: 1,
     swayAmp: 0.5,
@@ -166,8 +166,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.45,
     cooldownMin: 1.9,
     cooldownMax: 2.8,
-    charge: { slam: 1.45, sweep: 1.7, beam: 1.55, volley: 1.7, nova: 2.2, seesaw: 1.7 },
-    weights: { slam: 3, sweep: 4, beam: 4, volley: 2, nova: 0, seesaw: 0 },
+    charge: { slam: 1.45, sweep: 1.7, beam: 1.55, volley: 1.7, nova: 2.2, seesaw: 1.7, surge: 1.8 },
+    weights: { slam: 3, sweep: 4, beam: 4, volley: 2, nova: 0, seesaw: 0, surge: 0 },
     volleyCount: 4,
     beams: 1,
     swayAmp: 0.6,
@@ -187,8 +187,8 @@ export const BOSSES: BossDef[] = [
     zOffset: 0.6,
     cooldownMin: 1.6,
     cooldownMax: 2.4,
-    charge: { slam: 1.3, sweep: 1.5, beam: 1.25, volley: 2.0, nova: 2.2, seesaw: 1.7 },
-    weights: { slam: 3, sweep: 2, beam: 4, volley: 5, nova: 0, seesaw: 0 },
+    charge: { slam: 1.3, sweep: 1.5, beam: 1.25, volley: 2.0, nova: 2.2, seesaw: 1.7, surge: 1.8 },
+    weights: { slam: 3, sweep: 2, beam: 4, volley: 5, nova: 0, seesaw: 0, surge: 0 },
     volleyCount: 3,
     beams: 2,
     swayAmp: 0.45,
@@ -212,8 +212,8 @@ export const BOSSES: BossDef[] = [
     // to one safe wedge needs more read time than a single dodge. The beam
     // (laser) cooks 0.4s longer than its raw pace too, for a fairer dodge on
     // the fastest titan's tracking shot.
-    charge: { slam: 1.15, sweep: 1.35, beam: 1.6, volley: 1.8, nova: 2.6, seesaw: 1.7 },
-    weights: { slam: 3, sweep: 3, beam: 3, volley: 3, nova: 4, seesaw: 0 },
+    charge: { slam: 1.15, sweep: 1.35, beam: 1.6, volley: 1.8, nova: 2.6, seesaw: 1.7, surge: 1.8 },
+    weights: { slam: 3, sweep: 3, beam: 3, volley: 3, nova: 4, seesaw: 0, surge: 0 },
     volleyCount: 4,
     beams: 2,
     swayAmp: 0.35,
@@ -272,8 +272,8 @@ export const GOOPLIATH_DEF: BossDef = {
   // from a frantic opening.
   cooldownMin: 2.3,
   cooldownMax: 3.3,
-  charge: { slam: 1.6, sweep: 1.7, beam: 1.75, volley: 1.8, nova: 2.6, seesaw: 1.8 },
-  weights: { slam: 0, sweep: 3, beam: 3, volley: 3, nova: 3, seesaw: 5 },
+  charge: { slam: 1.6, sweep: 1.7, beam: 1.75, volley: 1.8, nova: 2.6, seesaw: 1.8, surge: 1.8 },
+  weights: { slam: 0, sweep: 3, beam: 3, volley: 3, nova: 3, seesaw: 5, surge: 0 },
   volleyCount: 4,
   beams: 2,
   swayAmp: 0, // the gel sim carries its own idle motion
@@ -283,6 +283,24 @@ export const GOOPLIATH_DEF: BossDef = {
   enrageAt: 0.35,
   weakPattern: 'body',
 };
+
+/**
+ * One boss slot in a full RUN (gauntlet / hardcore / raid). Normally the run
+ * is just the five titans; on BLAZING, GOOPLIATH slots in as the 2nd-to-last
+ * boss — fought right before GOLIATH — so the hardest runs carry the living
+ * tide too. (He is otherwise a standalone fight; see the sealed campaign
+ * entry and the raid breaker.)
+ */
+export type RunStage = { kind: 'titan'; index: number } | { kind: 'goop' };
+
+/** The boss order for a run at `difficulty`. Blazing is the only tier that
+ *  differs — it wedges GOOPLIATH in before the king. */
+export function runLineup(difficulty: Difficulty): RunStage[] {
+  const titans: RunStage[] = BOSSES.map((_, i) => ({ kind: 'titan', index: i }));
+  if (difficulty !== 'blazing') return titans;
+  const last = titans.length - 1; // GOLIATH stays the finale
+  return [...titans.slice(0, last), { kind: 'goop' }, titans[last]];
+}
 
 /** The RAID cut of GOOPLIATH: taller than any raid titan, four fists' worth
  *  of hits, and slightly snappier telegraphs (same law as raidBoss). */

@@ -30,12 +30,13 @@ import { BOSSES } from '../campaign/bosses.js';
 import { drawBossIcon } from '../campaign/icons.js';
 import {
   campaignProgress,
+  difficultyUnlocked,
   fmtRunTime,
   gauntletUnlocked,
   goopliathUnlocked,
   stageUnlocked,
 } from '../campaign/campaignState.js';
-import { ATTACH, GAME_TITLE, hueToColor, type ArcadeMode } from '../config.js';
+import { ATTACH, DIFFICULTY, DIFFICULTY_ORDER, GAME_TITLE, hueToColor, type ArcadeMode, type Difficulty } from '../config.js';
 import {
   LEADERBOARD_VISIBLE_ROWS,
   boardScroll,
@@ -97,6 +98,9 @@ export type MenuAction =
   /** The sealed entry beneath the line-up: GOOPLIATH's own fight. */
   | 'campaign-goopliath'
   | `campaign-${number}`
+  /** Run difficulty picker — campaign (local) and raid (host, mirrored). */
+  | `diff-${string}`
+  | `raiddiff-${string}`
   /** Open the shared arcade lobby modal for a networked mode (2v2 / ffa / raid). */
   | 'open-raid'
   /** The arcade lobby: browse rooms, make one, join one, drop onto bots, host
@@ -2015,19 +2019,82 @@ function drawCoinHud(ctx: CanvasRenderingContext2D): void {
 // plates with their local best-clock boards. Bouts return here, win or lose.
 
 const CAMP_W = 1024;
-const CAMP_H = 620;
+const CAMP_H = 664;
 const CARD_W = 168;
 const CARD_H = 250;
 const CARD_GAP = 16;
 const CARD_Y = 96;
 const CARDS_X = (CAMP_W - (CARD_W * 5 + CARD_GAP * 4)) / 2;
-const RUN_BTN = { x: 48, y: 386, w: 320, h: 54 } as const;
-const HARD_BTN = { x: 48, y: 452, w: 320, h: 54 } as const;
+// The run difficulty chips sit right above the run buttons they govern.
+const DIFF_ROW = { x: 210, y: 360, w: 118, gap: 10, h: 34 } as const;
+const RUN_BTN = { x: 48, y: 410, w: 320, h: 54 } as const;
+const HARD_BTN = { x: 48, y: 476, w: 320, h: 54 } as const;
 /** The sealed sixth emblem BENEATH the line-up — GOOPLIATH's own fight. */
-const GOOP_BTN = { x: 48, y: 518, w: 320, h: 54 } as const;
+const GOOP_BTN = { x: 48, y: 542, w: 320, h: 54 } as const;
 const GOOP_GREEN = '#36e05a';
-const CAMP_CLOSE = { x: CAMP_W - 48 - 170, y: 536, w: 170, h: 54 } as const;
+const CAMP_CLOSE = { x: CAMP_W - 48 - 170, y: 600, w: 170, h: 54 } as const;
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+
+/**
+ * A row of the four difficulty chips (EASY / NORMAL / HARD / BLAZING) at
+ * (x,y). `current` is the selected tier; locked tiers wear a padlock and
+ * never highlight. `interactive` gates the hover glow (raid guests just watch
+ * the host's pick). Shared by the campaign gauntlet panel and the raid lobby.
+ */
+function drawDiffChips(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  chipW: number,
+  gap: number,
+  h: number,
+  current: Difficulty,
+  hoverAction: MenuAction | null,
+  prefix: string,
+  interactive: boolean,
+): void {
+  DIFFICULTY_ORDER.forEach((tier, i) => {
+    const cx = x + i * (chipW + gap);
+    const open = difficultyUnlocked(tier);
+    const on = tier === current;
+    const accent = hexCss(DIFFICULTY[tier].accent);
+    const hot = interactive && open && hoverAction === (`${prefix}${tier}` as MenuAction);
+    plate(ctx, cx, y, chipW, h, {
+      cut: 8,
+      fill: on ? hexToRgba(accent, 0.28) : open ? 'rgba(150,150,170,0.10)' : 'rgba(150,150,170,0.04)',
+      stroke: on || hot ? accent : UI.steelDim,
+      rivets: false,
+    });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 17px system-ui, sans-serif';
+    ctx.fillStyle = on ? accent : open ? UI.text : UI.steelDim;
+    ctx.fillText(DIFFICULTY[tier].label, cx + chipW / 2, y + h / 2 + (open ? 0 : -3));
+    if (!open) padlock(ctx, cx + chipW / 2, y + h - 7, 0.4);
+  });
+}
+
+/** Hit-test a difficulty chip row; returns the action for an UNLOCKED tier. */
+function hitDiffChips(
+  px: number,
+  py: number,
+  x: number,
+  y: number,
+  chipW: number,
+  gap: number,
+  h: number,
+  prefix: string,
+): MenuAction | null {
+  if (py < y - 4 || py > y + h + 4) return null;
+  for (let i = 0; i < DIFFICULTY_ORDER.length; i++) {
+    const cx = x + i * (chipW + gap);
+    if (px >= cx && px <= cx + chipW) {
+      const tier = DIFFICULTY_ORDER[i];
+      return difficultyUnlocked(tier) ? (`${prefix}${tier}` as MenuAction) : null;
+    }
+  }
+  return null;
+}
 
 /** A simple stencil padlock for sealed stages. */
 function padlock(ctx: CanvasRenderingContext2D, cx: number, cy: number, s = 1): void {
@@ -2147,6 +2214,16 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     }
   }
 
+  // Run difficulty — governs the gauntlet + hardcore runs below (EASY always
+  // open, HARD/BLAZING earned by clearing the run a tier down). BLAZING wedges
+  // GOOPLIATH into the lineup 2nd-to-last.
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = stencilFont(20);
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText('DIFFICULTY', 48, DIFF_ROW.y + DIFF_ROW.h / 2);
+  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', true);
+
   // The timed runs — unlocked by clearing the gauntlet, then by finishing it.
   drawRunRow(
     ctx, RUN_BTN, 'RUN THE GAUNTLET', 'GAUNTLET SEALED', gauntletUnlocked(), UI.emberBright,
@@ -2202,6 +2279,8 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   const inBtn = (b: { x: number; y: number; w: number; h: number }): boolean =>
     x >= b.x && x <= b.x + b.w && y >= b.y - 5 && y <= b.y + b.h + 5;
   if (inBtn(CAMP_CLOSE)) return 'campaign-close';
+  const diff = hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-');
+  if (diff) return diff;
   if (inBtn(RUN_BTN) && gauntletUnlocked()) return 'campaign-speedrun';
   if (inBtn(HARD_BTN) && campaignProgress.hardcoreUnlocked) return 'campaign-hardcore';
   if (inBtn(GOOP_BTN) && goopliathUnlocked()) return 'campaign-goopliath';
@@ -2225,10 +2304,10 @@ function hitCampaign(u: number, v: number): MenuAction | null {
 // RANKED's server browser: hosting makes a VISIBLE room others can find.
 
 const RAID_W = 640;
-// Tall enough for TWO host breakers in a raid lobby (hardcore + goopliath)
-// with clear air before the status line — the panel's world height scales
-// with this at registration, so the layout just breathes.
-const RAID_H = 620;
+// Tall enough for the difficulty chip row + TWO host breakers (hardcore +
+// goopliath) with clear air before the status line — the panel's world height
+// scales with this at registration, so the layout just breathes.
+const RAID_H = 700;
 const RAID_ROW_Y0 = 150;
 const RAID_ROW_H = 58;
 const RAID_ROW_GAP = 10;
@@ -2246,7 +2325,10 @@ const RAID_SLOT_GAP = 10;
 // far too long to sit beside the toggle on one line (it used to run straight
 // through it). RAID_BREAKER_H is the row height both the draw and the hit
 // test share.
-const RAID_HC_Y = 396;
+// The run-difficulty chips (host-controlled, mirrored to the squad) sit just
+// below the seats, above the two breakers.
+const RAID_DIFF = { x: 188, y: 394, w: 90, gap: 7, h: 34 } as const;
+const RAID_HC_Y = 448;
 const RAID_BREAKER_H = 46;
 /** The second raid breaker: FIGHT GOOPLIATH — swap the titans for the tide. */
 const RAID_GOOP_Y = RAID_HC_Y + RAID_BREAKER_H + 6;
@@ -2391,6 +2473,18 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     ctx.textAlign = 'center';
   }
 
+  // The run difficulty (raid only) — the host picks, the squad sees. Guests
+  // get no hover glow (interactive=false); the mirrored pick launches for all.
+  if (mode === 'raid') {
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 17px system-ui, sans-serif';
+    ctx.fillStyle = UI.textDim;
+    ctx.fillText('DIFFICULTY', 70, RAID_DIFF.y + RAID_DIFF.h / 2);
+    drawDiffChips(ctx, RAID_DIFF.x, RAID_DIFF.y, RAID_DIFF.w, RAID_DIFF.gap, RAID_DIFF.h, mesh.raidDifficulty, hoverAction, 'raiddiff-', host);
+    ctx.textAlign = 'center';
+  }
+
   // The host breakers (raid only) — the host throws them; all see where they
   // sit. HARDCORE keeps the stakes; FIGHT GOOPLIATH swaps the whole run for
   // one long fight against the tide.
@@ -2459,6 +2553,10 @@ function hitRaid(u: number, v: number): MenuAction | null {
 
   if (app.lobbyView === 'lobby') {
     const onBreaker = (by: number): boolean => y >= by - 4 && y <= by + RAID_BREAKER_H && x >= 70 && x <= RAID_W - 70;
+    if (mode === 'raid' && mesh.isHost()) {
+      const rd = hitDiffChips(x, y, RAID_DIFF.x, RAID_DIFF.y, RAID_DIFF.w, RAID_DIFF.gap, RAID_DIFF.h, 'raiddiff-');
+      if (rd) return rd;
+    }
     if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_HC_Y)) return 'lobby-hardcore';
     if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_GOOP_Y)) return 'lobby-goopliath';
     const count = mesh.occupants.filter(Boolean).length;
