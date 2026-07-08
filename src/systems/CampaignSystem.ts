@@ -627,8 +627,12 @@ export class CampaignSystem extends createSystem({
     this.scene.add(this.goopFx.group);
     this.goop = new GelCreature(this.goopFx);
     // The man-sized distance LOD reads garbage inside a scaled parent — and a
-    // boss that fills the view is never "far". Pin the step budget instead.
+    // boss that fills the view is never "far". Pin the step budget instead
+    // (animateGoop sheds it further while a limb is mid-swing).
     this.goop.qualityOverride = GOOPLIATH.quality;
+    // Fireballs hit HARDER than fists — wider shove, deeper craters, bigger
+    // lumps. Spectacle only; the hit count is untouched.
+    this.goop.sim.impactScale = GOOPLIATH.impactScale;
     this.goopScale = (this.def.scale * GOOPLIATH.titanHeightPerScale) / GOOP_BODY.height;
     this.goopRoot = new Group();
     this.goopRoot.scale.setScalar(this.goopScale);
@@ -1168,8 +1172,12 @@ export class CampaignSystem extends createSystem({
       else _head.set(0, 0, -1);
       const punch = Math.min(GOOPLIATH.punchMax, GOOPLIATH.punchBase + speed * GOOPLIATH.punchGain);
       const res = goop.receivePunchWorld(_v, _head, punch);
-      sfx.squelch(0.45 + res.strength * 0.55);
-      this.goopFx?.flash(_v, 0x8cff70, 0.5 + res.strength * 0.6);
+      sfx.squelch(0.5 + res.strength * 0.5);
+      this.goopFx?.flash(_v, 0x8cff70, 0.7 + res.strength * 0.9);
+      // Splash-back: a second spray of droplets kicked TOWARD the thrower —
+      // the follow-through that sells the ball burying itself in the gel.
+      _p.set(-_head.x, Math.abs(_head.y) + 0.6, -_head.z).normalize();
+      this.goopFx?.burst(_v, _p, 3 + Math.round(res.strength * 4), 2.2 + res.strength * 1.6);
 
       if ((ball.getValue(Fireball, 'owner') ?? 0) !== 0) continue; // a squadmate's — theirs to score
       const hand = (ball.getValue(Fireball, 'hand') ?? 0) as 0 | 1;
@@ -2200,12 +2208,14 @@ export class CampaignSystem extends createSystem({
           }
         }
         if (age > burstClock) {
-          burstClock = age + 0.06;
+          // Kept lean — the seesaw is the boss's busiest beat, and particle
+          // spam here stacks on top of the gel's own swing cost.
+          burstClock = age + 0.09;
           const sx = side * rand(0.1, w - 0.2);
           const sz = rand(-OCTAGON_HALF_DEPTH, OCTAGON_HALF_DEPTH);
           _v.set(cx + sx * cos + sz * sin, 0.12, cz - sx * sin + sz * cos);
-          emberBurst(_v, 5, true);
-          if (k > 0.3 && k < 0.6) spawnFireImpact(world, _v, 1, 0.7);
+          emberBurst(_v, 4, true);
+          if (k > 0.3 && k < 0.55) spawnFireImpact(world, _v, 1, 0.7);
         }
       },
       dispose() {
@@ -2419,6 +2429,11 @@ export class CampaignSystem extends createSystem({
     this.playerHeadOf(fighting ? this.faceSeat : this.mySeatId(), _head);
     _p.copy(_head).sub(root.position).divideScalar(root.scale.x || 1);
     goop.faceToward(_p);
+
+    // A mid-swing limb stretches the raymarch's bounding box across far more
+    // of the view — exactly when frame time spikes — so the step budget
+    // drops for the swing and snaps back with the limb.
+    goop.qualityOverride = goop.isPunching ? GOOPLIATH.attackQuality : GOOPLIATH.quality;
 
     goop.update(delta * GOOPLIATH.timeScale, _head);
 

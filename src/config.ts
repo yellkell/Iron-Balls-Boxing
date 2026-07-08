@@ -451,6 +451,15 @@ export const GOOPLIATH = {
   /** Raymarch quality override (1 = the full step budget). The gel shader is
    *  fill-rate bound and a boss this size covers a LOT of Quest pixels. */
   quality: 0.85,
+  /** Step budget while an attack is mid-swing: an extended limb stretches
+   *  the march's bounding box across far more of the view — the exact moment
+   *  frame time spikes — so the budget drops while he's punching and comes
+   *  back the moment the limb snaps home. */
+  attackQuality: 0.6,
+  /** How hard a landed ball physically works the gel, relative to a GOOP
+   *  fist: >1 shoves the blobs harder, carves wider/deeper craters and tears
+   *  bigger lumps — pure spectacle, damage is untouched (hits are hits). */
+  impactScale: 1.45,
   /** THE SEESAW — his signature: he floods one half of your platform, then
    *  the other, with this many seconds between halves — enough time to hurl
    *  yourself across the centreline, no more. As the fight progresses the
@@ -467,10 +476,10 @@ export const GOOPLIATH = {
   finalHaste: 0.6,
   /** How hard a fireball reads as a "fist" to the gel sim: reaction speed =
    *  base + ball speed × gain, capped. Past ~2.5 the sim tears a LUMP out —
-   *  so only genuinely hard throws knock chunks off. */
-  punchBase: 1.5,
-  punchGain: 0.11,
-  punchMax: 3.4,
+   *  soft lobs squish, genuinely hard throws knock chunks off. */
+  punchBase: 1.55,
+  punchGain: 0.13,
+  punchMax: 3.6,
 };
 
 /** Match format: best-of rounds, Blaston-style pacing. */

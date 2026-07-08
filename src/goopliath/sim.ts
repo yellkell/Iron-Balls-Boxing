@@ -111,6 +111,11 @@ export class GoopSim {
    */
   blendScale = 1;
 
+  /** How hard incoming hits physically work the gel (boss fights turn this
+   *  up): scales the blob shove, the crater size and the torn-lump size —
+   *  spectacle only, it never touches scoring. */
+  impactScale = 1;
+
   /** Extra per-anchor offsets (punch animation drives arm anchors here). */
   readonly offsets: Float32Array = new Float32Array(ANCHOR_COUNT * 3);
   /** Extra per-anchor radius scale (the striking fist swells). */
@@ -300,7 +305,9 @@ export class GoopSim {
     if (d > 0.06) return { hit: false, lump: false, strength: 0 };
 
     const strength = Math.min(1, (speed - PUNCH.hitSpeed) / (PUNCH.lumpSpeed * 1.6 - PUNCH.hitSpeed));
-    const kick = speed * PUNCH.impulse;
+    const kick = speed * PUNCH.impulse * this.impactScale;
+    // A harder impact also rings a wider patch of the surface.
+    const splash = PUNCH.splashRadius * Math.sqrt(this.impactScale);
 
     // Shove every core blob near the contact, falloff by distance.
     for (const b of this.core) {
@@ -308,8 +315,8 @@ export class GoopSim {
       const dy = b.y - point.y;
       const dz = b.z - point.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist > PUNCH.splashRadius) continue;
-      const w = 1 - dist / PUNCH.splashRadius;
+      if (dist > splash) continue;
+      const w = 1 - dist / splash;
       const boost = w * w * kick * 0.016; // verlet: shift prev to add velocity
       b.px -= dir.x * boost;
       b.py -= dir.y * boost;
@@ -323,9 +330,10 @@ export class GoopSim {
       x: point.x + dir.x * 0.08,
       y: point.y + dir.y * 0.08,
       z: point.z + dir.z * 0.08,
-      rMax: 0.14 + 0.13 * strength,
+      rMax: (0.14 + 0.13 * strength) * this.impactScale,
       age: 0,
-      life: PUNCH.dentLife,
+      // Bigger craters linger a touch longer so the cave-in reads out fully.
+      life: PUNCH.dentLife * (0.8 + 0.2 * this.impactScale),
     });
 
     // Set the whole surface roiling — the ripple you feel after a solid hit.
@@ -335,7 +343,7 @@ export class GoopSim {
     let tore = false;
     if (speed >= PUNCH.lumpSpeed && this.lumps.length < CREATURE.maxLumps && this.ko === 0) {
       tore = true;
-      const r = 0.085 + 0.05 * strength;
+      const r = (0.085 + 0.05 * strength) * Math.min(1.35, this.impactScale);
       // Volume theft: the nearest couple of core blobs shrink to pay for it.
       let nearest = 0;
       let nd = 1e5;
