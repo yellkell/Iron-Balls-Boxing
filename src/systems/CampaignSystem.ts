@@ -68,6 +68,7 @@ import { opponents } from '../combat/opponentBus.js';
 import { applyArenaLayout } from '../arena/arena.js';
 import { app, saveStats } from '../menu/appState.js';
 import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customization.js';
+import { addCoins } from '../menu/wallet.js';
 import { mesh } from '../net/mesh.js';
 import type { PeerMessage } from '../net/protocol.js';
 import { myName, reportCampaign, reportRun } from '../net/leaderboard.js';
@@ -85,6 +86,7 @@ import {
   ARENA_GAP,
   CAMPAIGN,
   COMBAT,
+  CURRENCY,
   FIREBALL,
   GOOPLIATH,
   MODE_LAYOUT,
@@ -2582,7 +2584,10 @@ export class CampaignSystem extends createSystem({
         saveCampaignProgress();
       }
     }
-    reportCampaign(true, firstClear);
+    // GOOPLIATH stays OFF every board: no XP write, no run record — the
+    // fight pays plain coins locally and that's all. Titans report as ever.
+    if (goopMode) addCoins(CURRENCY.perGame * (firstClear ? 2 : 1));
+    else reportCampaign(true, firstClear);
 
     // Felling the king crowns you: the CHAMPION pad joins your locker.
     // (Also granted retroactively to saves that beat GOLIATH pre-reward.
@@ -2662,7 +2667,9 @@ export class CampaignSystem extends createSystem({
 
     app.stats.losses += 1;
     saveStats();
-    reportCampaign(false, false); // the consolation rate, same as a bot loss
+    // GOOPLIATH stays off every board — the consolation is coins only.
+    if (this.goopMode()) addCoins(CURRENCY.perGame);
+    else reportCampaign(false, false); // the consolation rate, same as a bot loss
     if (this.goopMode()) {
       // The tide takes everyone eventually.
       this.hud.title('DISSOLVED', this.raid() ? 'the squad is spent' : '', '#e8352a');
