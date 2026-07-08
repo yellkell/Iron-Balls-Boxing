@@ -791,6 +791,9 @@ export class FireballSystem extends createSystem({
           ball.setValue(Fireball, 'recallLock', 0);
           ball.setValue(Fireball, 'returnHit', st === BallState.Dead ? 1 : 0);
           this.netBlend.delete(ball);
+          // You HEAR their throw — hear their recall too: a returning enemy
+          // ball changing course is exactly the read a dodge needs.
+          sfx.recall();
           // Mirror the rival's fired attachment onto our copy of their ball so
           // it splits/scales and deals matching damage when it reaches us.
           if (cmd.att) {
