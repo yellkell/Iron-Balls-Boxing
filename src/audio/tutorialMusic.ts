@@ -13,7 +13,7 @@ import { isMusicMuted } from './menuMusic.js';
 import { musicVolume } from './musicVolume.js';
 import breakcoreUrl from '../assets/music/breakcore.mp3?url';
 
-const VOLUME = 0.4;
+const VOLUME = 0.12; // matched to the battle-music floor — music is the floor, SFX the foreground
 
 let audio: HTMLAudioElement | null = null;
 

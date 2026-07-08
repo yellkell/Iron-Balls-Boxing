@@ -31,6 +31,10 @@ const battleUrls = Object.values(
 // the floor, everywhere.
 const BATTLE_VOLUME = 0.12;
 export const BOSS_BATTLE_VOLUME = BATTLE_VOLUME;
+/** The one exception to the floor: raid GOLIATH's resurrection anthem is a
+ *  SET PIECE — the rise is scored to it — so it plays above the battle bed
+ *  (though still well under the lobby's 0.5). */
+const FINALE_VOLUME = 0.2;
 const VICTORY_VOLUME = 0.26;
 
 // Post-match handoff timings.
@@ -102,7 +106,7 @@ export function startFinaleTrack(): void {
     finale = new Audio(brainEaterUrl);
     finale.loop = true;
   }
-  finale.volume = BOSS_BATTLE_VOLUME * musicVolume();
+  finale.volume = FINALE_VOLUME * musicVolume();
   finale.currentTime = 0;
   void finale.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */
