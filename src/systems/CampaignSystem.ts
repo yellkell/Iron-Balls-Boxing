@@ -1984,6 +1984,12 @@ export class CampaignSystem extends createSystem({
     // Difficulty is the outer multiplier: EASY dawdles, BLAZING presses. The
     // pressure lives in the GAP, never the windup (chargeTime is its own knob).
     mult *= this.diff.cooldown;
+    // FLOOR the compounding: enrage × (crown/finalHaste) × difficulty could
+    // otherwise stack to ~0.2, spamming attacks so fast that the seesaw/surge
+    // floods (slabs + particles) pile up and drag the frame — this was the
+    // "blazing GOOPLIATH is laggier" tell. Cap the fastest cadence; the gel
+    // itself renders no differently, so the effect density was the cost.
+    mult = Math.max(0.5, mult);
     return rand(this.def.cooldownMin, this.def.cooldownMax) * mult;
   }
 
