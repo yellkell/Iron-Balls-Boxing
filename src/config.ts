@@ -461,12 +461,14 @@ export const GOOPLIATH = {
   attackQuality: 0.5,
   /** How far his gesture swings extend, in body-scale units from his centre.
    *  He never needs to reach the player's platform — the floor zones carry
-   *  the danger — and a short lunge keeps the raymarch box (and the frame
-   *  time) from ballooning across the whole arena mid-swing. */
-  gestureReach: 0.85,
+   *  the danger — and the swing must stay basically WITHIN his silhouette:
+   *  any limb stretched toward the player drags the raymarch's bounding box
+   *  (and the frame time) across the view with it. The wind-up pose is the
+   *  telegraph; the strike is a tight body-local snap. */
+  gestureReach: 0.5,
   /** How hard a landed ball physically works the gel, relative to a GOOP
-   *  fist: >1 shoves the blobs harder, carves wider/deeper craters and tears
-   *  bigger lumps — pure spectacle, damage is untouched (hits are hits). */
+   *  fist: >1 shoves the blobs harder and carves wider/deeper craters —
+   *  pure spectacle, damage is untouched (hits are hits). */
   impactScale: 1.45,
   /** THE SEESAW — his signature: he floods one half of your platform, then
    *  the other, with this many seconds between halves — enough time to hurl
@@ -483,8 +485,8 @@ export const GOOPLIATH = {
    *  fight escalates instead of plateauing. */
   finalHaste: 0.6,
   /** How hard a fireball reads as a "fist" to the gel sim: reaction speed =
-   *  base + ball speed × gain, capped. Past ~2.5 the sim tears a LUMP out —
-   *  soft lobs squish, genuinely hard throws knock chunks off. */
+   *  base + ball speed × gain, capped. Drives shove/dent/roil strength —
+   *  lumps are disabled for the boss (goopConfig CREATURE.maxLumps 0). */
   punchBase: 1.55,
   punchGain: 0.13,
   punchMax: 3.6,

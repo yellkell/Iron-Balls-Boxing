@@ -19,8 +19,11 @@ export const CREATURE = {
   globHeight: 0.95,
   /** Smooth-min blend width — how gloopily the blobs fuse (bigger = soupier). */
   blend: 0.19,
-  /** Max simultaneous knocked-out lumps in flight/resting on the floor. */
-  maxLumps: 8,
+  /** Max simultaneous knocked-out lumps in flight/resting on the floor.
+   *  ZERO for the boss: torn-off globs flying at the player (and crawling
+   *  home after) cost blobs in the march loop and frames on Quest — the
+   *  body's own dents/jiggle carry the hit feedback. */
+  maxLumps: 0,
   /** Max simultaneous impact dents (negative blobs carved by fireballs). */
   maxDents: 4,
   /** Seconds for glob -> boxer form-up (and back down). */
