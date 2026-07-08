@@ -337,16 +337,15 @@ export function ignite(): void {
 
 /**
  * A punched ball leaving the fist. Throw and recall are designed as
- * OPPOSITES so they never blur mid-fight: the throw is percussive and
- * FALLING — a hard crack off the knuckles, departing air dropping away in
- * pitch, a launch kick in the chest. (The recall is its tonal, RISING
- * mirror below.)
+ * OPPOSITES so they never blur mid-fight: the throw is a deep, smooth,
+ * FALLING whoomp — full-bodied departing air over a round sub punch,
+ * everything below ~1.2 kHz, nothing bright, nothing metallic. (The recall
+ * is its tonal, RISING mirror below.)
  */
 export function throwWhoosh(): void {
-  noiseHit(0.045, 0.3, 5200, 1600, 0.8); // the crack off the knuckles
-  whooshNoise(0.34, 0.26, 1500, 240); // departing air — pitch falls away
-  tone({ freq: 300, to: 62, type: 'sawtooth', dur: 0.16, gain: 0.09 }); // hot tail dropping
-  tone({ freq: 96, to: 40, type: 'sine', dur: 0.16, gain: 0.22 }); // launch kick
+  whooshNoise(0.38, 0.3, 1000, 190); // full-bodied departing air, falling away
+  noiseHit(0.07, 0.15, 750, 260, 0.6); // dull release puff off the glove
+  tone({ freq: 120, to: 44, type: 'sine', dur: 0.2, gain: 0.28 }); // the WHOOMP you feel
 }
 
 /** Recall pulled — the throw's mirror: a tonal, RISING pull. Two detuned
