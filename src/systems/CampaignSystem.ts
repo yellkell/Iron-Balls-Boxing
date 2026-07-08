@@ -39,7 +39,7 @@ import {
 import { BOSSES, buildTitan, goopliathBoss, raidBoss, type AttackKind, type BossDef, type TitanRig } from '../campaign/bosses.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { GooFx } from '../goopliath/splats.js';
-import { CREATURE as GOOP_BODY } from '../goopliath/goopConfig.js';
+import { ATTACKS as GOOP_ATTACKS, CREATURE as GOOP_BODY, type AttackName as GoopAttackName } from '../goopliath/goopConfig.js';
 import {
   campaign,
   campaignProgress,
@@ -1644,7 +1644,29 @@ export class CampaignSystem extends createSystem({
       seats,
       zoneSeats,
     };
+    if (this.goop) this.goopTelegraph(this.attack.kind, chargeTime, seats[0]);
     sfx.chargeWhine(chargeTime);
+  }
+
+  /**
+   * GOOPLIATH's telegraphs are his own BODY — a distinct silhouette per
+   * attack, stretched so the whip lands exactly ON the detonation: the
+   * spinning BACKFIST coils through a sweep's whole charge, BOTH ARMS rear
+   * up into the clap for the seesaw, a straight CROSS thrusts down the beam
+   * line, and the nova surges up out of an UPPERCUT. (The floor decals stay
+   * — the gesture is the far tell, the floor the near one.)
+   */
+  private goopTelegraph(kind: AttackKind, chargeTime: number, seat: number): void {
+    const goop = this.goop;
+    if (!goop) return;
+    const name: GoopAttackName =
+      kind === 'sweep' ? 'backfist' : kind === 'seesaw' ? 'clap' : kind === 'beam' ? 'cross' : 'uppercut';
+    // The gel clock runs slow (GOOPLIATH.timeScale): rescale its native
+    // telegraph so wind-up + charge share one clock and the strike phase
+    // begins as the first zone resolves.
+    goop.tempoScale = Math.max(0.4, (chargeTime * GOOPLIATH.timeScale) / GOOP_ATTACKS[name].telegraph);
+    this.seatPoint(seat, 0, 1.5, 0, _v);
+    goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', _v);
   }
 
   /** My head's local X (for arm choice when I'm the one being hunted). */
@@ -1829,9 +1851,8 @@ export class CampaignSystem extends createSystem({
     } else if (kind === 'sweep') {
       sfx.sweepWhoosh();
       if (zone.kind === 'sweep') this.spawnBladeSweep(zone.y, this.attack!.arm, seat);
-      // GOOPLIATH's sweep IS the spin attack: the whole gel body coils and
-      // whips through a spinning kick while the blade travels.
-      if (this.goop) this.goopFlavourSwing('spinkick', seat);
+      // (GOOPLIATH already coiled through the charge — his backfist telegraph
+      // whips through on this beat; see goopTelegraph.)
       this.strikeSwing[this.attack!.arm] = 0.6;
       // The squad sweep: the titan whips through a FULL TURN while the blade
       // cascades around the arc — re-armed per landing so the spin carries
@@ -1847,8 +1868,7 @@ export class CampaignSystem extends createSystem({
       sfx.beamBlast();
       sfx.slamImpact();
       if (zone.kind === 'nova') this.spawnNovaWave(zone.angle, zone.halfAngle, seat);
-      // GOOPLIATH claps the wave out of himself — flavour, not hit logic.
-      if (this.goop) this.goopFlavourSwing('clap', seat);
+      // (GOOPLIATH's uppercut telegraph surges the wave out on this beat.)
     } else if (kind === 'seesaw') {
       sfx.gooSlam();
       if (zone.kind === 'half') {

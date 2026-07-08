@@ -436,10 +436,11 @@ export const GOOPLIATH = {
   /** Fireball hits to fell him. THE longest fight in the game by design. */
   hitsCampaign: 75,
   hitsRaid: 300,
-  /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign matches the
-   *  raid cut of GOLIATH (~7.3 m); the raid cut stands taller still. */
-  scaleCampaign: 3.95,
-  scaleRaid: 5.2,
+  /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
+   *  solo GOLIATH's size (~4.9 m of gel across the duel gap); the raid cut
+   *  is a third taller again for the wide ring. */
+  scaleCampaign: 2.65,
+  scaleRaid: 3.45,
   /** Titan rigs stand ~1.85 m per scale unit; the gel sim is 1.78 m tall at
    *  native size — this converts def.scale into the parent group's scale. */
   titanHeightPerScale: 1.85,
