@@ -35,7 +35,7 @@ export const BOSS_BATTLE_VOLUME = BATTLE_VOLUME;
  *  SET PIECE — the rise is scored to it — so it plays above the battle bed
  *  (though still well under the lobby's 0.5). */
 const FINALE_VOLUME = 0.2;
-const VICTORY_VOLUME = 0.26;
+const VICTORY_VOLUME = 0.12; // on the same floor as everything else
 
 // Post-match handoff timings.
 const VICTORY_LOBBY_MS = 6500; // extra airtime in the lobby if the sting has more
