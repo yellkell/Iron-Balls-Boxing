@@ -27,54 +27,64 @@
           radial-gradient(circle at 72% 28%, rgba(229, 63, 26, 0.24), transparent 34rem),
           linear-gradient(135deg, #07080b 0%, #13151a 52%, #22100b 100%);
       }
+      /* The landing is the in-game marquee, verbatim: the FIRE FIGHT sign
+         breathing in its pool of red, on black, one button beneath. */
       .landing {
         position: fixed;
         inset: 0;
         z-index: 1000;
-        display: grid;
+        display: flex;
+        flex-direction: column;
         align-items: center;
-        padding: clamp(24px, 7vw, 96px);
+        justify-content: center;
+        gap: clamp(28px, 6vh, 56px);
+        padding: clamp(16px, 5vw, 48px);
         box-sizing: border-box;
-        color: #f4efe8;
-        background:
-          linear-gradient(90deg, rgba(4, 5, 8, 0.94) 0%, rgba(4, 5, 8, 0.72) 48%, rgba(4, 5, 8, 0.24) 100%),
-          linear-gradient(180deg, rgba(230, 68, 26, 0.22) 0%, rgba(230, 68, 26, 0) 44%);
+        background: #000;
         transition:
           opacity 220ms ease,
           visibility 220ms ease;
       }
-      .landing::after {
-        content: "";
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background:
-          linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-        background-size: 72px 72px;
-        mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.72), transparent 68%);
+      .landing__logo-wrap {
+        position: relative;
+        display: grid;
+        place-items: center;
       }
-      .landing__content {
+      .landing__logo {
         position: relative;
         z-index: 1;
-        max-width: 640px;
+        width: min(82vw, 620px);
+        height: auto;
       }
-      .landing__eyebrow {
-        margin: 0 0 34px;
-        color: #ff8b52;
-        font-size: clamp(3.4rem, 9vw, 8rem);
-        font-weight: 800;
-        line-height: 0.9;
-        letter-spacing: 0;
-        text-transform: uppercase;
+      /* The ACTIVE red glow behind the sign — the same breathing pool the
+         menu banner sits in: a wide haze under a hotter core. */
+      .landing__glow {
+        position: absolute;
+        width: 130%;
+        aspect-ratio: 3 / 2.4;
+        border-radius: 50%;
+        pointer-events: none;
+        background:
+          radial-gradient(circle, rgba(255, 42, 16, 0.5) 0%, rgba(255, 42, 16, 0.22) 34%, rgba(255, 42, 16, 0) 62%),
+          radial-gradient(circle, rgba(196, 18, 8, 0.42) 0%, rgba(196, 18, 8, 0.18) 48%, rgba(196, 18, 8, 0) 72%);
+        filter: blur(4px);
+        animation: landing-breathe 2.6s ease-in-out infinite;
       }
-      .landing__subtitle {
-        margin: -20px 0 34px;
-        color: rgba(244, 239, 232, 0.82);
-        font-size: clamp(1.15rem, 2.7vw, 2rem);
-        font-weight: 800;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
+      @keyframes landing-breathe {
+        0%,
+        100% {
+          opacity: 0.55;
+          transform: scale(0.94);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.08);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .landing__glow {
+          animation: none;
+        }
       }
       .enter-vr {
         width: min(100%, 280px);
@@ -115,30 +125,20 @@
         pointer-events: none;
       }
       @media (max-width: 700px) {
-        .landing {
-          align-items: end;
-        }
-        .landing__eyebrow {
-          font-size: clamp(2.6rem, 17vw, 4.8rem);
-        }
-        .landing__subtitle {
-          margin-top: -18px;
-          font-size: clamp(0.95rem, 5vw, 1.25rem);
-        }
-        .enter-vr {
-          width: 100%;
+        .landing__logo {
+          width: min(92vw, 620px);
         }
       }
     </style>
   </head>
   <body>
     <div id="scene-container"></div>
-    <section class="landing" id="landing" aria-labelledby="landing-title">
-      <main class="landing__content">
-        <h1 class="landing__eyebrow" id="landing-title">Fire Fight</h1>
-        <p class="landing__subtitle">Iron Sharpens Iron</p>
-        <button class="enter-vr" id="enter-vr" type="button">Enter VR</button>
-      </main>
+    <section class="landing" id="landing" aria-label="Fire Fight">
+      <div class="landing__logo-wrap">
+        <div class="landing__glow" aria-hidden="true"></div>
+        <img class="landing__logo" src="/signs/fire-fight.png" alt="FIRE FIGHT" />
+      </div>
+      <button class="enter-vr" id="enter-vr" type="button">Enter VR</button>
     </section>
     <script type="module" src="/src/main.ts"></script>
   </body>
