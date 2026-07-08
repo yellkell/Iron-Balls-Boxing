@@ -273,8 +273,8 @@ export const GOOPLIATH_DEF: BossDef = {
   cooldownMin: 2.3,
   cooldownMax: 3.3,
   charge: { slam: 1.6, sweep: 1.7, beam: 1.75, volley: 1.8, nova: 2.6, seesaw: 1.8 },
-  weights: { slam: 0, sweep: 3, beam: 3, volley: 0, nova: 3, seesaw: 5 },
-  volleyCount: 0,
+  weights: { slam: 0, sweep: 3, beam: 3, volley: 3, nova: 3, seesaw: 5 },
+  volleyCount: 4,
   beams: 2,
   swayAmp: 0, // the gel sim carries its own idle motion
   slamStyle: 'single',

@@ -65,7 +65,7 @@ import { match } from '../combat/matchState.js';
 import { applyRoster, fighterAt } from '../combat/setup.js';
 import { localIndexOf, peerPos, worldToPeer } from '../combat/layout.js';
 import { opponents } from '../combat/opponentBus.js';
-import { applyArenaLayout } from '../arena/arena.js';
+import { applyArenaLayout, platformName, tintPlatform } from '../arena/arena.js';
 import { app, saveStats } from '../menu/appState.js';
 import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customization.js';
 import { addCoins } from '../menu/wallet.js';
@@ -92,6 +92,7 @@ import {
   MODE_LAYOUT,
   OCTAGON_HALF_DEPTH,
   OCTAGON_HALF_WIDTH,
+  PALETTE,
   RAID,
   RAID_RING_RADIUS,
 } from '../config.js';
@@ -576,6 +577,13 @@ export class CampaignSystem extends createSystem({
 
     if (goopMode) this.parkHitboxes(); // no weak points — the SDF is the hitbox
     else this.ensureHitboxes();
+    // GOOPLIATH's ground runs goop-green: the raid pit pedestal, or the far
+    // pedestal his solo fight looms behind. (Titans keep their tints —
+    // teardown puts the pit back in danger red.)
+    if (goopMode) {
+      const pad = this.scene.getObjectByName(this.raid() ? 'raid-boss-platform' : platformName(1));
+      if (pad) tintPlatform(pad, this.def.accent);
+    }
     this.disposeShots();
     this.disposeAttack();
     this.cycleIdx = 0; // every pattern opens on the head
@@ -700,6 +708,10 @@ export class CampaignSystem extends createSystem({
     }
     applyRoster();
     applyArenaLayout(this.scene);
+    // A GOOPLIATH bout leaves the pit pedestal green — hand it back to the
+    // titans in danger red (the slot pads re-tint in applyArenaLayout).
+    const pit = this.scene.getObjectByName('raid-boss-platform');
+    if (pit) tintPlatform(pit, PALETTE.danger);
   }
 
   // --- intro ceremony ---------------------------------------------------------
@@ -1205,8 +1217,14 @@ export class CampaignSystem extends createSystem({
 
   // --- the volley: blockable fireballs -----------------------------------------
 
-  /** Pod muzzle world position on `side` (matches the pod bonus hitboxes). */
+  /** Pod muzzle world position on `side` (matches the pod bonus hitboxes).
+   *  GOOPLIATH has no pods — his volley spits from the gel's shoulder mass. */
   private podPos(side: -1 | 1, out: Vector3): void {
+    if (this.goop) {
+      const root = this.goopRoot!.position;
+      out.set(root.x + side * 0.42 * this.goopScale, root.y + 1.32 * this.goopScale, root.z);
+      return;
+    }
     const s = this.def.scale;
     const root = this.rig!.root.position;
     out.set(root.x + side * 0.37 * s, root.y + 1.44 * s, root.z);
@@ -1220,7 +1238,8 @@ export class CampaignSystem extends createSystem({
     this.playerHeadOf(seat, _head);
     const group = new Group();
     group.add(glowSprite(this.def.accent, 0.55));
-    const core = glowSprite(0xffe9c2, 0.26);
+    // The gel spits GREEN fire — a pale lime core instead of furnace-warm.
+    const core = glowSprite(this.goop ? 0xeaffdd : 0xffe9c2, 0.26);
     group.add(core);
     group.position.copy(_v);
     this.scene.add(group);
@@ -1229,7 +1248,8 @@ export class CampaignSystem extends createSystem({
     const speed = CAMPAIGN.volleySpeed * (this.raid() ? RAID.volleySpeedMult : 1);
     const vel = new Vector3().copy(_head).sub(_v).normalize().multiplyScalar(speed);
     this.shots.push({ pos: _v.clone(), vel, age: 0, group, trail: 0, seat });
-    sfx.mortarThump();
+    if (this.goop) sfx.gooWhoosh(); // spat, not fired
+    else sfx.mortarThump();
   }
 
   private updateShots(delta: number): void {
@@ -1668,7 +1688,15 @@ export class CampaignSystem extends createSystem({
     const goop = this.goop;
     if (!goop) return;
     const name: GoopAttackName =
-      kind === 'sweep' ? 'backfist' : kind === 'seesaw' ? 'clap' : kind === 'beam' ? 'cross' : 'uppercut';
+      kind === 'sweep'
+        ? 'backfist'
+        : kind === 'seesaw'
+          ? 'clap'
+          : kind === 'beam'
+            ? 'cross'
+            : kind === 'volley'
+              ? 'jab'
+              : 'uppercut';
     // The gel clock runs slow (GOOPLIATH.timeScale): rescale its native
     // telegraph so wind-up + charge share one clock and the strike phase
     // begins as the first zone resolves.
@@ -1801,7 +1829,14 @@ export class CampaignSystem extends createSystem({
         this.detonate(a.kind, a.zones[i], a.zoneSeats[i] ?? a.seats[0]);
       } else {
         const fill = clamp(a.time / dueAt, 0, 1);
-        a.telegraphs[i]?.update(fill, this.time);
+        const tg = a.telegraphs[i];
+        if (tg) {
+          tg.update(fill, this.time);
+          // The seesaw shows only the IMMINENT beat and the one after — five
+          // panes at once made "which side is next" a shrug; two reads as
+          // "THIS side now, THAT side next".
+          if (a.zones[i].kind === 'half') tg.group.visible = dueAt - a.time < GOOPLIATH.seesawGap * 1.9;
+        }
         const m = a.markers[i];
         const zone = a.zones[i];
         if (m && zone.kind === 'shot') {
@@ -1893,11 +1928,10 @@ export class CampaignSystem extends createSystem({
       // (GOOPLIATH's uppercut telegraph surges the wave out on this beat.)
     } else if (kind === 'seesaw') {
       sfx.gooSlam();
-      if (zone.kind === 'half') {
-        this.spawnHalfFlood(zone.side, seat);
-        // The tide slams that half with the matching gel limb.
-        this.goopFlavourSwing(zone.side === 1 ? 'overhand' : 'hook', seat);
-      }
+      // The opening clap (his telegraph) is the ONLY swing the seesaw gets —
+      // per-half limb slams re-ballooned the raymarch bounds on every beat
+      // and read as random punching; the flood visual carries the landings.
+      if (zone.kind === 'half') this.spawnHalfFlood(zone.side, seat);
     } else {
       if (zone.kind === 'shot') this.launchShot(zone.side, seat);
     }
@@ -2238,14 +2272,6 @@ export class CampaignSystem extends createSystem({
         slab.removeFromParent();
       },
     });
-  }
-
-  /** A gel limb thrown WITH a detonation — pure theatre, aimed a short lunge
-   *  toward the marked seat; the floor zones own the actual damage. Skipped
-   *  mid-swing. */
-  private goopFlavourSwing(name: 'overhand' | 'hook' | 'clap' | 'spinkick', seat: number): void {
-    if (!this.goop) return;
-    this.goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', this.goopSwingTarget(seat, _v));
   }
 
   private updateStrikes(delta: number): void {

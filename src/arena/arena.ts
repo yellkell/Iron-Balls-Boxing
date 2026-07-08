@@ -266,8 +266,9 @@ function xdFaceTexture(): CanvasTexture {
   return xdFaceTex;
 }
 
-/** Recolour a platform's neon rim + slab emissive to a team tint. */
-function tintPlatform(group: Object3D, color: number): void {
+/** Recolour a platform's neon rim + slab emissive to a team tint. (Exported
+ *  for CampaignSystem: GOOPLIATH's ground goes goop-green for his fights.) */
+export function tintPlatform(group: Object3D, color: number): void {
   const core = new Color(color).lerp(new Color(0xffffff), 0.45);
   const tint = new Color(color);
   group.traverse((o) => {

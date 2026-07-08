@@ -136,18 +136,18 @@ const HALF_FRAG = /* glsl */ `
   void main(){
     vec3 col = warnColor();
     float a = 0.0;
-    // The flood: the whole half fills as the wave charges. Alpha rides the
-    // FILL hard (a seesaw stacks several of these panes per side, each on its
-    // own clock) so the stage landing NEXT is always the bright one and the
-    // far-future stages stay faint.
-    a += 0.03 + 0.55 * uFill * uFill;
+    // The flood: the whole half fills as the wave charges. Only TWO panes
+    // ever show at once (the imminent beat and the one after — see
+    // advanceAttack), so the ramp is bold: the side about to blow is
+    // unmistakably the bright one, its follow-up a faint promise.
+    a += 0.05 + 0.55 * uFill;
     // The centreline rail — the honest border you must be across. The mesh is
     // authored with u = 0 on the centreline, u = 1 at the outer rim.
-    a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.15 + 0.85 * uFill);
+    a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.25 + 0.75 * uFill);
     // Bands marching toward the centreline — CROSS HERE, the other half lives.
     float lane = fract(vUv.x * 5.0 + uTime * 2.4);
     float band = step(0.72, lane) * step(abs(fract(vUv.y * 3.0) - 0.5), 0.32);
-    a += band * 0.3 * uFill;
+    a += band * (0.1 + 0.25 * uFill);
     a *= pulse();
     gl_FragColor = vec4(col, a);
   }
