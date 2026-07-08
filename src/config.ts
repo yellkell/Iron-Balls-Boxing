@@ -342,8 +342,11 @@ export const CAMPAIGN = {
   volleyInterval: 0.45, // seconds between shots in a volley
   volleyBlockRadius: 0.32, // a fist this close deflects the shot
   volleyHitRadius: 0.22, // shot core radius vs your body spheres
-  enrageCooldownMult: 0.65, // enraged titans attack this much sooner…
-  enrageChargeMult: 0.85, // …and charge that much faster
+  // Enrage compresses the GAPS, never the reads: the windup/telegraph length
+  // is sacred (a late-fight laser must stay as dodgeable as the first one),
+  // so an enraged boss only attacks sooner — and now noticeably sooner, to
+  // keep enrage meaning something without the old charge squeeze.
+  enrageCooldownMult: 0.55,
 
   // THE GAUNTLET RUN — all five back to back, unlocked once all are felled.
   // The clock only counts fight time, so intros/collapses cost you nothing.
@@ -455,7 +458,12 @@ export const GOOPLIATH = {
    *  the march's bounding box across far more of the view — the exact moment
    *  frame time spikes — so the budget drops while he's punching and comes
    *  back the moment the limb snaps home. */
-  attackQuality: 0.6,
+  attackQuality: 0.5,
+  /** How far his gesture swings extend, in body-scale units from his centre.
+   *  He never needs to reach the player's platform — the floor zones carry
+   *  the danger — and a short lunge keeps the raymarch box (and the frame
+   *  time) from ballooning across the whole arena mid-swing. */
+  gestureReach: 0.85,
   /** How hard a landed ball physically works the gel, relative to a GOOP
    *  fist: >1 shoves the blobs harder, carves wider/deeper craters and tears
    *  bigger lumps — pure spectacle, damage is untouched (hits are hits). */

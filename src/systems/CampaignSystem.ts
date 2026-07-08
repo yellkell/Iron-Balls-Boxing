@@ -1461,10 +1461,10 @@ export class CampaignSystem extends createSystem({
     this.disposeAttack(); // a straggling ratk never stacks two live attacks
     if (!seats.length) seats = [this.mySeatId()];
     this.faceSeat = seats[0];
-    const chargeTime =
-      kind === 'decree'
-        ? RAID.decreeCharge
-        : this.def.charge[kind] * (this.enraged ? CAMPAIGN.enrageChargeMult : 1);
+    // The windup is SACRED whatever the phase — enrage and GOOPLIATH's haste
+    // compress the cooldown between attacks (attackCooldown), never the
+    // telegraph itself: a late-fight laser reads exactly like the first one.
+    const chargeTime = kind === 'decree' ? RAID.decreeCharge : this.def.charge[kind];
     const zones: Zone[] = [];
     const zoneSeats: number[] = [];
     const telegraphs: (Telegraph | null)[] = [];
@@ -1673,8 +1673,22 @@ export class CampaignSystem extends createSystem({
     // telegraph so wind-up + charge share one clock and the strike phase
     // begins as the first zone resolves.
     goop.tempoScale = Math.max(0.4, (chargeTime * GOOPLIATH.timeScale) / GOOP_ATTACKS[name].telegraph);
-    this.seatPoint(seat, 0, 1.5, 0, _v);
-    goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', _v);
+    goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', this.goopSwingTarget(seat, _v));
+  }
+
+  /** Where a gesture swing aims: a SHORT lunge toward the marked seat, capped
+   *  at gestureReach body-units from his centre. He never stretches across
+   *  the arena — the floor zones carry the danger, and a limb that spans the
+   *  gap balloons the raymarch bounds (the attack-time frame spike). */
+  private goopSwingTarget(seat: number, out: Vector3): Vector3 {
+    const root = this.goopRoot!.position;
+    this.seatPoint(seat, 0, 0, 0, out);
+    out.sub(root);
+    out.y = 0;
+    const len = out.length() || 1;
+    out.multiplyScalar((this.goopScale * GOOPLIATH.gestureReach) / len).add(root);
+    out.y = 1.6; // aimed at head height, so the swing still reads as AT you
+    return out;
   }
 
   /** My head's local X (for arm choice when I'm the one being hunted). */
@@ -2226,12 +2240,12 @@ export class CampaignSystem extends createSystem({
     });
   }
 
-  /** A gel limb thrown WITH a detonation — pure theatre, aimed at the marked
-   *  seat; the floor zones own the actual damage. Skipped mid-swing. */
+  /** A gel limb thrown WITH a detonation — pure theatre, aimed a short lunge
+   *  toward the marked seat; the floor zones own the actual damage. Skipped
+   *  mid-swing. */
   private goopFlavourSwing(name: 'overhand' | 'hook' | 'clap' | 'spinkick', seat: number): void {
     if (!this.goop) return;
-    this.seatPoint(seat, 0, 1.5, 0, _v);
-    this.goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', _v);
+    this.goop.throwAttack(name, Math.random() < 0.5 ? 'left' : 'right', this.goopSwingTarget(seat, _v));
   }
 
   private updateStrikes(delta: number): void {
