@@ -2241,9 +2241,15 @@ const RAID_CLOSE_BTN = { x: RAID_W / 2 - 90, y: RAID_H - 78, w: 180, h: 48 };
 const RAID_SLOT_Y0 = 148;
 const RAID_SLOT_H = 52;
 const RAID_SLOT_GAP = 10;
-const RAID_HC_Y = 398;
+// The two host breakers stack below the seats. Each is a bold title over a
+// small descriptor with the toggle centred on the right — the descriptor is
+// far too long to sit beside the toggle on one line (it used to run straight
+// through it). RAID_BREAKER_H is the row height both the draw and the hit
+// test share.
+const RAID_HC_Y = 396;
+const RAID_BREAKER_H = 46;
 /** The second raid breaker: FIGHT GOOPLIATH — swap the titans for the tide. */
-const RAID_GOOP_Y = 444;
+const RAID_GOOP_Y = RAID_HC_Y + RAID_BREAKER_H + 6;
 // Status line over the bottom controls. In a joined lobby the FFA host also
 // gets a START button (short-handed launch) tucked left of LEAVE. Sits well
 // clear of the HARDCORE row above (its text + toggle plate) — the two used to
@@ -2389,27 +2395,35 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
   // sit. HARDCORE keeps the stakes; FIGHT GOOPLIATH swaps the whole run for
   // one long fight against the tide.
   if (mode === 'raid') {
-    const breaker = (y: number, label: string, on: boolean, action: MenuAction, accent: string): void => {
+    const pw = 88;
+    const ph = 32;
+    const px = RAID_W - 92 - pw;
+    const breaker = (y: number, title: string, desc: string, on: boolean, action: MenuAction, accent: string): void => {
+      const hot = hoverAction === action && host;
+      // Bold title over a dim descriptor — both kept clear of the toggle
+      // (they end well before px so the two never touch).
       ctx.textAlign = 'left';
-      ctx.font = '700 21px system-ui, sans-serif';
-      ctx.fillStyle = hoverAction === action && host ? accent : UI.textDim;
-      ctx.fillText(label, 92, y + 23);
-      const pw = 96;
-      const ph = 34;
-      const px = RAID_W - 92 - pw;
-      plate(ctx, px, y, pw, ph, {
+      ctx.font = '800 22px system-ui, sans-serif';
+      ctx.fillStyle = on ? accent : hot ? accent : UI.text;
+      ctx.fillText(title, 92, y + 18);
+      ctx.font = '600 15px system-ui, sans-serif';
+      ctx.fillStyle = UI.textDim;
+      ctx.fillText(desc, 92, y + 39);
+      // The toggle, vertically centred on the row.
+      const py = y + (RAID_BREAKER_H - ph) / 2;
+      plate(ctx, px, py, pw, ph, {
         cut: 10,
         fill: on ? hexToRgba(accent, 0.25) : 'rgba(150,150,170,0.12)',
-        stroke: on ? accent : host && hoverAction === action ? accent : UI.steelDim,
+        stroke: on ? accent : hot ? accent : UI.steelDim,
         rivets: false,
       });
       ctx.fillStyle = on ? accent : UI.steelDim;
       const kw = pw / 2 - 10;
-      ctx.fillRect(on ? px + pw - kw - 6 : px + 6, y + 6, kw, ph - 12);
+      ctx.fillRect(on ? px + pw - kw - 6 : px + 6, py + 6, kw, ph - 12);
       ctx.textAlign = 'center';
     };
-    breaker(RAID_HC_Y, 'hardcore — no healing between titans', mesh.raidHardcore, 'lobby-hardcore', UI.danger);
-    breaker(RAID_GOOP_Y, 'fight goopliath — the tide, not the titans', mesh.raidGoopliath, 'lobby-goopliath', GOOP_GREEN);
+    breaker(RAID_HC_Y, 'HARDCORE', 'no healing between titans', mesh.raidHardcore, 'lobby-hardcore', UI.danger);
+    breaker(RAID_GOOP_Y, 'FIGHT GOOPLIATH', 'the tide, not the titans', mesh.raidGoopliath, 'lobby-goopliath', GOOP_GREEN);
   }
 
   // Launch status. 2v2 + raid auto-launch when full; FFA can go short-handed.
@@ -2444,8 +2458,9 @@ function hitRaid(u: number, v: number): MenuAction | null {
     x >= b.x && x <= b.x + b.w && y >= b.y - 4 && y <= b.y + b.h + 4;
 
   if (app.lobbyView === 'lobby') {
-    if (mode === 'raid' && mesh.isHost() && y >= RAID_HC_Y - 4 && y <= RAID_HC_Y + 40 && x >= 70 && x <= RAID_W - 70) return 'lobby-hardcore';
-    if (mode === 'raid' && mesh.isHost() && y >= RAID_GOOP_Y - 4 && y <= RAID_GOOP_Y + 40 && x >= 70 && x <= RAID_W - 70) return 'lobby-goopliath';
+    const onBreaker = (by: number): boolean => y >= by - 4 && y <= by + RAID_BREAKER_H && x >= 70 && x <= RAID_W - 70;
+    if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_HC_Y)) return 'lobby-hardcore';
+    if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_GOOP_Y)) return 'lobby-goopliath';
     const count = mesh.occupants.filter(Boolean).length;
     if (mode === 'ffa' && mesh.isHost() && count >= 2 && count < (mesh.capacity || 4)) {
       if (inBtn(LOBBY_START_BTN)) return 'lobby-start';
