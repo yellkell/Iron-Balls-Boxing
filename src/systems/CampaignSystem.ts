@@ -1715,7 +1715,10 @@ export class CampaignSystem extends createSystem({
           const tg = halfTelegraph(side, halfW, depth);
           this.seatPoint(seat, 0, CAMPAIGN.decalY, 0, _v);
           tg.group.position.copy(_v);
-          tg.group.rotation.y = this.seatYawDelta(seat) + (axis ? Math.PI / 2 : 0);
+          // −90° (not +90°): a +90° turn maps the +x half to −z, but the hit
+          // test damages the +z half (the one the player stands on) — so the
+          // flood must land there too, or the shown danger reads inverted.
+          tg.group.rotation.y = this.seatYawDelta(seat) + (axis ? -Math.PI / 2 : 0);
           this.scene.add(tg.group);
           telegraphs.push(tg);
           staggers.push(i * GOOPLIATH.seesawGap);
@@ -2360,7 +2363,7 @@ export class CampaignSystem extends createSystem({
     this.seatPoint(seat, 0, 0, 0, _v);
     const cx = _v.x;
     const cz = _v.z;
-    const yd = this.seatYawDelta(seat) + (axis ? Math.PI / 2 : 0);
+    const yd = this.seatYawDelta(seat) + (axis ? -Math.PI / 2 : 0); // match the telegraph's turn
     const cos = Math.cos(yd);
     const sin = Math.sin(yd);
     // Extents in the (pre-rotation) local frame: w spans the SPLIT axis, d the
