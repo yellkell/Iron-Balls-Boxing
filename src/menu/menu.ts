@@ -335,7 +335,7 @@ function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
   buttonPlate(ctx, 70, 80, PW - 140, 54, 'TUTORIAL', UI.emberBright, hoverAction === 'start-tutorial');
   // The single-player CAMPAIGN — the titan gauntlet — right below it.
   buttonPlate(ctx, 70, 140, PW - 140, 54, 'CAMPAIGN', UI.danger, hoverAction === 'open-campaign');
-  // The RAID — four raiders, five titans, one lobby.
+  // The RAID — up to five raiders, five titans, one lobby.
   buttonPlate(ctx, 70, 200, PW - 140, 54, 'RAID', '#b26bff', hoverAction === 'open-raid');
   buttonPlate(ctx, 70, 260, PW - 140, 54, 'AIM TRAINING', UI.ember, hoverAction === 'start-training');
 
@@ -2447,12 +2447,16 @@ function drawRaid(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null)
 function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null, mode: ArcadeMode, meta: LobbyMeta): void {
   const host = mesh.isHost();
   const cap = mesh.capacity || 4;
-  // The room's seats — filled callsigns, or a seat left open.
+  // The room's seats — filled callsigns, or a seat left open. A five-seat
+  // raid room compresses its rows so the fifth clears the difficulty chips.
+  const rowH = cap > 4 ? 44 : RAID_SLOT_H;
+  const rowGap = cap > 4 ? 6 : RAID_SLOT_GAP;
+  const rowY0 = cap > 4 ? 128 : RAID_SLOT_Y0;
   for (let seat = 0; seat < cap; seat++) {
-    const ry = RAID_SLOT_Y0 + seat * (RAID_SLOT_H + RAID_SLOT_GAP);
+    const ry = rowY0 + seat * (rowH + rowGap);
     const occupied = !!mesh.occupants[seat];
     const isMe = mesh.joined && seat === mesh.mySeat;
-    plate(ctx, 70, ry, RAID_W - 140, RAID_SLOT_H, {
+    plate(ctx, 70, ry, RAID_W - 140, rowH, {
       cut: 12,
       fill: isMe ? 'rgba(255,122,24,0.14)' : occupied ? meta.seatSoft : 'rgba(150,150,170,0.06)',
       stroke: isMe ? UI.ember : occupied ? meta.accent : UI.steelDim,
@@ -2462,17 +2466,17 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     ctx.font = '700 23px system-ui, sans-serif';
     ctx.fillStyle = occupied ? UI.text : UI.steelDim;
     const label = occupied ? mesh.names[seat] || `PLAYER ${seat + 1}` : 'open seat…';
-    ctx.fillText(label, 92, ry + RAID_SLOT_H / 2 + 2);
+    ctx.fillText(label, 92, ry + rowH / 2 + 2);
     ctx.textAlign = 'right';
     const teamTag = seatTeamTag(mode, seat);
     if (seat === 0 && occupied) {
       ctx.font = '800 16px system-ui, sans-serif';
       ctx.fillStyle = meta.hostTag;
-      ctx.fillText(teamTag ? `HOST · ${teamTag}` : 'HOST', RAID_W - 92, ry + RAID_SLOT_H / 2 + 2);
+      ctx.fillText(teamTag ? `HOST · ${teamTag}` : 'HOST', RAID_W - 92, ry + rowH / 2 + 2);
     } else if (teamTag) {
       ctx.font = '800 15px system-ui, sans-serif';
       ctx.fillStyle = seat < 2 ? UI.coolBright : UI.amberSoft;
-      ctx.fillText(teamTag, RAID_W - 92, ry + RAID_SLOT_H / 2 + 2);
+      ctx.fillText(teamTag, RAID_W - 92, ry + rowH / 2 + 2);
     }
     ctx.textAlign = 'center';
   }
@@ -2524,23 +2528,29 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     breaker(RAID_GOOP_Y, 'FIGHT GOOPLIATH', 'the tide, not the titans', mesh.raidGoopliath, 'lobby-goopliath', GOOP_GREEN);
   }
 
-  // Launch status. 2v2 + raid auto-launch when full; FFA can go short-handed.
+  // Launch status. 2v2 auto-launches when full; FFA and RAID can also go
+  // short-handed (≥2) — the raid boss scales to the squad that walks in.
   const count = mesh.occupants.filter(Boolean).length;
   const full = count >= cap;
-  const ffaReady = mode === 'ffa' && count >= 2; // FFA is playable with 2–4
+  const shortStart = mode === 'ffa' || mode === 'raid'; // playable with 2+
+  const shortReady = shortStart && count >= 2;
   ctx.textAlign = 'center';
   ctx.font = full ? '800 24px system-ui, sans-serif' : '600 21px system-ui, sans-serif';
   ctx.fillStyle = full ? '#d9a832' : 'rgba(230,236,242,0.85)';
   const noun = mode === 'raid' ? 'raiders' : 'players';
   const launchWord = mode === 'raid' ? 'launches the raid' : 'starts the brawl';
   ctx.fillText(
-    full ? 'ROOM FULL — LAUNCHING…' : `${count} / ${cap} ${noun} — a full room ${launchWord}`,
+    full
+      ? 'ROOM FULL — LAUNCHING…'
+      : shortStart
+        ? `${count} / ${cap} ${noun} — start at 2, a full room ${launchWord}`
+        : `${count} / ${cap} ${noun} — a full room ${launchWord}`,
     RAID_W / 2,
     RAID_STATUS_Y,
   );
 
-  // Short-handed FFA: host gets a START button once there are ≥2 in.
-  if (mode === 'ffa' && host && ffaReady && !full) {
+  // Short-handed FFA / RAID: host gets a START button once there are ≥2 in.
+  if (shortStart && host && shortReady && !full) {
     buttonPlate(ctx, LOBBY_START_BTN.x, LOBBY_START_BTN.y, LOBBY_START_BTN.w, LOBBY_START_BTN.h, 'START NOW', UI.amber, hoverAction === 'lobby-start');
     buttonPlate(ctx, LOBBY_LEAVE_BTN.x, LOBBY_LEAVE_BTN.y, LOBBY_LEAVE_BTN.w, LOBBY_LEAVE_BTN.h, 'LEAVE', UI.steel, hoverAction === 'lobby-leave');
   } else {
@@ -2564,7 +2574,7 @@ function hitRaid(u: number, v: number): MenuAction | null {
     if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_HC_Y)) return 'lobby-hardcore';
     if (mode === 'raid' && mesh.isHost() && onBreaker(RAID_GOOP_Y)) return 'lobby-goopliath';
     const count = mesh.occupants.filter(Boolean).length;
-    if (mode === 'ffa' && mesh.isHost() && count >= 2 && count < (mesh.capacity || 4)) {
+    if ((mode === 'ffa' || mode === 'raid') && mesh.isHost() && count >= 2 && count < (mesh.capacity || 4)) {
       if (inBtn(LOBBY_START_BTN)) return 'lobby-start';
       if (inBtn(LOBBY_LEAVE_BTN)) return 'lobby-leave';
     }

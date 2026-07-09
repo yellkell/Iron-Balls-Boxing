@@ -458,9 +458,15 @@ export class CampaignSystem extends createSystem({
     });
   }
 
-  /** GOLIATH crown tuning, phase- and mode-aware. */
+  /** The launch-time squad size (2–5) every raid scale reads. */
+  private raidSize(): number {
+    return Math.min(5, Math.max(1, app.raidSize));
+  }
+
+  /** GOLIATH crown tuning, phase- and mode-aware: full squads take doubled
+   *  ring stops; a duo gets solo's single-hit stops (two fists shred nothing). */
   private crownPerStop(): number {
-    return this.raid() ? RAID.crownPerStop : 1;
+    return this.raid() && this.raidSize() >= 3 ? RAID.crownPerStop : 1;
   }
 
   private crownLoopsNow(): number {
@@ -611,7 +617,7 @@ export class CampaignSystem extends createSystem({
     let goopStage = false;
     if (this.goopSolo()) {
       // The dedicated gel fight — solo entry or raid breaker.
-      this.def = goopliathBoss(this.raid());
+      this.def = goopliathBoss(this.raid(), this.raidSize());
       this.runLen = 1;
       goopStage = true;
     } else if (this.runMode()) {
@@ -621,11 +627,11 @@ export class CampaignSystem extends createSystem({
       this.runLen = lineup.length;
       const rs = lineup[clamp(app.campaignStage, 0, lineup.length - 1)];
       if (rs.kind === 'goop') {
-        this.def = goopliathBoss(this.raid());
+        this.def = goopliathBoss(this.raid(), this.raidSize());
         goopStage = true;
       } else {
         const base = BOSSES[rs.index];
-        this.def = this.raid() ? raidBoss(base, app.campaignStage) : base;
+        this.def = this.raid() ? raidBoss(base, app.campaignStage, this.raidSize()) : base;
       }
     } else {
       // A single campaign stage.

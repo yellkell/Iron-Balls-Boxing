@@ -1199,6 +1199,9 @@ export class MenuSystem extends createSystem({}) {
       app.campaignMode = 'raid';
       app.raidHardcore = mesh.raidHardcore;
       app.raidGoopliath = mesh.raidGoopliath;
+      // Squad size snapshot — the boss is built for THIS many fists (2–5)
+      // and stays that way even if someone drops mid-run.
+      app.raidSize = Math.min(5, Math.max(1, mesh.occupants.filter(Boolean).length));
       app.difficulty = mesh.raidDifficulty; // the host's pick, mirrored to all
       app.campaignStage = 0;
     } else {

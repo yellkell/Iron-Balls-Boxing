@@ -31,7 +31,7 @@ import type { ArcadeMode } from '../config.js';
 import type { PeerMessage } from './protocol.js';
 import type { MeshState } from './mesh.js';
 
-const CAPACITY: Record<ArcadeMode, number> = { '1v1': 2, '2v2': 4, ffa: 4, raid: 4 };
+const CAPACITY: Record<ArcadeMode, number> = { '1v1': 2, '2v2': 4, ffa: 4, raid: 5 };
 
 let firebaseApp: FirebaseApp | undefined;
 function db(): Firestore {

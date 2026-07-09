@@ -93,7 +93,8 @@ export function createCampaignHud(scene: Scene): CampaignHud {
 
   // The RAID squad readout: the other raiders' names + slim bars, floating
   // off to your left where a glance takes them in without leaving the fight.
-  const squad = makeText(scene, 384, 224, 0.5);
+  // Tall enough for FOUR squadmates (a five-raider room).
+  const squad = makeText(scene, 384, 296, 0.5);
   squad.mesh.position.set(-0.72, 1.22, -1.05);
   squad.mesh.rotation.y = 0.42;
   squad.mesh.visible = false;
@@ -164,7 +165,7 @@ export function createCampaignHud(scene: Scene): CampaignHud {
       squad.key = key;
       const { ctx, w } = squad;
       ctx.clearRect(0, 0, w, squad.h);
-      rows.slice(0, 3).forEach((r, i) => {
+      rows.slice(0, 4).forEach((r, i) => {
         const y = 18 + i * 72;
         const down = r.frac <= 0;
         ctx.textAlign = 'left';

@@ -356,13 +356,17 @@ export const CAMPAIGN = {
 };
 
 /**
- * RAID — the four-player group campaign. Same five titans as the gauntlet but
- * built for a SQUAD: bigger, far tougher, attacks split across four platforms,
- * and GOLIATH does not stay down. The host runs the boss (attack picks, health,
- * weak-point pattern) and echoes state; every client renders every attack and
- * judges only the strikes aimed at ITS OWN platform.
+ * RAID — the 2–5 player group campaign. Same five titans as the gauntlet but
+ * built for a SQUAD: bigger, far tougher, attacks split across up to five
+ * platforms, and GOLIATH does not stay down. The host runs the boss (attack
+ * picks, health, weak-point pattern) and echoes state; every client renders
+ * every attack and judges only the strikes aimed at ITS OWN platform. The
+ * boss's pools and cadence scale with the raider count SNAPSHOT at launch
+ * (app.raidSize) — a mid-run disconnect never shrinks a boss.
  */
 export const RAID = {
+  /** A raid can launch short-handed once this many raiders are seated. */
+  minRaiders: 2,
   /** Raid titans are ALL giants: every stage starts at solo GOLIATH's size and
    *  grows this much per stage beyond it (stage 0 = GOLIATH-sized RUSTHOOK,
    *  final-stage GOLIATH ~1.5x his solo self). */
@@ -375,8 +379,10 @@ export const RAID = {
    *  its CURRENT target, so a side seat plays the whole fight at an angle —
    *  the extra bulge is what keeps their hits landing past the armour. */
   weakMult: 1.25,
-  /** Boss health multiplier — "more than 4x": four raiders, and then some. */
-  healthMult: 4.6,
+  /** Boss health multiplier PER RAIDER — the pool is this × the launch
+   *  squad size, so time-to-kill holds steady from 2 up to 5 fists. A
+   *  4-squad lands on 4.6 — the original "four raiders, and then some". */
+  healthPerRaider: 1.15,
   /**
    * Attack cadence multiplier PER STAGE, tuned to how many raiders each
    * swing marks: stage I rotates ONE target (so it swings fast to keep the
@@ -386,6 +392,13 @@ export const RAID = {
   cooldownMult: [0.62, 0.72, 0.9, 0.92, 0.88],
   /** Charge-time multiplier — slightly snappier telegraphs. */
   chargeMult: 0.92,
+  /**
+   * Small-squad mercy on the cadence: `cooldownMult` is tuned for four
+   * raiders sharing the heat, so each missing raider below four eases the
+   * cooldown scaling this far back toward solo pace (capped at 0.6 — a duo
+   * still fights a RAID titan, just not one swinging four players' worth).
+   */
+  cooldownEase: 0.3,
   /** Seconds between blade landings as a squad sweep cascades around the
    *  arc — one continuous spinning cut, platform after platform. */
   sweepCascade: 0.12,
@@ -438,7 +451,8 @@ export const RAID = {
 export const GOOPLIATH = {
   /** Fireball hits to fell him. THE longest fight in the game by design. */
   hitsCampaign: 75,
-  hitsRaid: 300,
+  /** Raid hit count PER RAIDER — a 4-squad lands on the original 300. */
+  hitsPerRaider: 75,
   /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
    *  solo GOLIATH's size (~4.9 m of gel across the duel gap); the raid cut
    *  is a third taller again for the wide ring. */
@@ -684,11 +698,11 @@ export const TEAM_SPACING = 1.9;
  */
 export const FFA_ARM = ARENA_GAP * 0.7;
 
-/** RAID arc seat bearings (radians about the boss anchor): a ~108° semicircle
- *  spread, symmetric — at RAID_RING_RADIUS that puts ~3.7 m centre-to-centre
- *  between neighbouring platforms (over a full platform's length of clear air
- *  between pads). */
-const RAID_ARC_ANGLES = [-0.9424778, -0.31415927, 0.31415927, 0.9424778];
+/** RAID arc seat bearings (radians about the boss anchor): five seats on a
+ *  ~144° semicircle spread, symmetric, 36° apart — at RAID_RING_RADIUS that
+ *  keeps the same ~3.7 m centre-to-centre between neighbouring platforms as
+ *  the old four-seat arc (over a full platform's length of clear air). */
+const RAID_ARC_ANGLES = [-1.2566371, -0.6283185, 0, 0.6283185, 1.2566371];
 
 /**
  * RAID ring radius — every seat's distance to the titan's pit. Twice the duel

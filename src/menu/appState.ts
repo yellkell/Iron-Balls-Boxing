@@ -164,6 +164,10 @@ export const app: {
   lobbyRooms: { id: string; host: string; count: number; cap: number; hardcore: boolean; goopliath: boolean }[];
   /** The launched raid runs hardcore (host's lobby toggle, stamped at start). */
   raidHardcore: boolean;
+  /** Raider count SNAPSHOT at raid launch (2–5) — boss pools and cadence
+   *  scale off this, and it deliberately never shrinks mid-run: a disconnect
+   *  must not deflate a boss the survivors are already fighting. */
+  raidSize: number;
   /** The launched raid is the GOOPLIATH fight instead of the titan run
    *  (host's lobby breaker, stamped at start — same law as raidHardcore). */
   raidGoopliath: boolean;
@@ -227,6 +231,7 @@ export const app: {
   lobbyRooms: [],
   raidHardcore: false,
   raidGoopliath: false,
+  raidSize: 4,
   difficulty: loadDifficulty(),
   environment: ((): AppEnvironment => {
     const e = localStorage.getItem('ff-env');

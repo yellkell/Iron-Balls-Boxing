@@ -225,23 +225,32 @@ export const BOSSES: BossDef[] = [
   },
 ];
 
+/** Small-squad mercy: `mult` is a cadence multiplier tuned for FOUR raiders
+ *  sharing the heat — each missing raider below four eases it back toward
+ *  1.0 (solo pace), capped so a duo still fights a raid-tempo titan. */
+function easeCadence(mult: number, raiders: number): number {
+  const ease = Math.min(0.6, Math.max(0, 4 - raiders) * RAID.cooldownEase);
+  return mult + (1 - mult) * ease;
+}
+
 /**
  * The RAID cut of a titan: EVERY raid stage is a giant — the smallest raid
  * machine starts at solo GOLIATH's size and each stage grows past that — with
- * a health pool sized for FOUR fists (well over 4x), and a cadence tuned per
- * stage to how many raiders each swing marks — stage I rotates one target and
- * swings fast; stage III+ mark the whole squad, so the pace eases back toward
- * solo.
+ * a health pool sized to the squad (`healthPerRaider` × the launch raider
+ * count, 2–5), and a cadence tuned per stage to how many raiders each swing
+ * marks — stage I rotates one target and swings fast; stage III+ mark the
+ * whole squad, so the pace eases back toward solo. Short squads get the
+ * cadence eased toward solo too (easeCadence).
  */
-export function raidBoss(def: BossDef, stage: number): BossDef {
+export function raidBoss(def: BossDef, stage: number, raiders: number): BossDef {
   const charge = { ...def.charge };
   for (const k of Object.keys(charge) as AttackKind[]) charge[k] *= RAID.chargeMult;
-  const cd = RAID.cooldownMult[stage] ?? RAID.cooldownMult[RAID.cooldownMult.length - 1] ?? 0.9;
+  const cd = easeCadence(RAID.cooldownMult[stage] ?? RAID.cooldownMult[RAID.cooldownMult.length - 1] ?? 0.9, raiders);
   const goliath = BOSSES[BOSSES.length - 1]!;
   return {
     ...def,
     scale: goliath.scale * (1 + RAID.scaleStageStep * stage),
-    health: Math.round(def.health * RAID.healthMult),
+    health: Math.round(def.health * RAID.healthPerRaider * raiders),
     cooldownMin: def.cooldownMin * cd,
     cooldownMax: def.cooldownMax * cd,
     charge,
@@ -302,18 +311,20 @@ export function runLineup(difficulty: Difficulty): RunStage[] {
   return [...titans.slice(0, last), { kind: 'goop' }, titans[last]];
 }
 
-/** The RAID cut of GOOPLIATH: taller than any raid titan, four fists' worth
- *  of hits, and slightly snappier telegraphs (same law as raidBoss). */
-export function goopliathBoss(raid: boolean): BossDef {
+/** The RAID cut of GOOPLIATH: taller than any raid titan, one squad's worth
+ *  of hits (`hitsPerRaider` × the launch raider count), and slightly
+ *  snappier telegraphs (same laws as raidBoss, mercy included). */
+export function goopliathBoss(raid: boolean, raiders = 4): BossDef {
   if (!raid) return GOOPLIATH_DEF;
   const charge = { ...GOOPLIATH_DEF.charge };
   for (const k of Object.keys(charge) as AttackKind[]) charge[k] *= RAID.chargeMult;
+  const cd = easeCadence(0.85, raiders);
   return {
     ...GOOPLIATH_DEF,
     scale: GOOPLIATH.scaleRaid,
-    health: GOOPLIATH.hitsRaid,
-    cooldownMin: GOOPLIATH_DEF.cooldownMin * 0.85,
-    cooldownMax: GOOPLIATH_DEF.cooldownMax * 0.85,
+    health: GOOPLIATH.hitsPerRaider * raiders,
+    cooldownMin: GOOPLIATH_DEF.cooldownMin * cd,
+    cooldownMax: GOOPLIATH_DEF.cooldownMax * cd,
     charge,
   };
 }

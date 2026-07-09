@@ -39,8 +39,9 @@ export interface OpponentPose {
   accentLight: number;
 }
 
-/** Most OTHER boxers in any mode: FFA (3 rivals) and 2v2 (1 ally + 2 rivals). */
-export const MAX_OPPONENTS = 3;
+/** Most OTHER boxers in any mode: RAID seats five (4 squadmates); FFA has 3
+ *  rivals and 2v2 has 1 ally + 2 rivals. Unused slots simply stay inactive. */
+export const MAX_OPPONENTS = 4;
 
 function makePose(): OpponentPose {
   return {
