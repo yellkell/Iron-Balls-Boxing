@@ -95,6 +95,18 @@ export class BotSystem extends createSystem({
       const seat = roster[slot];
       const myTeam = seat.team;
 
+      // TUTORIAL statue mode: through the opening lessons the sparring bot
+      // stands rooted on his pad — posed and facing the player, but no
+      // strafing, no wind-ups, no guard — until Ember names him awake.
+      if (app.tutorialBotFrozen) {
+        bot.windup = -1;
+        bot.blockTimer = 0;
+        pose.orbiting[0] = pose.orbiting[1] = false;
+        pose.blocking[0] = pose.blocking[1] = false;
+        this.pose(bot, seat.pos[0], seat.pos[2], _head, delta);
+        continue;
+      }
+
       this.move(bot, seat.pos[0], seat.pos[2], myTeam, delta);
       // Aim/face the nearest enemy; with none in range the bot just guards.
       const target = this.nearestEnemy(bot, seat.pos[0], seat.pos[2], myTeam);

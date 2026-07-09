@@ -245,15 +245,6 @@ export class TutorialSystem extends createSystem({
   private saidFightTaken = false;
   private saidFightLow = false;
 
-  // --- the sparring bot's look: parked dead-still and painted rust until
-  //     she points him out ("See that rust bucket?" — the throw beat) ---
-  private botFrozen = true;
-  private botCaptured = false;
-  private botHead = new Vector3();
-  private botHeadQ = new Quaternion();
-  private botHands: [Vector3, Vector3] = [new Vector3(), new Vector3()];
-  private botHandQs: [Quaternion, Quaternion] = [new Quaternion(), new Quaternion()];
-
   // --- health baselines (hits are read as dips against last frame) ---
   private prevMyHp = 100;
   private prevBotHp = TUT_BOT_HP;
@@ -684,7 +675,7 @@ export class TutorialSystem extends createSystem({
         this.thrown = false;
         this.caughtDuringThrow = false;
         // "See this rust bucket?" — he wakes up on cue.
-        this.botFrozen = false;
+        app.tutorialBotFrozen = false;
         this.queueLine('throwIt');
         break;
       case 'recall':
@@ -1014,34 +1005,12 @@ export class TutorialSystem extends createSystem({
   }
 
   /** The tutorial bot IS the rust bucket: paint its neon rusty orange-brown
-   *  (through the pose-accent channel OpponentSystem honours for the
-   *  tutorial), and until the throw beat points him out, hold his pose dead
-   *  still — BotSystem runs before us, so we overwrite its idle sway with
-   *  the stance he woke up in. */
+   *  through the pose-accent channel OpponentSystem honours for the tutorial.
+   *  (His statue stillness lives in BotSystem's app.tutorialBotFrozen branch
+   *  — BotSystem runs before the avatar renders, so only IT can hold him.) */
   private styleBot(): void {
-    const pose = opponents[0];
-    pose.accentHue = 0.07; // rusty orange-brown
-    pose.accentLight = 0.36;
-    if (!this.botFrozen) return;
-    if (!this.botCaptured) {
-      if (!pose.active) return; // no pose yet — capture on the first live frame
-      this.botHead.copy(pose.headPos);
-      this.botHeadQ.copy(pose.headQuat);
-      this.botHands[0].copy(pose.handPos[0]);
-      this.botHands[1].copy(pose.handPos[1]);
-      this.botHandQs[0].copy(pose.handQuat[0]);
-      this.botHandQs[1].copy(pose.handQuat[1]);
-      this.botCaptured = true;
-      return;
-    }
-    pose.headPos.copy(this.botHead);
-    pose.headQuat.copy(this.botHeadQ);
-    pose.handPos[0].copy(this.botHands[0]);
-    pose.handPos[1].copy(this.botHands[1]);
-    pose.handQuat[0].copy(this.botHandQs[0]);
-    pose.handQuat[1].copy(this.botHandQs[1]);
-    pose.fisting[0] = false;
-    pose.fisting[1] = false;
+    opponents[0].accentHue = 0.07; // rusty orange-brown
+    opponents[0].accentLight = 0.36;
   }
 
   private pinHealth(): void {
@@ -1085,8 +1054,7 @@ export class TutorialSystem extends createSystem({
     this.toSub(1);
     this.gazeT = 0;
 
-    this.botFrozen = true;
-    this.botCaptured = false;
+    app.tutorialBotFrozen = true; // a rusted statue until she names him
 
     this.prevMyHp = this.fighterHp(0);
     this.prevBotHp = this.fighterHp(1);
@@ -1108,6 +1076,7 @@ export class TutorialSystem extends createSystem({
     this.lob = null;
     this.lobPending = false;
     app.tutorialHoldFire = false;
+    app.tutorialBotFrozen = false;
     this.waitT = 0;
     this.nudgeStage = 0;
     // Hand the bot's neon back to the team tint for whatever bout comes next.

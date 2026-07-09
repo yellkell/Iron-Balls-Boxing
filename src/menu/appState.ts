@@ -118,6 +118,11 @@ export const app: {
    *  a UI click never doubles as an ignite or a throw. TutorialSystem
    *  re-asserts it every frame; it can never outlive the frame that set it. */
   tutorialHoldFire: boolean;
+  /** The tutorial's sparring bot stands as a statue — centred on his pad,
+   *  facing the player, never strafing or winding up — until the throw beat
+   *  names him ("See this rust bucket?"). Written only by TutorialSystem,
+   *  read only by BotSystem; false in every normal bout. */
+  tutorialBotFrozen: boolean;
   /** Aim Training option: targets shoot back so you can train dodging. */
   shootBack: boolean;
   /** When on: never queue online — RANKED is disabled and QUICK/2V2/FFA drop
@@ -210,6 +215,7 @@ export const app: {
   mode: 'bot',
   tutorial: false,
   tutorialHoldFire: false,
+  tutorialBotFrozen: false,
   side: 0,
   arcade: '1v1',
   mySlot: 0,
