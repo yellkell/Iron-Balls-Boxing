@@ -129,7 +129,7 @@ export const customization = {
   version: 1,
   /** The customisation panel (and the avatar mirror) is up in the lobby. */
   open: false,
-  /** The SHOP face is up (a sub-modal of customisation); false = the LOCKER. */
+  /** The STORE face is up (a sub-modal of the locker); false = the LOCKER. */
   shopOpen: false,
   /** Which tab the shop / locker shows. 'colour' and 'arena' are locker-only. */
   tab: 'avatars' as 'avatars' | 'platforms' | 'colour' | 'arena',

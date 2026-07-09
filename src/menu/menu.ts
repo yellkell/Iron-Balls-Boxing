@@ -178,7 +178,7 @@ export type MenuAction =
   | 'accent-light'
   /** Reset the avatar-accent (neon) hue to the house ember default. */
   | 'accent-default'
-  /** Swap between SHOP (all items) and LOCKER (your inventory + colours). */
+  /** The header tab pair: STORE (all items) ⇄ LOCKER (your inventory). */
   | 'open-shop'
   | 'open-locker'
   /** Switch the shop / locker tab. */
@@ -724,7 +724,7 @@ function drawInfoRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     ctx.textAlign = 'center';
   }
 
-  buttonPlate(ctx, 70, 226, PW - 140, 96, 'CUSTOMISE', UI.ember, hoverAction === 'open-custom');
+  buttonPlate(ctx, 70, 226, PW - 140, 96, 'LOCKER', UI.ember, hoverAction === 'open-custom');
 
   ctx.font = '600 24px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
@@ -1947,9 +1947,9 @@ function hitNews(u: number, v: number): MenuAction | null {
   return null;
 }
 
-// --- THE COIN WALLET + PLATFORM SHOP ----------------------------------------
+// --- THE COIN WALLET + PLATFORM STORE ---------------------------------------
 // A small readout sits beside the paper button: the bolt-dollar symbol and your
-// balance. Spend it in the shop (reached from CUSTOMISE) on new platforms — the
+// balance. Spend it in the STORE (the LOCKER's header tab) on new platforms —
 // three launch pads are free, a couple of recolours cost 100, the gold pad 1000.
 
 /** Draw the riveted "$" symbol at (x,y) sized w×h — the decoded PNG once it's
@@ -2609,9 +2609,10 @@ function hitRaid(u: number, v: number): MenuAction | null {
   return null;
 }
 
-// ─────────────────────────── SHOP & LOCKER ──────────────────────────────────
-// Two faces of one tabbed cosmetics plate. SHOP lists only the items you DON'T
-// own yet, with prices (buying auto-equips AND stocks your locker); LOCKER lists
+// ─────────────────────────── LOCKER & STORE ─────────────────────────────────
+// Two faces of one cosmetics plate, switched by the LOCKER | STORE header
+// tabs where the title used to sit. STORE lists only the items you DON'T own
+// yet, with prices (buying auto-equips AND stocks your locker); LOCKER lists
 // only what you own, to equip — plus a COLOUR tab carrying the armour + accent
 // hue sliders. Each tile shows a PICTURE of the skin: an animal silhouette (a
 // shield for the knight) for avatars, a little coloured pad for platforms.
@@ -2626,8 +2627,13 @@ const GRID_GAP = 14;
 const ITEM_W = (PAN_W - 80 - (GRID_COLS - 1) * GRID_GAP) / GRID_COLS;
 const ITEM_H = 112;
 const ROW_STEP = ITEM_H + 12;
-const FOOT_SWAP = { x: 40, y: PAN_H - 66, w: 210, h: 50 };
 const FOOT_CLOSE = { x: PAN_W - 40 - 160, y: PAN_H - 66, w: 160, h: 50 };
+// The LOCKER | STORE header pair — sits on the title line, switched like tabs.
+const HEAD_TAB = { x0: 104, y: 12, w: 145, gap: 8, h: 48 };
+const HEAD_TABS: Array<{ label: string; action: MenuAction }> = [
+  { label: 'LOCKER', action: 'open-locker' },
+  { label: 'STORE', action: 'open-shop' },
+];
 // COLOUR-tab tracks (locker only): armour repaints the suit, accent the neon,
 // each with a hue track and a lightness track beneath it.
 const ARMOUR_BAR = { x: 40, y: 168, w: PAN_W - 210, h: 38 };
@@ -2704,7 +2710,7 @@ function panelItems(locker: boolean): { items: DisplayItem[]; soon: PanRect | nu
   const rows = Math.max(1, Math.ceil(count / GRID_COLS));
   // Up to 3 rows fit at full height (the classic layout, untouched); more
   // than that shares the same vertical span between the rows.
-  const rowStep = rows <= 3 ? ROW_STEP : Math.floor((FOOT_SWAP.y - 12 - GRID_TOP) / rows);
+  const rowStep = rows <= 3 ? ROW_STEP : Math.floor((FOOT_CLOSE.y - 12 - GRID_TOP) / rows);
   const itemH = rowStep - (ROW_STEP - ITEM_H);
   let idx = 0;
   const next = (): PanRect => {
@@ -3018,9 +3024,40 @@ function gridHit(x: number, y: number, locker: boolean): MenuAction | null {
   return null;
 }
 
-/** SHOP — everything, with prices. Tabs: AVATARS / PLATFORMS. */
+/** The header pair: LOCKER | STORE drawn on the title line, active face lit. */
+function drawHeaderTabs(ctx: CanvasRenderingContext2D, active: 0 | 1, hoverAction: MenuAction | null): void {
+  HEAD_TABS.forEach((t, i) => {
+    const x = HEAD_TAB.x0 + i * (HEAD_TAB.w + HEAD_TAB.gap);
+    const hot = hoverAction === t.action && i !== active;
+    plate(ctx, x, HEAD_TAB.y, HEAD_TAB.w, HEAD_TAB.h, {
+      cut: 10,
+      fill: i === active ? 'rgba(255,176,0,0.16)' : hot ? 'rgba(20,22,30,0.9)' : 'rgba(10,11,15,0.6)',
+      stroke: i === active ? UI.amber : hot ? UI.steel : UI.steelDim,
+      rivets: false,
+    });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = stencilFont(24);
+    ctx.fillStyle = i === active ? UI.amber : hot ? UI.text : UI.textDim;
+    ctx.fillText(t.label, x + HEAD_TAB.w / 2, HEAD_TAB.y + HEAD_TAB.h / 2 + 2);
+  });
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+}
+
+function hitHeaderTabs(x: number, y: number): MenuAction | null {
+  if (y < HEAD_TAB.y || y > HEAD_TAB.y + HEAD_TAB.h) return null;
+  for (let i = 0; i < HEAD_TABS.length; i++) {
+    const tx = HEAD_TAB.x0 + i * (HEAD_TAB.w + HEAD_TAB.gap);
+    if (x >= tx && x <= tx + HEAD_TAB.w) return HEAD_TABS[i].action;
+  }
+  return null;
+}
+
+/** STORE — everything you don't own, with prices. Tabs: AVATARS / PLATFORMS. */
 function drawShop(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
-  panelBg(ctx, false, UI.amber, 'SHOP', PAN_W, PAN_H);
+  panelBg(ctx, false, UI.amber, '', PAN_W, PAN_H);
+  drawHeaderTabs(ctx, 1, hoverAction);
   drawCoinSymbol(ctx, PAN_W - 150, 22, 32, 32);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -3037,14 +3074,14 @@ function drawShop(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null)
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  buttonPlate(ctx, FOOT_SWAP.x, FOOT_SWAP.y, FOOT_SWAP.w, FOOT_SWAP.h, 'LOCKER', UI.cool, hoverAction === 'open-locker');
   buttonPlate(ctx, FOOT_CLOSE.x, FOOT_CLOSE.y, FOOT_CLOSE.w, FOOT_CLOSE.h, 'CLOSE', UI.amber, hoverAction === 'custom-close');
 }
 
 function hitShop(u: number, v: number): MenuAction | null {
   const x = u * PAN_W;
   const y = (1 - v) * PAN_H;
-  if (inPanRect(x, y, FOOT_SWAP)) return 'open-locker';
+  const head = hitHeaderTabs(x, y);
+  if (head) return head;
   if (inPanRect(x, y, FOOT_CLOSE)) return 'custom-close';
   const t = tabHit(x, y, 2);
   if (t !== null) return t === 0 ? 'tab-avatars' : 'tab-platforms';
@@ -3053,7 +3090,8 @@ function hitShop(u: number, v: number): MenuAction | null {
 
 /** LOCKER — your inventory: equip owned skins, plus the COLOUR sliders. */
 function drawLocker(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
-  panelBg(ctx, false, UI.emberBright, 'LOCKER', PAN_W, PAN_H);
+  panelBg(ctx, false, UI.emberBright, '', PAN_W, PAN_H);
+  drawHeaderTabs(ctx, 0, hoverAction);
   const tab = activeTab(true);
   drawTabs(ctx, [
     { label: 'AVATARS', action: 'tab-avatars', active: tab === 'avatars' },
@@ -3067,14 +3105,14 @@ function drawLocker(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nul
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  buttonPlate(ctx, FOOT_SWAP.x, FOOT_SWAP.y, FOOT_SWAP.w, FOOT_SWAP.h, 'SHOP', UI.amber, hoverAction === 'open-shop');
   buttonPlate(ctx, FOOT_CLOSE.x, FOOT_CLOSE.y, FOOT_CLOSE.w, FOOT_CLOSE.h, 'CLOSE', UI.amber, hoverAction === 'custom-close');
 }
 
 function hitLocker(u: number, v: number): MenuAction | null {
   const x = u * PAN_W;
   const y = (1 - v) * PAN_H;
-  if (inPanRect(x, y, FOOT_SWAP)) return 'open-shop';
+  const head = hitHeaderTabs(x, y);
+  if (head) return head;
   if (inPanRect(x, y, FOOT_CLOSE)) return 'custom-close';
   const t = tabHit(x, y, 4);
   if (t !== null) return t === 0 ? 'tab-avatars' : t === 1 ? 'tab-platforms' : t === 2 ? 'tab-colour' : 'tab-arena';
@@ -3171,7 +3209,7 @@ export function createMenu(scene: Scene): Menu {
   // BALL LOADOUT lives out on the RIGHT, wrapped toward you alongside the other
   // controls — the whole LEFT is left clear for the avatar mirror, so while
   // changing your skin you can still see it (it used to sit in front of it).
-  // Nudged further right + forward so the CUSTOMISE plate's edge no longer
+  // Nudged further right + forward so the LOCKER plate's edge no longer
   // clips it.
   balls.mesh.position.set(1.32, 1.18, -0.66);
   balls.mesh.rotation.y = -0.6;
