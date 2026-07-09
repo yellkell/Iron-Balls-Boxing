@@ -74,9 +74,13 @@ popup and pointer lines — and disposes them in `end()`).
 - **Captions**: a small subtitle plate (the `makePopup()` canvas pattern,
   industrial style) follows 0.35 m under the orb and mirrors the spoken line.
   It replaces the old lesson cards entirely.
-- **Interaction**: "punch me" = grip within 0.25 m of the orb with
-  `VelocityTracker` speed > 1.0 m/s. Gaze = head-forward · (orb − head)
-  normalised > 0.92 held 0.5 s.
+- **Interaction**: gaze = head-forward · (orb − head) normalised > 0.92 held
+  0.5 s. Confirmations happen on **the console** — a small industrial panel
+  anchored 1.2 m to the player's right, *the same spot where the BALL
+  LOADOUT panel later materialises*. For the two confirm beats it shows a
+  single big button (laser + trigger click — the existing `READY_BTN` /
+  `updateReadyPointer()` mechanism from `TutorialSystem.ts:192`, just moved
+  onto the console plane). Teaching that spot early pays off in Beat 6.
 
 ### Global rules (all beats)
 
@@ -103,10 +107,11 @@ Arena fades in. Tutorial music low. **Ember does not start in front of you.**
    after a second orbit she parks at eye height 1.4 m dead ahead and flares.
 3. On gaze (or forced park): a composed little bounce, flare, **E-011**
    (hello / name).
-4. **E-012** — clear some room, then *punch through her* to begin. She parks
-   at chest height, 0.6 m out: she is the ready button. On the punch: she
-   glides back a metre with an ember burst, haptic pulse on the punching
-   hand, `tutorialHoldFire = false`. That's the whole setup.
+4. **E-012** — clear some room, then hit **BEGIN** on the console. As she
+   says it she glides to the console spot and the panel fades in beneath her
+   with its single button; her leading the eye there is the tutorial for
+   *where tutorial UI lives*. On the click: soft chime, ember burst, panel
+   folds away, `tutorialHoldFire = false`. That's the whole setup.
 
 ### Beat 1 — IGNITE
 
@@ -176,11 +181,12 @@ side). Clean reps 1–3 get a praise-pool line; rep 4 completes the drill.
 
 ### Beat 6 — ATTACHMENTS *(loadout panel in-arena + live test on the bot)*
 
-1. **E-070** — orb flies to a spot 1.2 m to the player's right, pulsing.
-   The **BALL LOADOUT** panel materialises where she's hovering — reuse the
-   `'balls'` panel drawing + `clickBalls()` hit-test from
+1. **E-070** — orb flies back to **the console spot** (the player already
+   knows it from Beat 0), pulsing. The **BALL LOADOUT** panel materialises
+   there — reuse the `'balls'` panel drawing + `clickBalls()` hit-test from
    `src/menu/menu.ts:1181` on a tutorial-owned plane, lasers re-enabled for
-   it (TutorialSystem already owns pointer lines).
+   it (TutorialSystem already owns pointer lines). The panel gains a
+   **READY** button in its footer for the exit.
 2. **E-071** — she names SPLIT / GROW / SHRINK / CURVE, **hopping to each
    row of the panel in time with the line**, and tells them to pick one.
 3. WAIT: any change to `app.ballAttach` (or `app.ballArc`). On equip →
@@ -190,8 +196,8 @@ side). Clean reps 1–3 get a praise-pool line; rep 4 completes the drill.
    (`applyAttachment`, `FireballSystem.ts:189`). Recall-after-landing →
    **E-075**.
 5. Effect fires → **E-073**. Then **E-074**: free-play — she waits, praise
-   pool on further tests, and the exit is the same *punch-me* gesture from
-   Beat 0. Panel folds away when punched.
+   pool on further tests, and the exit is the **READY** button on the
+   loadout panel's footer. Panel folds away on the click.
 
 ### Beat 7 — GRADUATION FIGHT
 
@@ -218,7 +224,7 @@ smiling.
 |---|---|---|---|
 | `e010-over-here` | "Over here." | Quiet, inviting, off to the side. | Orb spawns at 10 o'clock. |
 | `e011-hello` | "There you are. Hello — I'm **Ember**. Your guide, and, statistically, your biggest fan." | Level and warm; the joke lands because she doesn't lean on it. | Gaze lands on her. |
-| `e012-begin` | "Clear yourself a little room, Clanker. Then punch straight through me — and we'll begin." | Calm instruction; "punch straight through me" delivered like it's the most normal request in the world. | Follows E-011; she parks at chest height. |
+| `e012-begin` | "Clear yourself a little room, Clanker. Then hit the button on the console, just here — and we'll begin." | Calm instruction; "just here" as she glides to the console and the panel fades in beneath her. | Follows E-011; console panel appears with its BEGIN button. |
 
 ### Beat 1 — Ignite
 
@@ -271,14 +277,14 @@ smiling.
 | `e071-attach-list` | "**Split** breaks it into three on the way home. **Grow** makes it big and mean. **Shrink** makes it small and spiteful. **Curve** bends around their guard. Pick one." | Rhythmic, evenly paced — she hops row to row on each name. | Follows E-070. |
 | `e072-attach-test` | "Good choice. Now throw at him — and recall while it's **still flying**." | Approving, then the lesson; lean on "still flying". | `app.ballAttach` / `ballArc` changes. |
 | `e073-attach-done` | "Did you **see** that? I never tire of that one. **Well done.**" | Her one almost-delighted read — still composed, but the smile is audible. | Attachment effect triggers mid-flight. |
-| `e074-attach-free` | "Try the others if you like. Punch me when you're ready." | Relaxed, fond on the callback. | Follows E-073; free-play begins. |
+| `e074-attach-free` | "Try the others if you like. Hit **ready** when you are." | Relaxed, unhurried; the small wordplay stays level. | Follows E-073; free-play begins. READY button on the panel footer exits. |
 | `e075-attach-retry` | "Recall while it's still in the **air** — timing is everything." | Helpful, precise. | Recall happened after the ball landed. |
 
 ### Beat 7 — Graduation
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e080-grad` | "That's everything I've got — and look at you now. Knock him down, and you're done. **Make me proud, slugger.**" | Proud but level; the send-off rises just a shade as she lifts to her perch. | Player punches out of free-play; fight begins. |
+| `e080-grad` | "That's everything I've got — and look at you now. Knock him down, and you're done. **Make me proud, slugger.**" | Proud but level; the send-off rises just a shade as she lifts to her perch. | READY clicked on the loadout panel; fight begins. |
 | `e081-fight-hit` | "There it is." | Quick, satisfied. | First hit landed (once). |
 | `e082-fight-taken` | "Shake it off. You're **iron**, remember?" | Warm, steadying, brief. | First time the player is hit (once). |
 | `e083-fight-low` | "He's wobbling. **Finish it.**" | Cool urgency — the closest she gets to intensity. | Bot under 15 HP (once). |
@@ -318,10 +324,12 @@ each — level, warm, never canned.**
   `tryParry`); the any-direction `move` check → the four-rep left/right
   dodge drill with per-rep direction verification.
 - **New**: `src/audio/tutorVoice.ts` (announcer clone + HRTF panner),
-  `src/assets/tutor/*.mp3`, orb visual (glowSprite + ember trail), punch-me
-  gesture check, in-arena BALL LOADOUT panel reusing the `'balls'` panel
-  draw/hit-test, reactive fight one-shots, praise pool with no-repeat-last
-  rotation.
+  `src/assets/tutor/*.mp3`, orb visual (glowSprite + ember trail), the
+  **console** — a fixed panel anchor to the player's right that hosts the
+  BEGIN button (Beat 0), then the BALL LOADOUT panel + READY button
+  (Beat 6), reusing the existing `READY_BTN` laser-click mechanism and the
+  `'balls'` panel draw/hit-test; reactive fight one-shots; praise pool with
+  no-repeat-last rotation.
 - **Ordering**: TutorialSystem already runs before FireballSystem
   (`main.ts:102`), so its `ballCommands` pushes and `tutorialHoldFire` edits
   land the same frame — no changes needed there.
