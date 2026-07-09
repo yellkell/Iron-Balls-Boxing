@@ -245,6 +245,15 @@ export class TutorialSystem extends createSystem({
   private saidFightTaken = false;
   private saidFightLow = false;
 
+  // --- the sparring bot's look: parked dead-still and painted rust until
+  //     she points him out ("See that rust bucket?" — the throw beat) ---
+  private botFrozen = true;
+  private botCaptured = false;
+  private botHead = new Vector3();
+  private botHeadQ = new Quaternion();
+  private botHands: [Vector3, Vector3] = [new Vector3(), new Vector3()];
+  private botHandQs: [Quaternion, Quaternion] = [new Quaternion(), new Quaternion()];
+
   // --- health baselines (hits are read as dips against last frame) ---
   private prevMyHp = 100;
   private prevBotHp = TUT_BOT_HP;
@@ -308,6 +317,7 @@ export class TutorialSystem extends createSystem({
 
     if (this.beat === 'fight') {
       this.capBotHealth();
+      this.styleBot(); // still the rust bucket, just awake
       // KO is the only way out: the 60 s clock must never end the round
       // itself, or GameStateSystem's round/match machinery banks scores and
       // stats mid-tutorial.
@@ -315,9 +325,11 @@ export class TutorialSystem extends createSystem({
       this.runFight(myHp, botHp, iWasHit, botWasHit);
     } else if (this.beat === 'wrapup') {
       this.runWrapup();
+      this.styleBot();
     } else {
       // Lessons: keep the bout calm and frozen (see header).
       this.suppressBot();
+      this.styleBot();
       this.pinHealth();
       match.roundTimer = MATCH.roundTime;
       this.runBeat(delta, this.collectBallEvents(), iWasHit, botWasHit);
@@ -659,6 +671,8 @@ export class TutorialSystem extends createSystem({
       case 'throw':
         this.thrown = false;
         this.caughtDuringThrow = false;
+        // "See that rust bucket?" — he wakes up on cue.
+        this.botFrozen = false;
         this.queueLine('throwIt');
         break;
       case 'recall':
@@ -987,6 +1001,37 @@ export class TutorialSystem extends createSystem({
     opponents[0].blocking[1] = false;
   }
 
+  /** The tutorial bot IS the rust bucket: paint its neon rusty orange-brown
+   *  (through the pose-accent channel OpponentSystem honours for the
+   *  tutorial), and until the throw beat points him out, hold his pose dead
+   *  still — BotSystem runs before us, so we overwrite its idle sway with
+   *  the stance he woke up in. */
+  private styleBot(): void {
+    const pose = opponents[0];
+    pose.accentHue = 0.07; // rusty orange-brown
+    pose.accentLight = 0.36;
+    if (!this.botFrozen) return;
+    if (!this.botCaptured) {
+      if (!pose.active) return; // no pose yet — capture on the first live frame
+      this.botHead.copy(pose.headPos);
+      this.botHeadQ.copy(pose.headQuat);
+      this.botHands[0].copy(pose.handPos[0]);
+      this.botHands[1].copy(pose.handPos[1]);
+      this.botHandQs[0].copy(pose.handQuat[0]);
+      this.botHandQs[1].copy(pose.handQuat[1]);
+      this.botCaptured = true;
+      return;
+    }
+    pose.headPos.copy(this.botHead);
+    pose.headQuat.copy(this.botHeadQ);
+    pose.handPos[0].copy(this.botHands[0]);
+    pose.handPos[1].copy(this.botHands[1]);
+    pose.handQuat[0].copy(this.botHandQs[0]);
+    pose.handQuat[1].copy(this.botHandQs[1]);
+    pose.fisting[0] = false;
+    pose.fisting[1] = false;
+  }
+
   private pinHealth(): void {
     const me = this.fighter(0);
     const bot = this.fighter(1);
@@ -1028,6 +1073,9 @@ export class TutorialSystem extends createSystem({
     this.toSub(1);
     this.gazeT = 0;
 
+    this.botFrozen = true;
+    this.botCaptured = false;
+
     this.prevMyHp = this.fighterHp(0);
     this.prevBotHp = this.fighterHp(1);
     startTutorialMusic(); // loops for the whole tutorial (lessons + graduation fight)
@@ -1050,6 +1098,9 @@ export class TutorialSystem extends createSystem({
     app.tutorialHoldFire = false;
     this.waitT = 0;
     this.nudgeStage = 0;
+    // Hand the bot's neon back to the team tint for whatever bout comes next.
+    opponents[0].accentHue = -1;
+    opponents[0].accentLight = 0.5;
     this.active = false;
     this.beat = 'attention';
     stopTutorialMusic(); // the lobby music fades back up on the way out

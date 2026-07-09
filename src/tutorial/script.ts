@@ -36,7 +36,7 @@ export const LINES = {
     text: "See that rust bucket? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot.",
   },
   throwDone: { id: 'e031-throw-done', text: 'Good job. He felt that.' },
-  throwSoft: { id: 'e032-throw-soft', text: 'Almost. Commit to the punch. Snap it out.' },
+  throwSoft: { id: 'e032-throw-soft', text: 'Almost. Commit to the punch.' },
 
   // Beat 3 — recall
   recall: {

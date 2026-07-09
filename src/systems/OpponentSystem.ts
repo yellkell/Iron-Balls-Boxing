@@ -157,7 +157,9 @@ export class OpponentSystem extends createSystem({
       // modes — duel, 2v2, FFA and raids; ball fire stays team-tinted, which
       // already tells friend from foe) and bots wear the team tint. accentHue
       // is -1 until a real peer packet arrives. Recolour only on a change.
-      const human = pose.accentHue >= 0 && (app.mode === 'net' || (app.arcade === 'raid' && mesh.joined));
+      // The TUTORIAL is the one bot bout allowed through: it paints its
+      // sparring bot rust via the same accent channel (see TutorialSystem).
+      const human = pose.accentHue >= 0 && (app.mode === 'net' || (app.arcade === 'raid' && mesh.joined) || app.tutorial);
       const want = dead
         ? DEAD_GREY
         : human
