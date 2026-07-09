@@ -369,10 +369,21 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'throw': {
-        // She hovers over the bot's head — a living target marker; her voice
-        // coming from downrange IS the aim cue.
-        this.orbTarget.copy(opponents[0].headPos);
-        this.orbTarget.y += 0.5;
+        if (this.queue.length) {
+          // Still praising the ignite (the rust-bucket line is queued behind
+          // it) — she stays on the fist she's praising, and only flies over
+          // as "See this rust bucket?" actually starts.
+          const grip = this.world.playerSpaceEntities.gripSpaces.right?.object3D;
+          if (grip) {
+            grip.getWorldPosition(this.orbTarget);
+            this.orbTarget.y += 0.28;
+          }
+        } else {
+          // She hovers over the bot's head — a living target marker; her
+          // voice coming from downrange IS the aim cue.
+          this.orbTarget.copy(opponents[0].headPos);
+          this.orbTarget.y += 0.5;
+        }
         if (events.softRelease && this.time - this.softAt > 3.5) {
           this.softAt = this.time;
           this.say('throwSoft');
@@ -480,10 +491,11 @@ export class TutorialSystem extends createSystem({
           // language the titans use for their kill zones, inverted.
           this.showZone(this.repAxis.x >= 0 ? 1 : -1);
         } else if (this.repIdx === 0 && this.sideFails === 0) {
-          // The explain line: a gentle sweep showing the two lanes — around
-          // the podium spot, never leaving the reading zone.
+          // The explain line: a slow, gentle sway showing the two lanes —
+          // around the podium spot, never leaving the reading zone (playtest:
+          // any faster and she's distracting while the thesis lands).
           this.podium();
-          this.orbTarget.addScaledVector(_right, Math.sin(this.beatT * 1.6) * 0.55);
+          this.orbTarget.addScaledVector(_right, Math.sin(this.beatT * 0.7) * 0.55);
         } else {
           // Between reps (praise, retry coaching): back to the podium.
           this.podium();
@@ -671,7 +683,7 @@ export class TutorialSystem extends createSystem({
       case 'throw':
         this.thrown = false;
         this.caughtDuringThrow = false;
-        // "See that rust bucket?" — he wakes up on cue.
+        // "See this rust bucket?" — he wakes up on cue.
         this.botFrozen = false;
         this.queueLine('throwIt');
         break;

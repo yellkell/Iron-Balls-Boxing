@@ -127,9 +127,10 @@ Arena fades in. Tutorial music low. **Ember does not start in front of you.**
 1. The sparring bot wears a **rusty orange-brown** tint the whole tutorial
    (he IS the rust bucket) and stands **dead still** through the opening
    beats — he only wakes into his idle sway on this beat's first line, right
-   as she names him. Orb zips downrange and hovers over the bot's head,
-   bobbing — a living target marker. **E-030** (her spatial voice from over
-   there is the aim cue).
+   as she names him. Ember stays on the player's fist while the ignite
+   praise finishes, then flies downrange ON the rust-bucket line and hovers
+   over the bot's head, bobbing — a living target marker. **E-030** (her
+   spatial voice from over there is the aim cue).
 2. WAIT: `playerBallIn(BallState.Flying)`. Release under
    `FIREBALL.minPunchSpeed` (1.1 m/s) → **E-032**.
 3. Success → **E-031** (bigger if it connects — `resolveLocalHit`,
@@ -252,7 +253,7 @@ smiling.
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e030-throw` | "See that **rust bucket**? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot." | Even, unhurried; the last phrase as she flies downrange. | Beat start. |
+| `e030-throw` | "See this **rust bucket**? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot." | Even, unhurried; she's flying downrange to him as she says it. | Beat start (she stays on the fist through the ignite praise; this line launches her over). |
 | `e031-throw-done` | "**Good job.** He felt that." | Level praise, a hint of satisfaction on the second sentence. | Ball goes Flying / connects. |
 | `e032-throw-soft` | "Almost. **Commit** to the punch." | Precise coaching, no disappointment. | Release under min punch speed. |
 
