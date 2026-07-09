@@ -271,7 +271,7 @@ smiling.
 | `e050-block` | "This one keeps you alive. A spinning ball is a **shield**. Spin one up, hold it close. He's going to throw at you." | Her most serious read; still calm, just lower and slower. | Beat start. |
 | `e051-block-incoming` | "Incoming." | Cool, clear — an alert tone in word form. | Lob leaves the bot's hand. |
 | `e052-block-done` | "Blocked. **Well done.** Again, a little faster this time." | Approval, then a composed challenge. Rolls straight into rep two. | Real parry on the lobbed ball. |
-| `e053-block-retry` | "You're fine. Ball up. Keep it between you and him. Again." | Steadying; used for hits and misses alike. Zero blame. | Lob hit the player or expired unblocked. |
+| `e053-block-retry` | "You're fine. Get your fireball spinning around your hand, and punch the oncoming ball to block. Again." | Steadying; used for hits and misses alike. Zero blame. Full re-teach of the mechanic — this is the retry line for the game's hardest concept. | Lob hit the player or expired unblocked. |
 | `e054-block-two` | "Two for two. You're a **natural**, Clanker." | The praise ceiling: level voice, genuinely pleased. | Second (faster) block lands. |
 
 ### Beat 5 — Move

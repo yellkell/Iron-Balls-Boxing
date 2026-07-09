@@ -544,10 +544,16 @@ export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round
   roundTime: 60, // seconds per round
   winTarget: 3, // first to N round wins takes the match
+  winTargetFfa: 2, // FFA only: a four-way scramble at first-to-3 drags — 2 crowns it
   roundOverDelay: 5, // breather between rounds before the next round's countdown
   roundCountdown: 3, // the 3-2-1 that opens every round AFTER the first
   matchOverDelay: 6, // pause after the match before returning to the lobby
 };
+
+/** Round wins that take the match in `mode` — FFA runs shorter (see above). */
+export function winTargetFor(mode: ArcadeMode): number {
+  return mode === 'ffa' ? MATCH.winTargetFfa : MATCH.winTarget;
+}
 
 /** The visible platform slab under each boxer. */
 export const PLATFORM = {

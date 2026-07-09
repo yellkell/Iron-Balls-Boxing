@@ -55,7 +55,10 @@ export const LINES = {
   },
   blockIncoming: { id: 'e051-block-incoming', text: 'Incoming.' },
   blockDone: { id: 'e052-block-done', text: 'Blocked. Well done. Again, a little faster this time.' },
-  blockRetry: { id: 'e053-block-retry', text: "You're fine. Ball up. Keep it between you and him. Again." },
+  blockRetry: {
+    id: 'e053-block-retry',
+    text: "You're fine. Get your fireball spinning around your hand, and punch the oncoming ball to block. Again.",
+  },
   blockTwo: { id: 'e054-block-two', text: "Two for two. You're a natural, Clanker." },
 
   // Beat 5 — move

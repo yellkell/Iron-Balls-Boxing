@@ -486,7 +486,7 @@ export class TutorialSystem extends createSystem({
           // around the podium spot, never leaving the reading zone (playtest:
           // any faster and she's distracting while the thesis lands).
           this.podium();
-          this.orbTarget.addScaledVector(_right, Math.sin(this.beatT * 0.7) * 0.55);
+          this.orbTarget.addScaledVector(_right, Math.sin(this.beatT * 0.7) * 0.35);
         } else {
           // Between reps (praise, retry coaching): back to the podium.
           this.podium();
@@ -703,6 +703,11 @@ export class TutorialSystem extends createSystem({
         // (holdFire stays up through the READY click's frame; update()'s
         // default-false releases it next frame.)
         this.removePanel('loadout');
+        // The drills left the bot's balls dead on the floor across the arena
+        // — call them home during the speech, so he visibly HOLDS his fire
+        // when the fight starts instead of a ball materialising mid-throw.
+        ballCommands.push({ type: 'recall', slot: 0, hand: 0 });
+        ballCommands.push({ type: 'recall', slot: 0, hand: 1 });
         this.queueLine('grad');
         break;
       case 'fight':

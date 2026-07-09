@@ -26,7 +26,7 @@ import { app, saveStats, training, type AppMode } from '../menu/appState.js';
 import * as sfx from '../audio/sfx.js';
 import { playVictory, startBattleMusic, stopBattleTrack } from '../audio/battleMusic.js';
 import { announce, preloadAnnouncer } from '../audio/announcer.js';
-import { MATCH, modeTeams, teamColor, type ArcadeMode } from '../config.js';
+import { MATCH, modeTeams, teamColor, winTargetFor, type ArcadeMode } from '../config.js';
 import { createScoreboard, type FighterHud, type Scoreboard } from '../ui/scoreboard.js';
 import { UI } from '../ui/industrial.js';
 import { net } from '../net/client.js';
@@ -186,7 +186,7 @@ export class GameStateSystem extends createSystem({
     } else if (match.phase === 'roundOver') {
       match.resultTimer -= delta;
       if (match.resultTimer <= 0) {
-        if (teams.some((t) => (match.teamScores[t] ?? 0) >= MATCH.winTarget)) this.toMatchOverArcade(teams);
+        if (teams.some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade))) this.toMatchOverArcade(teams);
         else {
           match.round += 1;
           this.beginCountdownArcade(actives, MATCH.roundCountdown);
@@ -224,7 +224,7 @@ export class GameStateSystem extends createSystem({
   private endRoundArcade(winnerTeam: number | undefined, result: RoundResult): void {
     match.roundWinnerTeam = winnerTeam ?? -1;
     if (winnerTeam !== undefined) match.teamScores[winnerTeam] = (match.teamScores[winnerTeam] ?? 0) + 1;
-    if (modeTeams(app.arcade).some((t) => (match.teamScores[t] ?? 0) >= MATCH.winTarget)) {
+    if (modeTeams(app.arcade).some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade))) {
       this.toMatchOverArcade(modeTeams(app.arcade));
       return;
     }

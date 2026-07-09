@@ -22,7 +22,7 @@ import {
   PlaneGeometry,
   type Scene,
 } from 'three';
-import { ARENA_GAP, MATCH } from '../config.js';
+import { ARENA_GAP, winTargetFor } from '../config.js';
 import type { MatchState } from '../combat/matchState.js';
 import { app, training } from '../menu/appState.js';
 import { UI, chamferPath, fitStencilText, metalText, solidBar, stencilFont } from './industrial.js';
@@ -160,9 +160,9 @@ function header(ctx: CanvasRenderingContext2D, title: string, neon: string): voi
   ctx.shadowBlur = 0;
 }
 
-/** Round-win pips: chamfered studs, lit per round taken. */
+/** Round-win pips: chamfered studs, lit per round taken (FFA runs to 2). */
 function scorePips(ctx: CanvasRenderingContext2D, x: number, y: number, won: number, color: string): void {
-  for (let i = 0; i < MATCH.winTarget; i++) {
+  for (let i = 0; i < winTargetFor(app.arcade); i++) {
     const px = x + i * 58;
     ctx.save();
     ctx.translate(px, y);
