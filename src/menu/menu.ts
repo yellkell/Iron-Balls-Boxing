@@ -1192,8 +1192,9 @@ const ATTACHMENTS: AttachInfo[] = [
 ];
 const TYPES = [ATTACH.split, ATTACH.grow, ATTACH.shrink];
 
-const BALL_W = 560;
-const BALL_H = 480;
+// Exported: TutorialSystem re-hosts this exact panel on its in-arena console.
+export const BALL_W = 560;
+export const BALL_H = 480;
 const BMX = 36; // side margin
 const BGAP = 18; // gap between tiles
 const TILE_W = (BALL_W - 2 * BMX - 2 * BGAP) / 3;
@@ -1323,8 +1324,9 @@ function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, 
   }
 }
 
-/** BALL LOADOUT: per-fist attachment picker with click-to-read descriptions. */
-function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+/** BALL LOADOUT: per-fist attachment picker with click-to-read descriptions.
+ *  Exported: the tutorial's console draws the same panel in-arena. */
+export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const hover = hoverAction !== null;
   panelBg(ctx, hover, UI.emberBright, 'BALL LOADOUT', BALL_W, BALL_H);
 
@@ -1361,8 +1363,9 @@ function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
   }
 }
 
-/** Tap a tile → equip/clear that attachment and show its description. */
-function clickBalls(u: number, v: number): boolean {
+/** Tap a tile → equip/clear that attachment and show its description.
+ *  Exported: the tutorial's console shares this hit-test. */
+export function clickBalls(u: number, v: number): boolean {
   const x = u * BALL_W;
   const y = (1 - v) * BALL_H;
   // Arc checkboxes sit on each fist's label line, above the tiles.
