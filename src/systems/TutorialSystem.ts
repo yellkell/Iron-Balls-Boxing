@@ -379,10 +379,9 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'recall': {
-        // In front where she can be SEEN coaching (a post at the shoulder
-        // played as a voice behind your ear), offset off the throwing line —
-        // at EYE height, whatever the player's gaze is doing.
-        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, 0.4);
+        // Front and centre — the podium. Anything she says while the player's
+        // eyes are downrange must sit INSIDE that sightline, not beside it.
+        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.0).addScaledVector(_right, 0.2);
         this.orbTarget.y = _head.y - 0.05;
         if (events.caught) {
           this.say('recallDone');
@@ -392,10 +391,6 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'block': {
-        // Bodyguard post: ahead and off-line, in view but clear of the lob —
-        // pinned at eye height so a downward glance can't sink her.
-        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, -0.45);
-        this.orbTarget.y = _head.y - 0.05;
         const res = this.resolveLob(delta, iWasHit);
         if (res === 'blocked') {
           this.blocks += 1;
@@ -418,6 +413,14 @@ export class TutorialSystem extends createSystem({
           this.pushLob(0, _v, this.lobSpeed);
           this.say('blockIncoming');
         }
+        // Talking happens from the podium, dead ahead where it can be read;
+        // she only steps wide of the firing line while a ball is coming.
+        if (this.lobLive()) {
+          this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, -0.7);
+        } else {
+          this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.05).addScaledVector(_right, -0.2);
+        }
+        this.orbTarget.y = _head.y - 0.05;
         break;
       }
 
@@ -451,6 +454,10 @@ export class TutorialSystem extends createSystem({
               this.say('moveRetry');
             }
           }
+          // While the ball flies she marks the lane to step into — out on the
+          // called side, forward of the player, inside their field of view.
+          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.1).addScaledVector(_fwdFlat, 1.1);
+          this.orbTarget.y = _head.y;
         } else if (this.speechIdle()) {
           // Next rep: she darts to the called side as the visual cue.
           const side = MOVE_REPS[this.repIdx];
@@ -464,20 +471,18 @@ export class TutorialSystem extends createSystem({
           // language the titans use for their kill zones, inverted.
           this.showZone(this.repAxis.x >= 0 ? 1 : -1);
         } else if (this.repIdx === 0 && this.sideFails === 0) {
-          // The explain line: she sweeps the two lanes while the thesis lands
-          // — out in FRONT, where the sweep can actually be watched.
+          // The explain line: a gentle sweep showing the two lanes — narrow
+          // enough that she (and her caption) never leave the reading zone.
           this.orbTarget
             .copy(_head)
             .addScaledVector(_fwdFlat, 1.1)
-            .addScaledVector(_right, Math.sin(this.beatT * 1.6) * 1.2);
+            .addScaledVector(_right, Math.sin(this.beatT * 1.6) * 0.55);
           this.orbTarget.y = _head.y;
-          break;
-        }
-        if (this.lobLive()) {
-          // Out on the called side, forward of the player — she marks the
-          // lane to step into without leaving their field of view.
-          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.1).addScaledVector(_fwdFlat, 1.1);
-          this.orbTarget.y = _head.y;
+        } else {
+          // Between reps (praise, retry coaching): back to the podium, dead
+          // ahead, where the line can actually be read.
+          this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.1);
+          this.orbTarget.y = _head.y - 0.05;
         }
         break;
       }

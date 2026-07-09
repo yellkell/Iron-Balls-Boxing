@@ -134,7 +134,9 @@ Arena fades in. Tutorial music low. **Ember does not start in front of you.**
 
 ### Beat 3 — RECALL
 
-1. Orb returns to the player's shoulder. **E-040**.
+1. Orb returns to the **podium** — dead ahead at eye height, inside the
+   player's downrange sightline (playtest: anything said from beside the
+   head goes unread). **E-040**.
 2. WAIT: ball goes `Returning`, then reverts to `Hover` (caught). Stall →
    replay **E-040** per the global nudge rule.
 3. Catch → **E-041**.
@@ -146,8 +148,9 @@ in `CollisionSystem.tryParry()` (`CollisionSystem.ts:326`) when the spent
 ball is the tagged one. Outcomes per lob: **blocked**, **hit**
 (`feedback.playerHitFlash` while tagged ball live), or **missed/expired**.
 
-1. Orb takes a post off the player's lead shoulder. **E-050** (shield +
-   he's going to throw).
+1. Orb talks from the podium (front and centre); she only steps wide of the
+   firing line while a lob is actually in flight. **E-050** (shield + he's
+   going to throw).
 2. WAIT: player has an `Orbit` ball — she won't let the bot throw until the
    shield exists (same guard as today's `tickBlock()`).
 3. Lob #1 at **2.4 m/s**, mid-chest. At release: **E-051** ("Incoming.").
@@ -181,8 +184,9 @@ count — **E-063**, repeat that side (drop to 2.3 m/s after two misses on the
 same side). A clean first rep gets a praise-pool line; the second completes
 the drill.
 
-1. **E-060** — the explain. Orb sweeps wide left, then wide right — out in
-   front — as she says it, showing the lanes.
+1. **E-060** — the explain. A gentle front-and-centre sweep shows the two
+   lanes (kept narrow so she and her caption never leave the reading zone);
+   praise/retry lines between reps come from the podium.
 2. Reps: L → R with the call-outs, retrying a side until it's clean.
 3. Drill complete → **E-064** (the Sheriff line — fires once ever).
 
