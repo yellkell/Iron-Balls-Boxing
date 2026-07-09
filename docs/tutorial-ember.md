@@ -269,7 +269,7 @@ smiling.
 |---|---|---|---|
 | `e030-throw` | "See this **rust bucket**? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot." | Even, unhurried; she's flying downrange to him as she says it. | Beat start (she stays on the fist through the ignite praise; this line launches her over). |
 | `e031-throw-done` | "**Good job.** He felt that." | Level praise, a hint of satisfaction on the second sentence. | Ball goes Flying / connects. |
-| `e032-throw-soft` | "Almost. **Commit** to the punch." | Precise coaching, no disappointment. | Release under min punch speed. |
+| `e032-throw-soft` | "Activate a ball, punch towards him, and release the trigger at the end of the swing!" | The full sequence again, step by step — patient re-teach with a lift of encouragement at the end, no disappointment. | Release under min punch speed (the ball dropped back to hover). |
 
 ### Beat 3 — Recall
 
