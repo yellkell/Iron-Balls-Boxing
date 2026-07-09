@@ -399,14 +399,31 @@ export class MenuSystem extends createSystem({}) {
     const skinChanged = customization.version !== this.lastSkinDraw;
     if (skinChanged) this.lastSkinDraw = customization.version;
     const hoverChanged = hover !== this.hovered || hoverAction !== this.hoveredAction;
-    // A slider scrub bumps the skin version EVERY frame — let the drag branch
-    // below repaint just the locker faces instead of all eight panels.
-    if (hoverChanged || boardScrolled || newsScrolled || (skinChanged && !dragged)) {
+    if (hoverChanged) {
+      // Repaint ONLY the panels whose hover visuals actually changed — the
+      // one the pointer left and the one it landed on. This used to be a
+      // redrawAll: every hover flicker re-rasterized all eight-plus visible
+      // canvases (news alone is 720×900) and re-uploaded megabytes of
+      // texture in one frame — a guaranteed dropped frame on Quest, which
+      // reads as "screen tearing" while the head is moving. Hover happens
+      // whenever a hand drifts, so the menu stuttered near-constantly.
+      const prev = this.hovered;
       this.hovered = hover;
       this.hoveredAction = hoverAction;
-      this.menu.redrawAll(hover, hoverAction);
-      if (hoverChanged && hover) sfx.uiHover(); // soft laser zap as the pointer lands
+      for (const p of this.menu.panels) {
+        if (!p.mesh.visible || (p.id !== prev && p.id !== hover)) continue;
+        p.redraw(p.id === hover ? hoverAction : null);
+      }
+      if (hover) sfx.uiHover(); // soft laser zap as the pointer lands
     }
+    // A scroll repaints its own page, nothing else.
+    if (boardScrolled) this.redrawPanel('board');
+    if (newsScrolled) this.redrawPanel('news');
+    // A skin change can touch several faces (locker, shop, board avatar) —
+    // it's a rare, single event, so the full repaint is fine. A slider scrub
+    // bumps the version EVERY frame — the drag branch below repaints just the
+    // locker faces instead.
+    if (skinChanged && !dragged) this.menu.redrawAll(this.hovered, this.hoveredAction);
 
     // Self-contained panel click (e.g. the ball loadout tiles).
     if (clicked) {
@@ -445,6 +462,11 @@ export class MenuSystem extends createSystem({}) {
     if (tickCoinRollup(delta)) {
       this.menu.panels.find((p) => p.id === 'coins')?.redraw(null);
     }
+  }
+
+  /** Repaint one panel by id, preserving its live hover highlight. */
+  private redrawPanel(id: PanelId): void {
+    this.menu.panels.find((p) => p.id === id)?.redraw(this.hovered === id ? this.hoveredAction : null);
   }
 
   private updateBoardScroll(pointing: boolean, axisY: number, delta: number): boolean {
