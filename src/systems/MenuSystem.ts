@@ -134,6 +134,8 @@ interface Pointer {
 
 export class MenuSystem extends createSystem({}) {
   private menu!: Menu;
+  /** Last lobby-ness handed to the music (null = never) — see applyState(). */
+  private musicInLobby: boolean | null = null;
   private ray = new Raycaster();
   private hovered: PanelId | null = null;
   private hoveredAction: MenuAction | null = null;
@@ -1343,9 +1345,15 @@ export class MenuSystem extends createSystem({}) {
     this.menu.setVisible(inLobby);
     // Back in the lobby: hand the audio over — the victory sting rings out, then
     // (and only then) the lobby music fades up, so they never overlap. During a
-    // bout / training the lobby music just pauses.
-    if (inLobby) handoffToLobby();
-    else setMenuMusicActive(false);
+    // bout / training the lobby music just pauses. Fired on the TRANSITION
+    // only: applyState() runs after every lobby click (tab swaps included),
+    // and re-running the handoff mid-fade used to yank the music to silence
+    // and start the fade over — the locker ⇄ store warble.
+    if (inLobby !== this.musicInLobby) {
+      this.musicInLobby = inLobby;
+      if (inLobby) handoffToLobby();
+      else setMenuMusicActive(false);
+    }
     // Fresh board standings + the day's Gasket Gazette whenever you land back
     // in the lobby (both throttled).
     if (inLobby) {

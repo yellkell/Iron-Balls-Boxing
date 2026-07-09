@@ -96,7 +96,10 @@ export function fadeInMenuMusic(): void {
   if (audio && !audio.paused && fadeTimer === null) return;
   stopFade();
   const a = ensureAudio();
-  a.volume = 0;
+  // Resume from wherever the level already is — a re-trigger mid-fade must
+  // continue the climb, never yank the track back to silence and start over.
+  const from = a.paused ? 0 : Math.min(a.volume, targetVol());
+  a.volume = from;
   void a.play().catch(() => {
     /* blocked — stay silent */
   });
@@ -105,7 +108,7 @@ export function fadeInMenuMusic(): void {
   fadeTimer = window.setInterval(() => {
     i += 1;
     const target = targetVol();
-    a.volume = Math.min(target, (target * i) / steps);
+    a.volume = Math.min(target, from + ((target - from) * i) / steps);
     if (i >= steps) stopFade();
   }, 50);
 }
