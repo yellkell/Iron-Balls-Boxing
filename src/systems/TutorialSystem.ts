@@ -47,7 +47,7 @@ import { match } from '../combat/matchState.js';
 import { ballCommands, opponents } from '../combat/opponentBus.js';
 import { app } from '../menu/appState.js';
 import { startTutorialMusic, stopTutorialMusic } from '../audio/tutorialMusic.js';
-import { FIREBALL, MATCH } from '../config.js';
+import { CAMPAIGN, FIREBALL, MATCH, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { UI, buttonPlate, plate, stencilFont } from '../ui/industrial.js';
 import { glowSprite } from '../materials/glow.js';
 import { emberBurst, spawnEmber } from '../fx/fire.js';
@@ -61,6 +61,7 @@ import {
   tutorVoiceActive,
 } from '../audio/tutorVoice.js';
 import { updateVoiceListener } from '../pub/voice/playback.js';
+import { goTelegraph, type Telegraph } from '../campaign/telegraphs.js';
 import { LINES, PRAISE_POOL, type LineKey } from '../tutorial/script.js';
 import { BALL_H, BALL_W, clickBalls, drawBalls, wrapText } from '../menu/menu.js';
 
@@ -228,6 +229,10 @@ export class TutorialSystem extends createSystem({
   private sideFails = 0;
   private repAxis = new Vector3();
   private repStart = new Vector3();
+  /** The green "stand HERE" half-deck cue, up while a footwork lob flies. */
+  private zone: Telegraph | null = null;
+  /** The current lob's planned flight time — drives the zone's charge fill. */
+  private lobFlight = 1;
   private attachBase: [number, number, boolean, boolean] = [0, 0, false, false];
   private attachStage: 'pick' | 'test' = 'pick';
   private effectSeen = false;
@@ -408,9 +413,12 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'move': {
+        // The floor cue charges with the lob, exactly like a boss telegraph.
+        this.zone?.update(Math.min(1, this.lobT / Math.max(0.3, this.lobFlight)), this.time);
         if (this.lobLive()) {
           const res = this.resolveLob(delta, iWasHit);
           if (res) {
+            this.removeZone();
             let clean = false;
             if (res === 'missed') {
               // Did the whole body actually go the called way?
@@ -443,6 +451,9 @@ export class TutorialSystem extends createSystem({
           // Head-height lob; the bot throws with the hand across from the call.
           this.pushLob(side === 'L' ? 1 : 0, _v.copy(_head), this.sideFails >= 2 ? 2.3 : 2.6);
           this.say(side === 'L' ? 'moveLeft' : 'moveRight');
+          // Light the called half of the deck green — "stand HERE", the same
+          // language the titans use for their kill zones, inverted.
+          this.showZone(this.repAxis.x >= 0 ? 1 : -1);
         } else if (this.repIdx === 0 && this.sideFails === 0) {
           // The explain line: she sweeps the two lanes while the thesis lands
           // — out in FRONT, where the sweep can actually be watched.
@@ -628,10 +639,11 @@ export class TutorialSystem extends createSystem({
   }
 
   private goto(beat: Beat): void {
-    // A leftover drill ball must not carry across beats.
+    // A leftover drill ball (and its floor cue) must not carry across beats.
     if (this.lobLive()) ballCommands.push({ type: 'spend', slot: 0, hand: this.lobHand });
     this.lob = null;
     this.lobPending = false;
+    this.removeZone();
     this.beat = beat;
     this.beatT = 0;
     this.toSub(0);
@@ -707,6 +719,20 @@ export class TutorialSystem extends createSystem({
     this.lob = null;
     this.lobHand = hand;
     this.lobT = 0;
+    this.lobFlight = flight;
+  }
+
+  /** Light one half of the player's deck green: "stand HERE". */
+  private showZone(side: -1 | 1): void {
+    this.removeZone();
+    this.zone = goTelegraph(side, OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH * 2);
+    this.zone.group.position.set(0, CAMPAIGN.decalY, 0);
+    this.scene.add(this.zone.group);
+  }
+
+  private removeZone(): void {
+    this.zone?.dispose();
+    this.zone = null;
   }
 
   private lobLive(): boolean {
@@ -1001,6 +1027,7 @@ export class TutorialSystem extends createSystem({
     this.removePanel('loadout');
     this.removeCaption();
     this.removePointers();
+    this.removeZone();
     this.queue.length = 0;
     this.captionText = '';
     this.speakUntil = 0;

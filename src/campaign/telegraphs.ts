@@ -153,6 +153,34 @@ const HALF_FRAG = /* glsl */ `
   }
 `;
 
+/**
+ * GO zone (the tutorial's footwork cue) — the inverse of the half flood:
+ * the called half of the deck GLOWS GREEN ("stand HERE"), bands march INTO
+ * it, and the centreline rail is the line to cross. Same fill contract as
+ * every warning: 0→1 as the incoming ball flies, so urgency reads exactly
+ * like a boss telegraph, just inverted from "flee" to "come".
+ */
+const GO_FRAG = /* glsl */ `
+  uniform float uFill, uTime;
+  varying vec2 vUv;
+  void main(){
+    vec3 col = vec3(0.34, 0.88, 0.54);
+    float a = 0.0;
+    // Welcoming flood, brightening as the ball closes.
+    a += 0.08 + 0.4 * uFill;
+    // The centreline rail — the honest border to get across (u = 0 there).
+    a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.3 + 0.7 * uFill);
+    // Bands marching INTO the safe half — follow them.
+    float lane = fract(vUv.x * 5.0 - uTime * 2.4);
+    float band = step(0.72, lane) * step(abs(fract(vUv.y * 3.0) - 0.5), 0.32);
+    a += band * (0.12 + 0.25 * uFill);
+    // A soft glow at the outer rim, so the zone reads as a destination.
+    a += smoothstep(0.92, 1.0, vUv.x) * 0.25;
+    a *= 0.85 + 0.15 * sin(uTime * mix(2.5, 10.0, uFill));
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
 /** Blade: a horizontal slice hanging in the air — bright core line, soft body. */
 const BLADE_FRAG = /* glsl */ `
   ${COMMON}
@@ -230,6 +258,20 @@ export function halfTelegraph(side: -1 | 1, halfWidth: number, depth: number): T
   // Authored for the +x half (u = 0 at the centreline); the −x half is the
   // same pane mirrored in place. The flip lives on the MESH — the group's
   // rotation stays free for the caller's seat yaw.
+  pane.position.x = (side * halfWidth) / 2;
+  pane.scale.x = side;
+  return makeTelegraph([pane], [mat]);
+}
+
+/**
+ * The green "stand HERE" half (see GO_FRAG) — used by the tutorial's
+ * footwork drill. `side` is the SAFE half's local-x sign; geometry mirrors
+ * halfTelegraph exactly, so it lands on the deck the same way.
+ */
+export function goTelegraph(side: -1 | 1, halfWidth: number, depth: number): Telegraph {
+  const mat = warnMat(GO_FRAG);
+  const pane = new Mesh(new PlaneGeometry(halfWidth, depth), mat);
+  pane.rotation.x = -Math.PI / 2;
   pane.position.x = (side * halfWidth) / 2;
   pane.scale.x = side;
   return makeTelegraph([pane], [mat]);

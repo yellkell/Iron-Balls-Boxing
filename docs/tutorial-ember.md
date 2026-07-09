@@ -169,7 +169,12 @@ slog; two clean-or-retry reps keeps the lesson honest without the grind.)
 
 Per rep: Ember **darts to the called side, forward of the player** (the
 visual cue stays in their field of view), calls the side (**E-061 / E-062**)
-as the bot lobs at the player's **head** at 2.6 m/s. Success = the ball
+as the bot lobs at the player's **head** at 2.6 m/s — and **the called half
+of the platform lights up GREEN** (`goTelegraph` in
+`src/campaign/telegraphs.ts`): the same floor-decal language the titans use
+for their kill zones, inverted to "stand HERE". Its fill charges with the
+lob's flight, chevrons march into the safe half, and the centreline rail is
+the line to cross. Success = the ball
 passes clean AND the head moved **≥ 0.35 m in the called direction** from its
 position at the moment of the throw. A hit, or a dodge the wrong way, doesn't
 count — **E-063**, repeat that side (drop to 2.3 m/s after two misses on the
