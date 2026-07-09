@@ -95,7 +95,7 @@ const PERCH_POS = new Vector3(1.5, 2.5, -1.9);
 
 // --- canvases ---------------------------------------------------------------
 const CAP_W = 768;
-const CAP_H = 184;
+const CAP_H = 224;
 const CON_W = 384;
 const CON_H = 224;
 const BEGIN_BTN = { x: 72, y: 116, w: 240, h: 64 };
@@ -1126,12 +1126,12 @@ export class TutorialSystem extends createSystem({
       });
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.font = stencilFont(19);
+      ctx.font = stencilFont(26);
       ctx.fillStyle = UI.emberBright;
-      ctx.fillText('EMBER', 34, 40);
-      ctx.font = '600 24px system-ui, sans-serif';
+      ctx.fillText('EMBER', 34, 48);
+      ctx.font = '600 31px system-ui, sans-serif';
       ctx.fillStyle = UI.text;
-      wrapText(ctx, this.captionText, 34, 72, CAP_W - 68, 30);
+      wrapText(ctx, this.captionText, 34, 88, CAP_W - 68, 38);
     }
     this.caption.tex.needsUpdate = true;
   }
@@ -1173,9 +1173,9 @@ export class TutorialSystem extends createSystem({
     plate(ctx, 8, 8, CON_W - 16, CON_H - 16, { cut: 18, fill: 'rgba(10,12,16,0.92)', stroke: UI.emberBright });
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    ctx.font = stencilFont(30);
+    ctx.font = stencilFont(38);
     ctx.fillStyle = UI.emberBright;
-    ctx.fillText('TUTORIAL', 36, 66);
+    ctx.fillText('TUTORIAL', 36, 72);
     buttonPlate(ctx, BEGIN_BTN.x, BEGIN_BTN.y, BEGIN_BTN.w, BEGIN_BTN.h, 'BEGIN', UI.amber, this.console.hot);
     this.console.tex.needsUpdate = true;
   }
