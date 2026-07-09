@@ -1255,8 +1255,9 @@ function drawAttachIcon(ctx: CanvasRenderingContext2D, type: number, cx: number,
   }
 }
 
-/** Word-wrap `text` into `maxW`, returning the count of lines drawn. */
-function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): void {
+/** Word-wrap `text` into `maxW`, returning the count of lines drawn.
+ *  Exported: the tutorial's caption plate wraps with the same algorithm. */
+export function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): void {
   const words = text.split(' ');
   let line = '';
   let cy = y;

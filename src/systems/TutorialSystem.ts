@@ -62,7 +62,7 @@ import {
 } from '../audio/tutorVoice.js';
 import { updateVoiceListener } from '../pub/voice/playback.js';
 import { LINES, PRAISE_POOL, type LineKey } from '../tutorial/script.js';
-import { BALL_H, BALL_W, clickBalls, drawBalls } from '../menu/menu.js';
+import { BALL_H, BALL_W, clickBalls, drawBalls, wrapText } from '../menu/menu.js';
 
 /** The bot's health in tutorial — deliberately low so a beginner can win. */
 const TUT_BOT_HP = 55;
@@ -70,7 +70,19 @@ const TUT_BOT_HP = 55;
 /** Where Ember drops below this HP she calls the finish. */
 const BOT_WOBBLE_HP = 15;
 
-type Beat = 'attention' | 'ignite' | 'throw' | 'recall' | 'block' | 'move' | 'attach' | 'grad' | 'fight';
+type Beat =
+  | 'attention'
+  | 'ignite'
+  | 'throw'
+  | 'recall'
+  | 'block'
+  | 'move'
+  | 'attach'
+  | 'grad'
+  | 'fight'
+  /** Post-KO breather: the round is banked but held open while Ember's
+   *  win/lose line (and its caption) plays out, then exit to menu. */
+  | 'wrapup';
 
 // --- Ember's marks (player platform at the origin, facing -Z at the bot) ----
 /** The console: a fixed panel anchor off the player's right shoulder. It hosts
@@ -127,6 +139,15 @@ interface Panel {
   mesh: Mesh;
   ctx: CanvasRenderingContext2D;
   tex: CanvasTexture;
+  /** Its one big button's hover state — lives and dies with the panel. */
+  hot: boolean;
+}
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** What the player's balls did since last frame — combat observed from outside. */
@@ -175,7 +196,6 @@ export class TutorialSystem extends createSystem({
   // --- console panels + laser pointers ---
   private console: Panel | null = null;
   private loadout: Panel | null = null;
-  private panelHot = false;
   private ray = new Raycaster();
   private pointers: Partial<Record<'left' | 'right', Pointer>> = {};
 
@@ -196,7 +216,6 @@ export class TutorialSystem extends createSystem({
   private sideFails = 0;
   private repAxis = new Vector3();
   private repStart = new Vector3();
-  private repLive = false;
   private attachBase: [number, number, boolean, boolean] = [0, 0, false, false];
   private attachStage: 'pick' | 'test' = 'pick';
   private effectSeen = false;
@@ -214,7 +233,9 @@ export class TutorialSystem extends createSystem({
   private waitT = 0;
   private nudgeStage = 0;
 
+  // Double-buffered so the per-frame collection never allocates.
   private prevBallState = new Map<Entity, number>();
+  private ballStateScratch = new Map<Entity, number>();
 
   update(delta: number): void {
     this.time += delta;
@@ -246,17 +267,26 @@ export class TutorialSystem extends createSystem({
     const iWasHit = myHp < this.prevMyHp - 0.01;
     const botWasHit = botHp < this.prevBotHp - 0.01;
 
-    const events = this.collectBallEvents();
+    // The trigger belongs to the game unless a beat (attention) or a console
+    // click (this frame) claims it — re-asserted below, cleared by default so
+    // a claim can never outlive the frame that made it.
+    app.tutorialHoldFire = false;
 
     if (this.beat === 'fight') {
       this.capBotHealth();
+      // KO is the only way out: the 60 s clock must never end the round
+      // itself, or GameStateSystem's round/match machinery banks scores and
+      // stats mid-tutorial.
+      match.roundTimer = MATCH.roundTime;
       this.runFight(myHp, botHp, iWasHit, botWasHit);
+    } else if (this.beat === 'wrapup') {
+      this.runWrapup();
     } else {
       // Lessons: keep the bout calm and frozen (see header).
       this.suppressBot();
       this.pinHealth();
       match.roundTimer = MATCH.roundTime;
-      this.runBeat(delta, events, iWasHit, botWasHit);
+      this.runBeat(delta, this.collectBallEvents(), iWasHit, botWasHit);
     }
 
     if (!this.active) return; // a win/lose line just ended the tutorial
@@ -305,11 +335,11 @@ export class TutorialSystem extends createSystem({
         if (!this.thrown && events.anyFlying) this.thrown = true;
         if (this.thrown && botWasHit) {
           this.say('throwDone');
-          this.goto('recall');
+          this.advanceFromThrow();
         } else if (this.thrown && !events.anyFlying) {
           // Landed without connecting — the throw still counts.
           this.sayPraise();
-          this.goto('recall');
+          this.advanceFromThrow();
         }
         break;
       }
@@ -355,7 +385,7 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'move': {
-        if (this.repLive || this.lobLive()) {
+        if (this.lobLive()) {
           const res = this.resolveLob(delta, iWasHit);
           if (res) {
             let clean = false;
@@ -365,7 +395,6 @@ export class TutorialSystem extends createSystem({
               _v.y = 0;
               clean = _v.dot(this.repAxis) >= DODGE_DIST;
             }
-            this.repLive = false;
             if (clean) {
               this.sideFails = 0;
               this.repIdx += 1;
@@ -388,7 +417,6 @@ export class TutorialSystem extends createSystem({
           this.repAxis.copy(_right);
           if (side === 'L') this.repAxis.negate();
           this.repStart.copy(_head);
-          this.repLive = true;
           // Head-height lob; the bot throws with the hand across from the call.
           this.pushLob(side === 'L' ? 1 : 0, _v.copy(_head), this.sideFails >= 2 ? 2.3 : 2.6);
           this.say(side === 'L' ? 'moveLeft' : 'moveRight');
@@ -398,7 +426,7 @@ export class TutorialSystem extends createSystem({
           this.orbTarget.y = _head.y;
           break;
         }
-        if (this.repLive) {
+        if (this.lobLive()) {
           // Parked out on the called side until the rep resolves.
           this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.4).addScaledVector(_fwd, 0.3);
           this.orbTarget.y = _head.y;
@@ -410,9 +438,17 @@ export class TutorialSystem extends createSystem({
         this.orbTarget.copy(this.attachStage === 'test' && !this.effectSeen ? opponents[0].headPos : CONSOLE_POS);
         this.orbTarget.y += this.attachStage === 'test' && !this.effectSeen ? 0.5 : 0.42;
         this.pollLoadout();
-        if (this.attachStage === 'pick' && this.attachChanged()) {
+        if (this.beat !== ('attach' as Beat)) break; // READY was clicked — we're in 'grad' now
+        // 'Picked one' means something is actually ON — a returning player
+        // tapping their already-equipped tile to read it UN-equips, and the
+        // test drill would dead-end with nothing to fire.
+        const anyEquipped =
+          (app.ballAttach[0] ?? 0) !== 0 || (app.ballAttach[1] ?? 0) !== 0 || !!app.ballArc[0] || !!app.ballArc[1];
+        if (this.attachStage === 'pick' && this.attachChanged() && anyEquipped) {
           this.attachStage = 'test';
           this.say('attachTest');
+        } else if (this.attachStage === 'test' && !this.effectSeen && !anyEquipped) {
+          this.attachStage = 'pick'; // everything toggled back off — re-pick
         }
         if (this.attachStage === 'test') {
           if (!this.effectSeen && events.effectLive) {
@@ -437,9 +473,19 @@ export class TutorialSystem extends createSystem({
         if (this.speechIdle() && this.beatT > 2) this.goto('fight');
         break;
       }
+      // 'fight' and 'wrapup' never reach runBeat — update() routes them to
+      // runFight()/runWrapup().
+    }
+  }
 
-      case 'fight':
-        break; // handled in runFight()
+  /** Throw beat done — skip the recall lesson if they already demonstrated a
+   *  clean recall-and-catch while the throw beat was still up. */
+  private advanceFromThrow(): void {
+    if (this.caughtDuringThrow) {
+      this.queueLine('recallDone');
+      this.goto('block');
+    } else {
+      this.goto('recall');
     }
   }
 
@@ -494,20 +540,19 @@ export class TutorialSystem extends createSystem({
         this.orbTarget.copy(CONSOLE_POS);
         this.orbTarget.y += 0.35;
         const hit = this.console ? this.pollPanel(this.console.mesh, CON_W, CON_H) : null;
-        const over =
-          !!hit &&
-          hit.x >= BEGIN_BTN.x && hit.x <= BEGIN_BTN.x + BEGIN_BTN.w &&
-          hit.y >= BEGIN_BTN.y && hit.y <= BEGIN_BTN.y + BEGIN_BTN.h;
-        if (over !== this.panelHot) {
-          this.panelHot = over;
+        const over = this.overRect(hit, BEGIN_BTN);
+        if (this.console && over !== this.console.hot) {
+          this.console.hot = over;
           this.drawConsole();
         }
-        if (over && hit.clicked) {
+        if (over && hit!.clicked) {
           sfx.uiClick();
           tutorChime();
           emberBurst(this.orbPos, 16);
           this.removePanel('console');
-          app.tutorialHoldFire = false;
+          // holdFire stays true THIS frame so FireballSystem (which runs
+          // after us) can't turn the click's trigger edge into an ignite;
+          // update()'s default-false releases it next frame.
           this.goto('ignite');
         }
         break;
@@ -530,11 +575,28 @@ export class TutorialSystem extends createSystem({
       this.saidFightLow = true;
       this.say('fightLow');
     }
-    // One clean knockdown graduates — bow out before the match machinery
-    // banks a result, so the tutorial never touches your stats or coins.
+    // One clean knockdown graduates. GameStateSystem has already banked this
+    // single round (it runs right after the KO frame's collision — the round
+    // bell is unavoidable) but the match can never progress past it: wrapup
+    // holds the round-over breather open, then exits to menu before anything
+    // else runs, so stats and coins are never touched.
     if (botHp <= 0 || myHp <= 0) {
-      this.say(botHp <= 0 ? 'win' : 'lose'); // the line outlives the scene
-      this.end(false);
+      this.say(botHp <= 0 ? 'win' : 'lose');
+      this.goto('wrapup');
+    }
+  }
+
+  /** Hold the post-KO breather open while her sign-off (and caption) lands. */
+  private runWrapup(): void {
+    this.suppressBot();
+    // GameStateSystem is in 'roundOver' counting down to the next round —
+    // keep the breather from expiring so no fresh round starts under the line.
+    match.resultTimer = Math.max(match.resultTimer, 1.0);
+    // She leaves the perch and comes to you for the goodbye.
+    this.orbTarget.copy(_head).addScaledVector(_fwd, 1.2);
+    this.orbTarget.y = _head.y + 0.1;
+    if (this.speechIdle() || this.beatT > 12) {
+      this.end(false); // her voice (if a clip is playing) finishes on its own
       app.tutorial = false;
       app.state = 'menu';
     }
@@ -560,13 +622,7 @@ export class TutorialSystem extends createSystem({
         this.queueLine('throwIt');
         break;
       case 'recall':
-        if (this.caughtDuringThrow) {
-          // They recalled and caught before she could ask — roll with it.
-          this.queueLine('recallDone');
-          this.goto('block');
-        } else {
-          this.queueLine('recall');
-        }
+        this.queueLine('recall');
         break;
       case 'block':
         this.blocks = 0;
@@ -576,7 +632,6 @@ export class TutorialSystem extends createSystem({
       case 'move':
         this.repIdx = 0;
         this.sideFails = 0;
-        this.repLive = false;
         this.queueLine('move');
         break;
       case 'attach':
@@ -588,8 +643,9 @@ export class TutorialSystem extends createSystem({
         this.makeLoadout();
         break;
       case 'grad':
+        // (holdFire stays up through the READY click's frame; update()'s
+        // default-false releases it next frame.)
         this.removePanel('loadout');
-        app.tutorialHoldFire = false; // the loadout hover-hold must not linger
         this.queueLine('grad');
         break;
       case 'fight':
@@ -604,6 +660,10 @@ export class TutorialSystem extends createSystem({
   private toSub(sub: number): void {
     this.sub = sub;
     this.subT = 0;
+  }
+
+  private overRect(hit: { x: number; y: number } | null, r: Rect): boolean {
+    return !!hit && hit.x >= r.x && hit.x <= r.x + r.w && hit.y >= r.y && hit.y <= r.y + r.h;
   }
 
   // --- the lobbed drill ball ----------------------------------------------
@@ -630,20 +690,20 @@ export class TutorialSystem extends createSystem({
 
   /**
    * Watch the lobbed ball to its outcome — combat observed from outside:
-   *  - 'hit'      the player's health dipped (the ball found them);
-   *  - 'blocked'  the ball died right next to the player without a hit —
-   *               only a parry (or a point-blank clash) does that;
-   *  - 'missed'   it sailed past, hit a wall, or died out on the floor.
+   *  - 'hit'      the ball died AND the player's health dipped this frame
+   *               (a dip alone isn't enough — the rim barrier also drains,
+   *               and a clean 0.4 m side-step can cross it mid-drill);
+   *  - 'blocked'  the ball died mid-air without hurting them. The only
+   *               things that kill our lob mid-air are the player's own
+   *               defence — a parry (anywhere along the flight: a returning
+   *               ball counts) or a mid-air clash;
+   *  - 'missed'   it sailed past the player, or fizzled out on the floor
+   *               (which is NOT a block, however close — seated players'
+   *               heads sit low enough that "near the head" would lie).
    */
   private resolveLob(delta: number, iWasHit: boolean): 'hit' | 'blocked' | 'missed' | null {
     if (!this.lobLive()) return null;
     this.lobT += delta;
-
-    if (iWasHit) {
-      this.lob = null;
-      this.lobPending = false;
-      return 'hit';
-    }
 
     if (this.lobPending) {
       // FireballSystem turns our command into a Flying owner-1 ball this frame.
@@ -665,23 +725,23 @@ export class TutorialSystem extends createSystem({
     }
 
     const ball = this.lob!;
-    if (!ball.active) {
-      this.lob = null;
-      return this.lobLastPos.distanceTo(_head) < 1.35 ? 'blocked' : 'missed';
+    let dead = !ball.active;
+    if (ball.active) {
+      const obj = ball.object3D;
+      if (obj) obj.getWorldPosition(this.lobLastPos);
+      dead = (ball.getValue(Fireball, 'state') ?? 0) === BallState.Dead;
     }
-    const obj = ball.object3D;
-    if (obj) obj.getWorldPosition(this.lobLastPos);
-    const state = ball.getValue(Fireball, 'state') ?? 0;
 
-    if (state === BallState.Dead) {
+    if (dead) {
       this.lob = null;
-      // Died close to the player without hurting them = a real block. A floor
-      // fizzle at their feet sits well over this radius from the head.
-      return this.lobLastPos.distanceTo(_head) < 1.35 ? 'blocked' : 'missed';
+      if (iWasHit) return 'hit'; // a body hit spends the ball the same frame
+      const onFloor = this.lobLastPos.y <= FIREBALL.radius + 0.06;
+      return onFloor ? 'missed' : 'blocked';
     }
+
     // Sailed past (a dodge, or a whiff): call it and tidy the ball away.
     _v.copy(this.lobLastPos).sub(_head);
-    if (state === BallState.Flying && (_v.dot(_fwd) < -0.8 || this.lobT > 6)) {
+    if (_v.dot(_fwd) < -0.8 || this.lobT > 6) {
       ballCommands.push({ type: 'spend', slot: 0, hand: this.lobHand });
       this.lob = null;
       return 'missed';
@@ -700,7 +760,9 @@ export class TutorialSystem extends createSystem({
       anyOrbit: false,
       anyFlying: false,
     };
-    const seen = new Map<Entity, number>();
+    // Reuse last frame's back buffer — a 90 Hz loop must not allocate a Map.
+    const seen = this.ballStateScratch;
+    seen.clear();
     for (const ball of this.queries.balls.entities) {
       if ((ball.getValue(Fireball, 'owner') ?? 0) !== 0) continue;
       if ((ball.getValue(Fireball, 'shard') ?? 0) === 1) continue;
@@ -721,6 +783,7 @@ export class TutorialSystem extends createSystem({
         if (Math.hypot(c[0], c[1], c[2]) > 0.25) ev.effectLive = true; // a real curve in flight
       }
     }
+    this.ballStateScratch = this.prevBallState;
     this.prevBallState = seen;
     return ev;
   }
@@ -741,6 +804,12 @@ export class TutorialSystem extends createSystem({
    *  An interruption means the moment moved on, so pending lines drop too. */
   private say(key: LineKey): void {
     this.queue.length = 0;
+    this.sayNow(key);
+  }
+
+  /** The actual speaking — used by say() and by the queue drain, which must
+   *  NOT clear the queue (it would eat every follow-up line it's draining). */
+  private sayNow(key: LineKey): void {
     const line = LINES[key];
     const dur = sayTutorLine(line.id, line.text);
     this.captionText = line.text;
@@ -771,7 +840,7 @@ export class TutorialSystem extends createSystem({
 
   private upkeep(delta: number): void {
     // Speech queue.
-    if (this.queue.length && this.time >= this.speakUntil) this.say(this.queue.shift()!);
+    if (this.queue.length && this.time >= this.speakUntil) this.sayNow(this.queue.shift()!);
 
     // Orb motion: critically-damped chase + idle bob.
     const k = 1 - Math.exp(-5.5 * delta);
@@ -793,7 +862,9 @@ export class TutorialSystem extends createSystem({
       }
       setTutorVoicePosition(this.orb.position);
     }
-    updateVoiceListener(_head, _headQ);
+    // The listener only matters while she's audible — no point scheduling
+    // nine AudioParam ramps a frame through minutes of silence.
+    if (tutorVoiceActive() || this.time < this.speakUntil) updateVoiceListener(_head, _headQ);
 
     // Gaze accumulator (attention beat).
     if (this.beat === 'attention') {
@@ -816,9 +887,8 @@ export class TutorialSystem extends createSystem({
     }
 
     // Panels face the player.
-    for (const p of [this.console, this.loadout]) {
-      if (p) p.mesh.lookAt(_head);
-    }
+    this.console?.mesh.lookAt(_head);
+    this.loadout?.mesh.lookAt(_head);
 
     // Idle nudges: 14 s → the beat's explain line again; then → "no rush".
     if (this.beat !== 'fight' && this.beat !== 'grad' && this.speechIdle()) {
@@ -836,13 +906,17 @@ export class TutorialSystem extends createSystem({
 
   // --- holding the bout calm ------------------------------------------------
 
-  /** Strip the bot's queued attacks before FireballSystem drains them, and
-   *  drop its wind-up glow — it stands and guards but never throws. (The
-   *  drills' lobs are pushed AFTER this purge, so they survive.) */
+  /** Strip the bot's queued attacks before FireballSystem drains them, drop
+   *  its wind-up glow AND its raised guard — it stands idle, never throws and
+   *  never slaps down the player's practice shots (a guarded throw during the
+   *  attachment test would read as the PLAYER mistiming their recall). The
+   *  drills' lobs are pushed AFTER this purge, so they survive. */
   private suppressBot(): void {
     ballCommands.length = 0;
     opponents[0].orbiting[0] = false;
     opponents[0].orbiting[1] = false;
+    opponents[0].blocking[0] = false;
+    opponents[0].blocking[1] = false;
   }
 
   private pinHealth(): void {
@@ -901,7 +975,6 @@ export class TutorialSystem extends createSystem({
     this.lob = null;
     this.lobPending = false;
     app.tutorialHoldFire = false;
-    this.panelHot = false;
     this.waitT = 0;
     this.nudgeStage = 0;
     this.active = false;
@@ -985,25 +1058,9 @@ export class TutorialSystem extends createSystem({
       ctx.fillText('EMBER', 34, 40);
       ctx.font = '600 24px system-ui, sans-serif';
       ctx.fillStyle = UI.text;
-      this.wrapCaption(ctx, this.captionText, 34, 72, CAP_W - 68, 30);
+      wrapText(ctx, this.captionText, 34, 72, CAP_W - 68, 30);
     }
     this.caption.tex.needsUpdate = true;
-  }
-
-  private wrapCaption(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): void {
-    let line = '';
-    let cy = y;
-    for (const w of text.split(' ')) {
-      const test = line ? `${line} ${w}` : w;
-      if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, x, cy);
-        line = w;
-        cy += lineH;
-      } else {
-        line = test;
-      }
-    }
-    if (line) ctx.fillText(line, x, cy);
   }
 
   // --- the console (BEGIN, then the ball loadout) ------------------------------
@@ -1019,7 +1076,7 @@ export class TutorialSystem extends createSystem({
     mesh.name = name;
     mesh.renderOrder = 20;
     this.scene.add(mesh);
-    return { mesh, ctx, tex };
+    return { mesh, ctx, tex, hot: false };
   }
 
   private disposePanel(p: Panel): void {
@@ -1033,7 +1090,6 @@ export class TutorialSystem extends createSystem({
     if (this.console) return;
     this.console = this.makePanel(CON_W, CON_H, 0.44, 'tutorial-console');
     this.console.mesh.position.copy(CONSOLE_POS);
-    this.panelHot = false;
     this.drawConsole();
   }
 
@@ -1047,7 +1103,7 @@ export class TutorialSystem extends createSystem({
     ctx.font = stencilFont(30);
     ctx.fillStyle = UI.emberBright;
     ctx.fillText('TUTORIAL', 36, 66);
-    buttonPlate(ctx, BEGIN_BTN.x, BEGIN_BTN.y, BEGIN_BTN.w, BEGIN_BTN.h, 'BEGIN', UI.amber, this.panelHot);
+    buttonPlate(ctx, BEGIN_BTN.x, BEGIN_BTN.y, BEGIN_BTN.w, BEGIN_BTN.h, 'BEGIN', UI.amber, this.console.hot);
     this.console.tex.needsUpdate = true;
   }
 
@@ -1056,7 +1112,6 @@ export class TutorialSystem extends createSystem({
     this.loadout = this.makePanel(LOAD_W, LOAD_H, 0.62, 'tutorial-loadout');
     this.loadout.mesh.position.copy(CONSOLE_POS);
     this.loadout.mesh.position.y += 0.06;
-    this.panelHot = false;
     this.drawLoadout();
   }
 
@@ -1065,7 +1120,7 @@ export class TutorialSystem extends createSystem({
     const ctx = this.loadout.ctx;
     ctx.clearRect(0, 0, LOAD_W, LOAD_H);
     drawBalls(ctx, null); // the lobby's exact BALL LOADOUT panel, re-hosted
-    buttonPlate(ctx, READY_BTN.x, READY_BTN.y, READY_BTN.w, READY_BTN.h, 'READY', UI.emberBright, this.panelHot);
+    buttonPlate(ctx, READY_BTN.x, READY_BTN.y, READY_BTN.w, READY_BTN.h, 'READY', UI.emberBright, this.loadout.hot);
     this.loadout.tex.needsUpdate = true;
   }
 
@@ -1073,18 +1128,17 @@ export class TutorialSystem extends createSystem({
   private pollLoadout(): void {
     if (!this.loadout) return;
     const hit = this.pollPanel(this.loadout.mesh, LOAD_W, LOAD_H);
-    // While a laser is ON the panel the trigger is a mouse, not a match: no
-    // igniting or throwing off a loadout tap. Point away and fire is yours.
-    app.tutorialHoldFire = hit !== null;
-    const overReady =
-      !!hit &&
-      hit.x >= READY_BTN.x && hit.x <= READY_BTN.x + READY_BTN.w &&
-      hit.y >= READY_BTN.y && hit.y <= READY_BTN.y + READY_BTN.h;
-    if (overReady !== this.panelHot) {
-      this.panelHot = overReady;
+    const overReady = this.overRect(hit, READY_BTN);
+    if (overReady !== this.loadout.hot) {
+      this.loadout.hot = overReady;
       this.drawLoadout();
     }
     if (!hit?.clicked) return;
+    // The click's trigger edge must not double as an ignite: claim the
+    // trigger for THIS frame only (FireballSystem runs after us; update()'s
+    // default-false releases it next frame). Hovering alone never claims it —
+    // a punch whose ray sweeps the panel on the release frame must still fly.
+    app.tutorialHoldFire = true;
     if (overReady) {
       sfx.uiClick();
       this.goto('grad');

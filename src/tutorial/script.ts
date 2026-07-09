@@ -22,7 +22,7 @@ export const LINES = {
   },
   begin: {
     id: 'e012-begin',
-    text: "Clear yourself a little room, Clanker. Then hit the button on the console, just here — and we'll begin.",
+    text: "Clear yourself a little room, Clanker — a big step each way. Then hit the button on the console, just here — and we'll begin.",
   },
 
   // Beat 1 — ignite

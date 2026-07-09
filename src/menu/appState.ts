@@ -113,8 +113,10 @@ export const app: {
    * untouched — set true only by the lobby's TUTORIAL button.
    */
   tutorial: boolean;
-  /** While the tutorial's intro card is up, the trigger drives the pointer
-   *  (clicking READY), so the fireballs hold off until it's dismissed. */
+  /** While the tutorial owns the trigger — its whole opening beat, plus the
+   *  single frame of any tutorial-console click — the fireballs hold off so
+   *  a UI click never doubles as an ignite or a throw. TutorialSystem
+   *  re-asserts it every frame; it can never outlive the frame that set it. */
   tutorialHoldFire: boolean;
   /** Aim Training option: targets shoot back so you can train dodging. */
   shootBack: boolean;

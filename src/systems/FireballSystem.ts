@@ -384,7 +384,8 @@ export class FireballSystem extends createSystem({
     }
     // Balls only come alive during a live round — no charging (or throwing) in
     // the off time between rounds / after the match. Training has no rounds.
-    // Held off entirely while the tutorial's intro card owns the trigger.
+    // Held off on frames where the tutorial owns the trigger (its opening
+    // beat, and the frame of a tutorial-console click).
     const roundLive = (app.state === 'training' || match.phase === 'playing') && !app.tutorialHoldFire;
 
     if (down) {

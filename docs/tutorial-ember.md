@@ -224,7 +224,7 @@ smiling.
 |---|---|---|---|
 | `e010-over-here` | "Over here." | Quiet, inviting, off to the side. | Orb spawns at 10 o'clock. |
 | `e011-hello` | "There you are. Hello — I'm **Ember**. Your guide, and, statistically, your biggest fan." | Level and warm; the joke lands because she doesn't lean on it. | Gaze lands on her. |
-| `e012-begin` | "Clear yourself a little room, Clanker. Then hit the button on the console, just here — and we'll begin." | Calm instruction; "just here" as she glides to the console and the panel fades in beneath her. | Follows E-011; console panel appears with its BEGIN button. |
+| `e012-begin` | "Clear yourself a little room, Clanker — a big step each way. Then hit the button on the console, just here — and we'll begin." | Calm instruction; "a big step each way" matters (the move drill demands it). "Just here" as she glides to the console and the panel fades in beneath her. | Follows E-011; console panel appears with its BEGIN button. |
 
 ### Beat 1 — Ignite
 

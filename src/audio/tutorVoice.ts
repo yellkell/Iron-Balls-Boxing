@@ -53,6 +53,12 @@ export function preloadTutorVoice(): void {
 
 let panner: PannerNode | null = null;
 let current: AudioBufferSourceNode | null = null;
+// Where the orb is right now — tracked cheaply while silent, so a starting
+// line can snap the panner there instead of ramping every silent frame.
+let posX = 0;
+let posY = 0;
+let posZ = 0;
+let hasPos = false;
 
 /** Her voice sits at the orb: HRTF so it pans and falls off like a real spark. */
 function ensurePanner(ctx: AudioContext): PannerNode {
@@ -87,7 +93,18 @@ export function sayTutorLine(id: string, text: string): number {
   stopTutorVoice();
   const src = ctx.createBufferSource();
   src.buffer = buf;
-  src.connect(ensurePanner(ctx));
+  const p = ensurePanner(ctx);
+  // Snap to the orb's current spot — no ramps ran while she was silent.
+  if (hasPos) {
+    if (p.positionX) {
+      p.positionX.setValueAtTime(posX, ctx.currentTime);
+      p.positionY.setValueAtTime(posY, ctx.currentTime);
+      p.positionZ.setValueAtTime(posZ, ctx.currentTime);
+    } else {
+      p.setPosition(posX, posY, posZ);
+    }
+  }
+  src.connect(p);
   src.onended = () => {
     if (current === src) current = null;
   };
@@ -111,8 +128,15 @@ export function stopTutorVoice(): void {
   current = null;
 }
 
-/** Pin her voice to the orb — call every frame while the tutorial runs. */
+/** Pin her voice to the orb — call every frame while the tutorial runs.
+ *  Silent frames just note the position (the next line snaps to it); ramps
+ *  are only scheduled while a clip is actually sounding. */
 export function setTutorVoicePosition(pos: Vector3): void {
+  posX = pos.x;
+  posY = pos.y;
+  posZ = pos.z;
+  hasPos = true;
+  if (!current) return;
   const ctx = audioContext();
   if (!ctx || !panner) return;
   const t = ctx.currentTime + 0.04;
