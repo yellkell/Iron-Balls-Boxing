@@ -330,14 +330,23 @@ function makePanel(
  *  BATTLE panel with the rest of the fights.) */
 function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   panelBg(ctx, false, UI.emberBright, 'ARCADE', PW, TRAIN_H);
+  // Until the tutorial has been RUN once, everything but the tutorial itself
+  // is sealed (MenuSystem's pre-tutorial gate) — draw it that way.
+  const locked = !app.tutorialDone;
 
   // TUTORIAL sits at the top — the very first thing a new boxer should tap.
   buttonPlate(ctx, 70, 80, PW - 140, 54, 'TUTORIAL', UI.emberBright, hoverAction === 'start-tutorial');
   // The single-player CAMPAIGN — the titan gauntlet — right below it.
-  buttonPlate(ctx, 70, 140, PW - 140, 54, 'CAMPAIGN', UI.danger, hoverAction === 'open-campaign');
+  buttonPlate(ctx, 70, 140, PW - 140, 54, 'CAMPAIGN', UI.danger, !locked && hoverAction === 'open-campaign', locked);
   // The RAID — up to five raiders, five titans, one lobby.
-  buttonPlate(ctx, 70, 200, PW - 140, 54, 'RAID', '#b26bff', hoverAction === 'open-raid');
-  buttonPlate(ctx, 70, 260, PW - 140, 54, 'AIM TRAINING', UI.ember, hoverAction === 'start-training');
+  buttonPlate(ctx, 70, 200, PW - 140, 54, 'RAID', '#b26bff', !locked && hoverAction === 'open-raid', locked);
+  buttonPlate(ctx, 70, 260, PW - 140, 54, 'AIM TRAINING', UI.ember, !locked && hoverAction === 'start-training', locked);
+  if (locked) {
+    ctx.font = '600 18px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,192,77,0.78)';
+    ctx.fillText('run the tutorial once to unlock Gasket', PW / 2, 334);
+  }
 
   // Two industrial breaker switches: targets-shoot-back, then only-play-bots.
   const breaker = (text: string, on: boolean, hot: boolean, py: number, onFill: string, onStroke: string): void => {
@@ -408,8 +417,10 @@ function hitDuel(u: number, v: number): MenuAction | null {
 function drawDuelRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const queueing = app.state === 'queueing';
   const rankedAction = queueing ? 'cancel-queue' : 'ranked-match';
+  // Every live fight is sealed until the tutorial has been run once.
+  const locked = !app.tutorialDone;
   // RANKED is disabled while ONLY PLAY BOTS is on (no online queue allowed).
-  const rankedOff = app.onlyBots && !queueing;
+  const rankedOff = (app.onlyBots && !queueing) || locked;
 
   // RANKED — opens the server browser (host your own room, or join a listed
   // one). Greyed + dead while ONLY PLAY BOTS is on.
@@ -440,9 +451,9 @@ function drawDuelRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
 
   // QUICK MATCH — drops you straight onto a bot, but keeps hunting; a human who
   // turns up pulls you into the live bout.
-  buttonPlate(ctx, 70, 138, PW - 140, 58, 'QUICK MATCH', UI.ember, hoverAction === 'quick-match');
+  buttonPlate(ctx, 70, 138, PW - 140, 58, 'QUICK MATCH', UI.ember, !locked && hoverAction === 'quick-match', locked);
   // PRIVATE — share a 5-digit code with a friend.
-  buttonPlate(ctx, 70, 202, PW - 140, 54, 'PRIVATE', UI.coolBright, hoverAction === 'private-open');
+  buttonPlate(ctx, 70, 202, PW - 140, 54, 'PRIVATE', UI.coolBright, !locked && hoverAction === 'private-open', locked);
 
   // The BRAWLS — 2V2 and FFA — sit below a faint divider: same live-fight hub,
   // one section for duels, one for the free-for-alls.
@@ -452,8 +463,8 @@ function drawDuelRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
   ctx.moveTo(70, 268);
   ctx.lineTo(PW - 70, 268);
   ctx.stroke();
-  buttonPlate(ctx, 70, 280, PW - 140, 50, '2V2', UI.cool, hoverAction === 'arcade-2v2');
-  buttonPlate(ctx, 70, 336, PW - 140, 50, 'FFA', UI.amber, hoverAction === 'arcade-ffa');
+  buttonPlate(ctx, 70, 280, PW - 140, 50, '2V2', UI.cool, !locked && hoverAction === 'arcade-2v2', locked);
+  buttonPlate(ctx, 70, 336, PW - 140, 50, 'FFA', UI.amber, !locked && hoverAction === 'arcade-ffa', locked);
 
   if (queueing) {
     ctx.textAlign = 'center';

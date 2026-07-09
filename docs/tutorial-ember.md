@@ -229,6 +229,20 @@ the drill.
 
 ## 3. The complete recording script
 
+**Context for the voice actor.** FIRE FIGHT is a virtual-reality boxing game
+where fighters conjure flaming iron balls around their fists — spin one up,
+punch it at your opponent, call it back, block with it. It's set in Gasket, a
+scrappy frontier factory town, and the players are "Clankers": big
+good-natured metal boxers. You are EMBER — the last living spark of Gasket's
+old foundry, a small floating ball of warm light who has appointed herself
+the new player's personal coach. Your read is calm, precise and quietly warm
+— think a voice assistant with a soul: perfect diction, an even smile, never
+shouting, never gushing. Warmth comes through word choice and a small lift in
+the read, not volume; praise delivered level ("Well done.") should land
+harder than any exclamation could. You're guiding a nervous first-timer
+through their first ten minutes in the headset — every line plays over live
+gameplay while they physically punch, dodge and duck around their room.
+
 33 numbered lines + 6 pool lines. **Bold** = punch the word (gently — she's
 Siri, not a hype man). The default read for everything is calm, level,
 smiling.
@@ -269,7 +283,7 @@ smiling.
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
 | `e050-block` | "This one keeps you alive. A spinning ball is a **shield**. Spin one up, hold it close. He's going to throw at you." | Her most serious read; still calm, just lower and slower. | Beat start. |
-| `e051-block-incoming` | "Incoming." | Cool, clear — an alert tone in word form. | Lob leaves the bot's hand. |
+| `e051-block-incoming` | "Incoming. Punch it down!" | Cool, clear alert, then a crisp imperative — energy without panic; she stays composed. | Lob leaves the bot's hand. |
 | `e052-block-done` | "Blocked. **Well done.** Again, a little faster this time." | Approval, then a composed challenge. Rolls straight into rep two. | Real parry on the lobbed ball. |
 | `e053-block-retry` | "You're fine. Get your fireball spinning around your hand, and punch the oncoming ball to block. Again." | Steadying; used for hits and misses alike. Zero blame. Full re-teach of the mechanic — this is the retry line for the game's hardest concept. | Lob hit the player or expired unblocked. |
 | `e054-block-two` | "Two for two. You're a **natural**, Clanker." | The praise ceiling: level voice, genuinely pleased. | Second (faster) block lands. |

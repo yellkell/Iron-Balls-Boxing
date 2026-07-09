@@ -123,6 +123,11 @@ export const app: {
    *  names him ("See this rust bucket?"). Written only by TutorialSystem,
    *  read only by BotSystem; false in every normal bout. */
   tutorialBotFrozen: boolean;
+  /** True once the tutorial has been RUN once (finished, win or lose — a
+   *  forfeit doesn't count). Until then the lobby is sealed: only the
+   *  tutorial, the Gazette, passthrough and settings answer (MenuSystem's
+   *  pre-tutorial gate). Persisted as 'ff-tutorial-done'. */
+  tutorialDone: boolean;
   /** Aim Training option: targets shoot back so you can train dodging. */
   shootBack: boolean;
   /** When on: never queue online — RANKED is disabled and QUICK/2V2/FFA drop
@@ -216,6 +221,7 @@ export const app: {
   tutorial: false,
   tutorialHoldFire: false,
   tutorialBotFrozen: false,
+  tutorialDone: loadTutorialDone(),
   side: 0,
   arcade: '1v1',
   mySlot: 0,
@@ -289,6 +295,22 @@ export function saveShootBack(): void {
 export function saveDifficulty(): void {
   try {
     localStorage.setItem('ff-difficulty', app.difficulty);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadTutorialDone(): boolean {
+  try {
+    return localStorage.getItem('ff-tutorial-done') === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveTutorialDone(): void {
+  try {
+    localStorage.setItem('ff-tutorial-done', app.tutorialDone ? '1' : '0');
   } catch {
     /* ignore */
   }

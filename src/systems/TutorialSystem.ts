@@ -45,7 +45,7 @@ import { Combatant } from '../components/Combatant.js';
 import { Health } from '../components/Health.js';
 import { match } from '../combat/matchState.js';
 import { ballCommands, opponents } from '../combat/opponentBus.js';
-import { app } from '../menu/appState.js';
+import { app, saveTutorialDone } from '../menu/appState.js';
 import { startTutorialMusic, stopTutorialMusic } from '../audio/tutorialMusic.js';
 import { CAMPAIGN, FIREBALL, MATCH, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { UI, buttonPlate, plate, stencilFont } from '../ui/industrial.js';
@@ -650,6 +650,10 @@ export class TutorialSystem extends createSystem({
     // She leaves the perch and comes back to the podium for the goodbye.
     this.podium();
     if (this.speechIdle() || this.beatT > 12) {
+      // Ran the whole thing, win or lose — that unseals the rest of the game
+      // (MenuSystem's pre-tutorial gate). A mid-run forfeit never gets here.
+      app.tutorialDone = true;
+      saveTutorialDone();
       this.end(false); // her voice (if a clip is playing) finishes on its own
       app.tutorial = false;
       app.state = 'menu';

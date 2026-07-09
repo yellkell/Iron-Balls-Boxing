@@ -121,6 +121,12 @@ const BOARD_SCROLL_REPEAT = 0.12;
 /** Pixels of newspaper body scrolled per thumbstick step (~2.5 lines). */
 const NEWS_SCROLL_STEP = 76;
 
+/** Panels a fresh boxer may use BEFORE running the tutorial: read the paper,
+ *  flip passthrough, tweak settings. Everything else — every fight, the
+ *  loadout, the shop — clanks like sealed armour until the tutorial has been
+ *  run once (app.tutorialDone; the tutorial button itself is always live). */
+const PRE_TUTORIAL_PANELS = new Set<string>(['gazette', 'news', 'passthrough', 'gear', 'settings']);
+
 interface Pointer {
   line: Line;
   dot: Mesh;
@@ -387,7 +393,9 @@ export class MenuSystem extends createSystem({}) {
         setMusicVolume(musicVolFromU(hit.uv.x)); // scrub the music volume live
         dragged = true;
       } else if (hit.uv && down) {
-        if (panel.click) {
+        if (!app.tutorialDone && action !== 'start-tutorial' && !PRE_TUTORIAL_PANELS.has(panel.id)) {
+          sfx.armorClank(); // sealed until the tutorial has been run once
+        } else if (panel.click) {
           if (panel.click(hit.uv.x, hit.uv.y)) clicked = true;
         } else if (action) {
           this.run(action);

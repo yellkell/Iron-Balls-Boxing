@@ -53,7 +53,7 @@ export const LINES = {
     id: 'e050-block',
     text: "This one keeps you alive. A spinning ball is a shield. Spin one up, hold it close. He's going to throw at you.",
   },
-  blockIncoming: { id: 'e051-block-incoming', text: 'Incoming.' },
+  blockIncoming: { id: 'e051-block-incoming', text: 'Incoming. Punch it down!' },
   blockDone: { id: 'e052-block-done', text: 'Blocked. Well done. Again, a little faster this time.' },
   blockRetry: {
     id: 'e053-block-retry',
