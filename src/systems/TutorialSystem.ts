@@ -103,10 +103,15 @@ const LOAD_W = BALL_W;
 const LOAD_H = BALL_H + 80;
 const READY_BTN = { x: 170, y: BALL_H + 16, w: 220, h: 54 };
 
-/** The four footwork reps: left, right, left, right. */
-const MOVE_REPS: ('L' | 'R')[] = ['L', 'R', 'L', 'R'];
+/** The footwork reps: one clean dodge each way (failures repeat the side —
+ *  playtest said four scripted reps was a slog). */
+const MOVE_REPS: ('L' | 'R')[] = ['L', 'R'];
 /** How far (m) the head must travel along the called side to count. */
-const DODGE_DIST = 0.4;
+const DODGE_DIST = 0.35;
+
+/** Ember's body: a fist-and-a-half of light (playtest: 0.17 read too small). */
+const ORB_HALO = 0.26;
+const ORB_CORE = 0.105;
 
 /** The explain line a stalled beat replays (the 14 s "want that again?"). */
 const NUDGE_LINE: Partial<Record<Beat, LineKey>> = {
@@ -184,6 +189,13 @@ export class TutorialSystem extends createSystem({
   private orbTarget = new Vector3();
   private emberAcc = 0;
   private gazeT = 0;
+  /** The attention drift path is anchored in WORLD space at tutorial start —
+   *  chasing the player's live gaze made her a carrot on a stick, always 50°
+   *  off-axis however fast they turned. */
+  private attnFwd = new Vector3(0, 0, -1);
+  /** Seconds the FIGHT banner has been up — we clear it ourselves, because
+   *  pinning the round clock disables GameStateSystem's own 1.2 s fade. */
+  private fightMsgT = 0;
 
   // --- speech + captions ---
   private caption: Panel | null = null;
@@ -272,6 +284,16 @@ export class TutorialSystem extends createSystem({
     // a claim can never outlive the frame that made it.
     app.tutorialHoldFire = false;
 
+    // We pin the round clock (lessons AND fight), which disables the game's
+    // own FIGHT-banner fade (it waits for the clock to tick 1.2 s down) — so
+    // fade it ourselves or the plate hangs mid-arena for the whole tutorial.
+    if (match.message === 'FIGHT') {
+      this.fightMsgT += delta;
+      if (this.fightMsgT > 1.2) match.message = '';
+    } else {
+      this.fightMsgT = 0;
+    }
+
     if (this.beat === 'fight') {
       this.capBotHealth();
       // KO is the only way out: the 60 s clock must never end the round
@@ -345,9 +367,10 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'recall': {
-        // Back to the player's shoulder while the ball flies home.
-        this.orbTarget.copy(_head).addScaledVector(_right, 0.45).addScaledVector(_fwd, 0.1);
-        this.orbTarget.y -= 0.15;
+        // In front where she can be SEEN coaching (a post at the shoulder
+        // played as a voice behind your ear), offset off the throwing line.
+        this.orbTarget.copy(_head).addScaledVector(_fwd, 0.9).addScaledVector(_right, 0.4);
+        this.orbTarget.y -= 0.1;
         if (events.caught) {
           this.say('recallDone');
           this.goto('block');
@@ -356,9 +379,9 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'block': {
-        // Bodyguard post off the lead shoulder.
-        this.orbTarget.copy(_head).addScaledVector(_right, -0.45).addScaledVector(_fwd, 0.2);
-        this.orbTarget.y -= 0.2;
+        // Bodyguard post: ahead and off-line, in view but clear of the lob.
+        this.orbTarget.copy(_head).addScaledVector(_fwd, 0.9).addScaledVector(_right, -0.45);
+        this.orbTarget.y -= 0.15;
         const res = this.resolveLob(delta, iWasHit);
         if (res === 'blocked') {
           this.blocks += 1;
@@ -421,14 +444,19 @@ export class TutorialSystem extends createSystem({
           this.pushLob(side === 'L' ? 1 : 0, _v.copy(_head), this.sideFails >= 2 ? 2.3 : 2.6);
           this.say(side === 'L' ? 'moveLeft' : 'moveRight');
         } else if (this.repIdx === 0 && this.sideFails === 0) {
-          // The explain line: she sweeps the two lanes while the thesis lands.
-          this.orbTarget.copy(_head).addScaledVector(_right, Math.sin(this.beatT * 1.6) * 1.3);
+          // The explain line: she sweeps the two lanes while the thesis lands
+          // — out in FRONT, where the sweep can actually be watched.
+          this.orbTarget
+            .copy(_head)
+            .addScaledVector(_fwd, 1.1)
+            .addScaledVector(_right, Math.sin(this.beatT * 1.6) * 1.2);
           this.orbTarget.y = _head.y;
           break;
         }
         if (this.lobLive()) {
-          // Parked out on the called side until the rep resolves.
-          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.4).addScaledVector(_fwd, 0.3);
+          // Out on the called side, forward of the player — she marks the
+          // lane to step into without leaving their field of view.
+          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.1).addScaledVector(_fwd, 1.1);
           this.orbTarget.y = _head.y;
         }
         break;
@@ -494,23 +522,20 @@ export class TutorialSystem extends createSystem({
     app.tutorialHoldFire = true;
     switch (this.sub) {
       case 1: {
-        // Drift across the periphery, ~10 o'clock toward 1 o'clock.
-        const k = Math.min(1, this.subT / 7);
-        _dir.copy(_fwd).applyAxisAngle(UP, 0.95 - k * 1.5);
+        // Drift across the periphery, ~10 o'clock toward 1 o'clock — along a
+        // path FIXED in the room (attnFwd), so turning toward her actually
+        // catches her instead of pushing her around your head.
+        const k = Math.min(1, this.subT / 6);
+        _dir.copy(this.attnFwd).applyAxisAngle(UP, 0.95 - k * 1.5);
         this.orbTarget.copy(_head).addScaledVector(_dir, 2.3);
         this.orbTarget.y = _head.y - 0.05;
         if (this.gazeT > 0.4) this.toSub(3);
         else if (this.subT > 4.5) {
+          // Still nothing? Enough being coy — chime and swing straight into
+          // their eyeline (playtest: lurking off-axis read as "behind me").
           tutorChime();
-          this.toSub(2);
+          this.toSub(3);
         }
-        break;
-      }
-      case 2: {
-        // Still nothing? One lap around their head, chiming.
-        const phi = this.subT * 2.4;
-        this.orbTarget.set(_head.x + Math.sin(phi) * 1.1, _head.y + 0.08, _head.z + Math.cos(phi) * 1.1);
-        if (this.gazeT > 0.4 || this.subT > 3.2) this.toSub(3);
         break;
       }
       case 3: {
@@ -852,8 +877,8 @@ export class TutorialSystem extends createSystem({
       // She pulses brighter while she talks.
       const talking = tutorVoiceActive() || this.time < this.speakUntil;
       const pulse = talking ? 1 + 0.14 * Math.abs(Math.sin(this.time * 7)) : 1;
-      this.halo?.scale.setScalar(0.17 * pulse);
-      this.core?.scale.setScalar(0.075 * (talking ? 1 + 0.1 * Math.abs(Math.sin(this.time * 7 + 1)) : 1));
+      this.halo?.scale.setScalar(ORB_HALO * pulse);
+      this.core?.scale.setScalar(ORB_CORE * (talking ? 1 + 0.1 * Math.abs(Math.sin(this.time * 7 + 1)) : 1));
       // Ember trail while she's on the move.
       this.emberAcc += delta;
       if (this.emberAcc > 0.12 && wasAt.distanceTo(this.orbPos) > 0.02) {
@@ -883,6 +908,10 @@ export class TutorialSystem extends createSystem({
         this.caption.mesh.position.copy(this.orb.position);
         this.caption.mesh.position.y -= 0.3;
         this.caption.mesh.lookAt(_head);
+        // Constant READABLE size: grow the plate with distance, so her lines
+        // stay legible when she's marking the bot 3.5 m downrange.
+        const s = Math.min(2.4, Math.max(1, this.caption.mesh.position.distanceTo(_head) / 1.5));
+        this.caption.mesh.scale.setScalar(s);
       }
     }
 
@@ -946,7 +975,11 @@ export class TutorialSystem extends createSystem({
     this.beatT = 0;
     this.playerHead(_head, _headQ);
     _fwd.set(0, 0, -1).applyQuaternion(_headQ);
-    _dir.copy(_fwd).applyAxisAngle(UP, 0.95);
+    this.attnFwd.copy(_fwd);
+    this.attnFwd.y = 0;
+    if (this.attnFwd.lengthSq() < 1e-4) this.attnFwd.set(0, 0, -1);
+    this.attnFwd.normalize();
+    _dir.copy(this.attnFwd).applyAxisAngle(UP, 0.95);
     this.orbPos.copy(_head).addScaledVector(_dir, 2.5);
     this.orbPos.y = _head.y - 0.1;
     this.orbTarget.copy(this.orbPos);
@@ -1008,8 +1041,8 @@ export class TutorialSystem extends createSystem({
   private makeOrb(): void {
     const orb = new Group();
     orb.name = 'ember-orb';
-    this.halo = glowSprite(0xffc04d, 0.17, 0.9);
-    this.core = glowSprite(0xfff4dc, 0.075, 1);
+    this.halo = glowSprite(0xffc04d, ORB_HALO, 0.9);
+    this.core = glowSprite(0xfff4dc, ORB_CORE, 1);
     this.halo.renderOrder = 22;
     this.core.renderOrder = 23;
     orb.add(this.halo, this.core);

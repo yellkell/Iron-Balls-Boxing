@@ -102,9 +102,10 @@ Arena fades in. Tutorial music low. **Ember does not start in front of you.**
 1. Orb spawns dim and small ~2.5 m out at the player's **10 o'clock**, just
    inside peripheral vision. Soft two-note chime. **E-010** ("Over here.") —
    quiet, spatialised, off to the side.
-2. She drifts across the periphery, left → right, trailing embers. WAIT for
-   **gaze**. If no gaze after 4 s she orbits the player's head once, chiming;
-   after a second orbit she parks at eye height 1.4 m dead ahead and flares.
+2. She drifts across the periphery, left → right, trailing embers — along a
+   path **fixed in the room**, so turning toward her catches her. WAIT for
+   **gaze**. If no gaze after ~4.5 s she chimes and swings straight into the
+   player's eyeline (never lurk off-axis or behind the head) and flares.
 3. On gaze (or forced park): a composed little bounce, flare, **E-011**
    (hello / name).
 4. **E-012** — clear some room, then hit **BEGIN** on the console. As she
@@ -162,21 +163,22 @@ ball is the tagged one. Outcomes per lob: **blocked**, **hit**
 ### Beat 5 — MOVE *(the footwork drill — left and right, twice each)*
 
 **Movement is everything.** This is now a drill, not a checkbox: the player
-must dodge **left and right, a couple of times each** — four clean dodges,
-alternating sides (L, R, L, R).
+must land **one clean dodge each way** — left, then right — and a failed rep
+repeats its side until it's clean. (Playtest note: four scripted reps was a
+slog; two clean-or-retry reps keeps the lesson honest without the grind.)
 
-Per rep: Ember **darts to the called side** (the visual cue), calls the side
-(**E-061 / E-062**) as the bot lobs at the player's **head** at 2.6 m/s.
-Success = tagged ball crosses the player's plane with **no** hit flash AND
-the head moved **≥ 0.4 m in the called direction** from its position at the
-moment of the throw (upgraded from the old any-direction 0.3 m check,
-`TutorialSystem.ts:301`). A hit, or a dodge the wrong way, doesn't count —
-**E-063**, repeat that side (drop to 2.3 m/s after two misses on the same
-side). Clean reps 1–3 get a praise-pool line; rep 4 completes the drill.
+Per rep: Ember **darts to the called side, forward of the player** (the
+visual cue stays in their field of view), calls the side (**E-061 / E-062**)
+as the bot lobs at the player's **head** at 2.6 m/s. Success = the ball
+passes clean AND the head moved **≥ 0.35 m in the called direction** from its
+position at the moment of the throw. A hit, or a dodge the wrong way, doesn't
+count — **E-063**, repeat that side (drop to 2.3 m/s after two misses on the
+same side). A clean first rep gets a praise-pool line; the second completes
+the drill.
 
-1. **E-060** — the explain. Orb sweeps wide left, then wide right as she
-   says it, showing the lanes.
-2. Reps: L → R → L → R with the call-outs, until four clean.
+1. **E-060** — the explain. Orb sweeps wide left, then wide right — out in
+   front — as she says it, showing the lanes.
+2. Reps: L → R with the call-outs, retrying a side until it's clean.
 3. Drill complete → **E-064** (the Sheriff line — fires once ever).
 
 ### Beat 6 — ATTACHMENTS *(loadout panel in-arena + live test on the bot)*
