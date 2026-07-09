@@ -34,7 +34,7 @@ adopted the player on sight.
 - **Dry wit, never sarcasm at the player's expense.** When the player fails
   she gets calmer and more precise, not disappointed.
 - **In-world texture**: she calls the player *Clanker* (affectionately) and
-  *slugger*; she thinks Sheriff Cole Ironside is wrong about Clankers and
+  *Rookie*; she thinks Sheriff Cole Ironside is wrong about Clankers and
   says so exactly once.
 - No giggles, no gasps, no squeals. Her biggest emotional swing is a slightly
   quicker, slightly brighter read.
@@ -234,8 +234,8 @@ smiling.
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
 | `e010-over-here` | "Over here." | Quiet, inviting, off to the side. | Orb spawns at 10 o'clock. |
-| `e011-hello` | "There you are. Hello — I'm **Ember**. Your guide, and, statistically, your biggest fan." | Level and warm; the joke lands because she doesn't lean on it. | Gaze lands on her. |
-| `e012-begin` | "Clear yourself a little room, Clanker — a big step each way. Then hit the button on the console, just here — and we'll begin." | Calm instruction; "a big step each way" matters (the move drill demands it). "Just here" as she glides to the console and the panel fades in beneath her. | Follows E-011; console panel appears with its BEGIN button. |
+| `e011-hello` | "There you are. Hello, I'm **Ember**. Your guide, and statistically, your **biggest fan**." | Level and warm; the joke lands because she doesn't lean on it. | Gaze lands on her. |
+| `e012-begin` | "Clear yourself a little room, Clanker. Then **press the button here**, and we'll begin." | Calm instruction; "a big step each way" matters (the move drill demands it). "Just here" as she glides to the console and the panel fades in beneath her. | Follows E-011; console panel appears with its BEGIN button. |
 
 ### Beat 1 — Ignite
 
@@ -243,38 +243,38 @@ smiling.
 |---|---|---|---|
 | `e020-ignite` | "Hold the trigger. Keep holding. You're spinning up a **fireball**." | Measured, slightly hushed — a demonstration, not a command. | Orb circles the player's fist. |
 | `e021-ignite-done` | "There it is. **Well done.**" | Understated approval — let the pause before "well done" do the work. | Ball reaches Orbit. |
-| `e022-ignite-retry` | "Hold — don't tap. It needs a moment to catch." | Patient, precise. | 10 s without a spin-up. |
+| `e022-ignite-retry` | "Hold, don't tap. It needs a moment to catch." | Patient, precise. | 10 s without a spin-up. |
 
 ### Beat 2 — Throw
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e030-throw` | "See the big fella? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot." | Even, unhurried; the last phrase as she flies downrange. | Beat start. |
+| `e030-throw` | "See that **rust bucket**? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot." | Even, unhurried; the last phrase as she flies downrange. | Beat start. |
 | `e031-throw-done` | "**Good job.** He felt that." | Level praise, a hint of satisfaction on the second sentence. | Ball goes Flying / connects. |
-| `e032-throw-soft` | "Almost. **Commit** to the punch — snap it out." | Precise coaching, no disappointment. | Release under min punch speed. |
+| `e032-throw-soft` | "Almost. **Commit** to the punch. Snap it out." | Precise coaching, no disappointment. | Release under min punch speed. |
 
 ### Beat 3 — Recall
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
 | `e040-recall` | "Pull the trigger again to call it home. Littering is a **crime** in Gasket." | Deadpan on the second sentence. | Beat start. |
-| `e041-recall-done` | "Caught. Throw, recall, catch — that's the heartbeat of everything. **Well done.**" | Quiet approval; the summary matters, keep it clear. | Clean catch. |
+| `e041-recall-done` | "Caught. Throw, recall, catch. That's the heartbeat of everything. **Well done.**" | Quiet approval; the summary matters, keep it clear. | Clean catch. |
 
 ### Beat 4 — Block
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e050-block` | "This one keeps you alive. A spinning ball is a **shield**. Spin one up, hold it close — he's going to throw at you." | Her most serious read; still calm, just lower and slower. | Beat start. |
+| `e050-block` | "This one keeps you alive. A spinning ball is a **shield**. Spin one up, hold it close. He's going to throw at you." | Her most serious read; still calm, just lower and slower. | Beat start. |
 | `e051-block-incoming` | "Incoming." | Cool, clear — an alert tone in word form. | Lob leaves the bot's hand. |
-| `e052-block-done` | "Blocked. **Well done.** Again — a little faster this time." | Approval, then a composed challenge. Rolls straight into rep two. | Real parry on the lobbed ball. |
-| `e053-block-retry` | "You're fine. Ball up — keep it between you and him. Again." | Steadying; used for hits and misses alike. Zero blame. | Lob hit the player or expired unblocked. |
+| `e052-block-done` | "Blocked. **Well done.** Again, a little faster this time." | Approval, then a composed challenge. Rolls straight into rep two. | Real parry on the lobbed ball. |
+| `e053-block-retry` | "You're fine. Ball up. Keep it between you and him. Again." | Steadying; used for hits and misses alike. Zero blame. | Lob hit the player or expired unblocked. |
 | `e054-block-two` | "Two for two. You're a **natural**, Clanker." | The praise ceiling: level voice, genuinely pleased. | Second (faster) block lands. |
 
 ### Beat 5 — Move
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e060-move` | "Blocking is good. **Not being there** is better. Movement is everything, Clanker. When I call a side — move. Whole body." | The thesis line of the tutorial; deliberate, each clause given room. | Beat start; orb sweeps the lanes. |
+| `e060-move` | "Blocking is good. **Not being there** is better. Movement is everything, Clanker. When I call a side, move. Whole body." | The thesis line of the tutorial; deliberate, each clause given room. | Beat start; orb sweeps the lanes. |
 | `e061-move-left` | "**Left.**" | Clean call-out. Not shouted — clear and immediate, like a turn-by-turn direction. | Left-rep lob released; orb darts left. |
 | `e062-move-right` | "**Right.**" | Same as E-061, mirrored. | Right-rep lob released; orb darts right. |
 | `e063-move-retry` | "Bigger steps. Off the line. **Again.**" | Crisp reset; used for hits and wrong-way dodges. | Failed rep. |
@@ -284,23 +284,23 @@ smiling.
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e070-attach` | "Now — my favourite part. Come look. This is your **ball loadout**." | A small, contained lift in energy: this is her excited. | Beat start; panel materialises at the orb. |
+| `e070-attach` | "Now, my favourite part. Come look. This is your **ball loadout**." | A small, contained lift in energy: this is her excited. | Beat start; panel materialises at the orb. |
 | `e071-attach-list` | "**Split** breaks it into three on the way home. **Grow** makes it big and mean. **Shrink** makes it small and spiteful. **Curve** bends around their guard. Pick one." | Rhythmic, evenly paced — she hops row to row on each name. | Follows E-070. |
-| `e072-attach-test` | "Good choice. Now throw at him — and recall while it's **still flying**." | Approving, then the lesson; lean on "still flying". | `app.ballAttach` / `ballArc` changes. |
+| `e072-attach-test` | "Good choice. Now throw at him, and recall while it's **still flying**." | Approving, then the lesson; lean on "still flying". | `app.ballAttach` / `ballArc` changes. |
 | `e073-attach-done` | "Did you **see** that? I never tire of that one. **Well done.**" | Her one almost-delighted read — still composed, but the smile is audible. | Attachment effect triggers mid-flight. |
-| `e074-attach-free` | "Try the others if you like. Hit **ready** when you are." | Relaxed, unhurried; the small wordplay stays level. | Follows E-073; free-play begins. READY button on the panel footer exits. |
-| `e075-attach-retry` | "Recall while it's still in the **air** — timing is everything." | Helpful, precise. | Recall happened after the ball landed. |
+| `e074-attach-free` | "Try the others if you like. **Press the button** when you're ready." | Relaxed, unhurried; the small wordplay stays level. | Follows E-073; free-play begins. READY button on the panel footer exits. |
+| `e075-attach-retry` | "Recall while it's still in the **air**. Timing is everything." | Helpful, precise. | Recall happened after the ball landed. |
 
 ### Beat 7 — Graduation
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e080-grad` | "That's everything I've got — and look at you now. Knock him down, and you're done. **Make me proud, slugger.**" | Proud but level; the send-off rises just a shade as she lifts to her perch. | READY clicked on the loadout panel; fight begins. |
+| `e080-grad` | "That's everything I've got, and look at you now. Knock him down, and you're done. **Make me proud, Rookie.**" | Proud but level; the send-off rises just a shade as she lifts to her perch. | READY clicked on the loadout panel; fight begins. |
 | `e081-fight-hit` | "There it is." | Quick, satisfied. | First hit landed (once). |
 | `e082-fight-taken` | "Shake it off. You're **iron**, remember?" | Warm, steadying, brief. | First time the player is hit (once). |
 | `e083-fight-low` | "He's wobbling. **Finish it.**" | Cool urgency — the closest she gets to intensity. | Bot under 15 HP (once). |
-| `e084-win` | "Down goes the big fella. **Well done, well done, well done.** Gasket's waiting for you, Clanker." | The three "well done"s stay level — the repetition is the celebration. Fond close. | Bot KO'd; return to menu after. |
-| `e085-lose` | "Up you get. He's been at this for years — you, about ten minutes. Come back swinging. **I'll be here.**" | Soft, certain, no pity. The promise is the retry hook. | Player KO'd. |
+| `e084-win` | "Down goes the rust bucket. **Well done, well done, well done.** Go check out the locker and the store, get some drip. Gasket's waiting for you, Clanker." | The three "well done"s stay level — the repetition is the celebration. Fond close. | Bot KO'd; return to menu after. |
+| `e085-lose` | "Up you get. He's been at this for years. You, about ten minutes. Come back swinging. **I'll be here.**" | Soft, certain, no pity. The promise is the retry hook. | Player KO'd. |
 
 ### Praise pool (E-100s) — rotate at random, never repeat the last pick
 
