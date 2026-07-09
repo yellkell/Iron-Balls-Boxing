@@ -28,7 +28,7 @@ export const LINES = {
   // Beat 1 — ignite
   ignite: { id: 'e020-ignite', text: "Hold the trigger. Keep holding. You're spinning up a fireball." },
   igniteDone: { id: 'e021-ignite-done', text: 'There it is. Well done.' },
-  igniteRetry: { id: 'e022-ignite-retry', text: "Hold, don't tap. It needs a moment to catch." },
+  igniteRetry: { id: 'e022-ignite-retry', text: "Hold, don't tap." },
 
   // Beat 2 — throw
   throwIt: {

@@ -261,7 +261,7 @@ smiling.
 |---|---|---|---|
 | `e020-ignite` | "Hold the trigger. Keep holding. You're spinning up a **fireball**." | Measured, slightly hushed — a demonstration, not a command. | Orb circles the player's fist. |
 | `e021-ignite-done` | "There it is. **Well done.**" | Understated approval — let the pause before "well done" do the work. | Ball reaches Orbit. |
-| `e022-ignite-retry` | "Hold, don't tap. It needs a moment to catch." | Patient, precise. | 10 s without a spin-up. |
+| `e022-ignite-retry` | "Hold, don't tap." | Patient, precise. | 10 s without a spin-up. |
 
 ### Beat 2 — Throw
 
