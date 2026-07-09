@@ -379,10 +379,7 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'recall': {
-        // Front and centre — the podium. Anything she says while the player's
-        // eyes are downrange must sit INSIDE that sightline, not beside it.
-        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.0).addScaledVector(_right, 0.2);
-        this.orbTarget.y = _head.y - 0.05;
+        this.podium();
         if (events.caught) {
           this.say('recallDone');
           this.goto('block');
@@ -413,14 +410,14 @@ export class TutorialSystem extends createSystem({
           this.pushLob(0, _v, this.lobSpeed);
           this.say('blockIncoming');
         }
-        // Talking happens from the podium, dead ahead where it can be read;
-        // she only steps wide of the firing line while a ball is coming.
+        // Talking happens from the podium; she only steps wide of the firing
+        // line while a ball is actually coming.
         if (this.lobLive()) {
           this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, -0.7);
+          this.orbTarget.y = _head.y - 0.05;
         } else {
-          this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.05).addScaledVector(_right, -0.2);
+          this.podium();
         }
-        this.orbTarget.y = _head.y - 0.05;
         break;
       }
 
@@ -471,18 +468,13 @@ export class TutorialSystem extends createSystem({
           // language the titans use for their kill zones, inverted.
           this.showZone(this.repAxis.x >= 0 ? 1 : -1);
         } else if (this.repIdx === 0 && this.sideFails === 0) {
-          // The explain line: a gentle sweep showing the two lanes — narrow
-          // enough that she (and her caption) never leave the reading zone.
-          this.orbTarget
-            .copy(_head)
-            .addScaledVector(_fwdFlat, 1.1)
-            .addScaledVector(_right, Math.sin(this.beatT * 1.6) * 0.55);
-          this.orbTarget.y = _head.y;
+          // The explain line: a gentle sweep showing the two lanes — around
+          // the podium spot, never leaving the reading zone.
+          this.podium();
+          this.orbTarget.addScaledVector(_right, Math.sin(this.beatT * 1.6) * 0.55);
         } else {
-          // Between reps (praise, retry coaching): back to the podium, dead
-          // ahead, where the line can actually be read.
-          this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.1);
-          this.orbTarget.y = _head.y - 0.05;
+          // Between reps (praise, retry coaching): back to the podium.
+          this.podium();
         }
         break;
       }
@@ -564,9 +556,8 @@ export class TutorialSystem extends createSystem({
         break;
       }
       case 3: {
-        // Park dead ahead, flare, say hello.
-        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.5);
-        this.orbTarget.y = _head.y;
+        // Park at the podium, flare, say hello.
+        this.podium();
         if (this.orbPos.distanceTo(this.orbTarget) < 0.35) {
           emberBurst(this.orbPos, 14);
           this.say('hello');
@@ -575,8 +566,7 @@ export class TutorialSystem extends createSystem({
         break;
       }
       case 4: {
-        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.5);
-        this.orbTarget.y = _head.y;
+        this.podium();
         if (this.speechIdle()) {
           // She glides to the console and the BEGIN panel fades in beneath
           // her — leading the eye there is the tutorial for where UI lives.
@@ -642,9 +632,8 @@ export class TutorialSystem extends createSystem({
     // GameStateSystem is in 'roundOver' counting down to the next round —
     // keep the breather from expiring so no fresh round starts under the line.
     match.resultTimer = Math.max(match.resultTimer, 1.0);
-    // She leaves the perch and comes to you for the goodbye.
-    this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.2);
-    this.orbTarget.y = _head.y + 0.1;
+    // She leaves the perch and comes back to the podium for the goodbye.
+    this.podium();
     if (this.speechIdle() || this.beatT > 12) {
       this.end(false); // her voice (if a clip is playing) finishes on its own
       app.tutorial = false;
@@ -715,6 +704,14 @@ export class TutorialSystem extends createSystem({
 
   private overRect(hit: { x: number; y: number } | null, r: Rect): boolean {
     return !!hit && hit.x >= r.x && hit.x <= r.x + r.w && hit.y >= r.y && hit.y <= r.y + r.h;
+  }
+
+  /** THE talking spot — where she greeted the player (dead ahead, 1.5 m, eye
+   *  level). Playtest: that placement read perfectly; every explainer since
+   *  uses it verbatim. Partially fronting the bot is fine — she's the lesson. */
+  private podium(): void {
+    this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.5);
+    this.orbTarget.y = _head.y;
   }
 
   // --- the lobbed drill ball ----------------------------------------------
