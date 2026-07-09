@@ -60,6 +60,11 @@ export class CountdownSystem extends createSystem({}) {
       new PlaneGeometry(2.6, 1.3),
       new MeshBasicMaterial({ map: this.texture, transparent: true, depthWrite: false }),
     );
+    // Above the fireball pass (core renderOrder 1 / corona 2): the plate
+    // writes no depth, so a ball BEHIND it that drew later used to paint
+    // straight over the 3-2-1-FIGHT. Depth testing still lets a ball in
+    // FRONT of the plate occlude it correctly.
+    this.board.renderOrder = 5;
     this.board.visible = false;
     this.scene.add(this.board);
 
@@ -88,7 +93,10 @@ export class CountdownSystem extends createSystem({}) {
       }),
     );
     this.glow.position.z = -0.03;
-    this.glow.renderOrder = -1;
+    // Just under the board (renderOrder is scene-global, not hierarchical):
+    // the aura draws right before the plate, after the fireballs — at its old
+    // -1 the balls painted over it too.
+    this.glow.renderOrder = 4;
     this.board.add(this.glow);
   }
 
