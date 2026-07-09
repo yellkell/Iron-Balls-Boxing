@@ -92,7 +92,7 @@ export const LINES = {
   fightLow: { id: 'e083-fight-low', text: "He's wobbling. Finish it." },
   win: {
     id: 'e084-win',
-    text: "Down goes the rust bucket. Well done, well done, well done. Go check out the locker and the store, get some drip. Gasket's waiting for you, Clanker.",
+    text: "Down goes the rust bucket. Well done, well done, well done. Go check out the locker and the store, get yourself some drip. Gasket's waiting for you, Clanker.",
   },
   lose: {
     id: 'e085-lose',
