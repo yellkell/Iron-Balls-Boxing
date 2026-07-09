@@ -129,6 +129,9 @@ const UP = new Vector3(0, 1, 0);
 const _head = new Vector3();
 const _headQ = new Quaternion();
 const _fwd = new Vector3();
+/** Gaze-pitch-free forward for PLACING things: a player staring down at
+ *  their fist must not drag Ember (and her caption) to the floor with them. */
+const _fwdFlat = new Vector3();
 const _right = new Vector3();
 const _v = new Vector3();
 const _v2 = new Vector3();
@@ -276,6 +279,10 @@ export class TutorialSystem extends createSystem({
     _right.y = 0;
     if (_right.lengthSq() < 1e-4) _right.set(1, 0, 0);
     _right.normalize();
+    _fwdFlat.copy(_fwd);
+    _fwdFlat.y = 0;
+    if (_fwdFlat.lengthSq() < 1e-4) _fwdFlat.set(0, 0, -1);
+    _fwdFlat.normalize();
 
     // Hits are health dips against last frame's (pinned) baseline — combat
     // observed from outside, no hooks in CollisionSystem.
@@ -373,9 +380,10 @@ export class TutorialSystem extends createSystem({
 
       case 'recall': {
         // In front where she can be SEEN coaching (a post at the shoulder
-        // played as a voice behind your ear), offset off the throwing line.
-        this.orbTarget.copy(_head).addScaledVector(_fwd, 0.9).addScaledVector(_right, 0.4);
-        this.orbTarget.y -= 0.1;
+        // played as a voice behind your ear), offset off the throwing line —
+        // at EYE height, whatever the player's gaze is doing.
+        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, 0.4);
+        this.orbTarget.y = _head.y - 0.05;
         if (events.caught) {
           this.say('recallDone');
           this.goto('block');
@@ -384,9 +392,10 @@ export class TutorialSystem extends createSystem({
       }
 
       case 'block': {
-        // Bodyguard post: ahead and off-line, in view but clear of the lob.
-        this.orbTarget.copy(_head).addScaledVector(_fwd, 0.9).addScaledVector(_right, -0.45);
-        this.orbTarget.y -= 0.15;
+        // Bodyguard post: ahead and off-line, in view but clear of the lob —
+        // pinned at eye height so a downward glance can't sink her.
+        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 0.9).addScaledVector(_right, -0.45);
+        this.orbTarget.y = _head.y - 0.05;
         const res = this.resolveLob(delta, iWasHit);
         if (res === 'blocked') {
           this.blocks += 1;
@@ -459,7 +468,7 @@ export class TutorialSystem extends createSystem({
           // — out in FRONT, where the sweep can actually be watched.
           this.orbTarget
             .copy(_head)
-            .addScaledVector(_fwd, 1.1)
+            .addScaledVector(_fwdFlat, 1.1)
             .addScaledVector(_right, Math.sin(this.beatT * 1.6) * 1.2);
           this.orbTarget.y = _head.y;
           break;
@@ -467,7 +476,7 @@ export class TutorialSystem extends createSystem({
         if (this.lobLive()) {
           // Out on the called side, forward of the player — she marks the
           // lane to step into without leaving their field of view.
-          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.1).addScaledVector(_fwd, 1.1);
+          this.orbTarget.copy(_head).addScaledVector(this.repAxis, 1.1).addScaledVector(_fwdFlat, 1.1);
           this.orbTarget.y = _head.y;
         }
         break;
@@ -551,7 +560,7 @@ export class TutorialSystem extends createSystem({
       }
       case 3: {
         // Park dead ahead, flare, say hello.
-        this.orbTarget.copy(_head).addScaledVector(_fwd, 1.5);
+        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.5);
         this.orbTarget.y = _head.y;
         if (this.orbPos.distanceTo(this.orbTarget) < 0.35) {
           emberBurst(this.orbPos, 14);
@@ -561,7 +570,7 @@ export class TutorialSystem extends createSystem({
         break;
       }
       case 4: {
-        this.orbTarget.copy(_head).addScaledVector(_fwd, 1.5);
+        this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.5);
         this.orbTarget.y = _head.y;
         if (this.speechIdle()) {
           // She glides to the console and the BEGIN panel fades in beneath
@@ -629,7 +638,7 @@ export class TutorialSystem extends createSystem({
     // keep the breather from expiring so no fresh round starts under the line.
     match.resultTimer = Math.max(match.resultTimer, 1.0);
     // She leaves the perch and comes to you for the goodbye.
-    this.orbTarget.copy(_head).addScaledVector(_fwd, 1.2);
+    this.orbTarget.copy(_head).addScaledVector(_fwdFlat, 1.2);
     this.orbTarget.y = _head.y + 0.1;
     if (this.speechIdle() || this.beatT > 12) {
       this.end(false); // her voice (if a clip is playing) finishes on its own
@@ -791,8 +800,10 @@ export class TutorialSystem extends createSystem({
     }
 
     // Sailed past (a dodge, or a whiff): call it and tidy the ball away.
+    // Judged against the FLAT forward — a downward glance must not tilt the
+    // "behind the player" plane.
     _v.copy(this.lobLastPos).sub(_head);
-    if (_v.dot(_fwd) < -0.8 || this.lobT > 6) {
+    if (_v.dot(_fwdFlat) < -0.8 || this.lobT > 6) {
       ballCommands.push({ type: 'spend', slot: 0, hand: this.lobHand });
       this.lob = null;
       return 'missed';
