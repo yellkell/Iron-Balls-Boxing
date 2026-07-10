@@ -308,10 +308,33 @@ export function buildPub(world: World): PubRefs {
   shelf.position.set(0, 1.45, -D + 0.14);
   root.add(shelf);
   const bottleColors = [0xc97a1e, 0x7a3a10, 0x4fb7ff, 0x7dff5a, 0xe8352a, 0xc97a1e, 0xf2e9d4, 0x9f7bff];
+  /** A lathe-turned spirit bottle: a slight foot, straight body, a curved
+   *  shoulder easing into a slim neck, and a rolled lip at the mouth —
+   *  instead of the plain glowing cylinders the shelf used to carry.
+   *  `h` is total height, `r` the body radius; the base sits at y = 0. */
+  const bottleProfile = (h: number, r: number, squat: boolean): Vector2[] => {
+    // Squat bottles carry their width higher (a rum jug); tall ones taper
+    // sooner (a long-necked spirit) — two silhouettes read as a real shelf.
+    const bodyTop = h * (squat ? 0.62 : 0.5);
+    const neckR = r * 0.32;
+    return [
+      new Vector2(0, 0),
+      new Vector2(r * 0.9, 0), // base edge — the slight undercut reads as a foot
+      new Vector2(r, h * 0.05), // out to full body width
+      new Vector2(r, bodyTop), // straight body wall (the label section)
+      new Vector2(r * 0.68, h * 0.74), // the shoulder easing in
+      new Vector2(neckR, h * 0.84), // into the neck
+      new Vector2(neckR, h * 0.93), // straight neck
+      new Vector2(neckR * 1.5, h * 0.945), // the rolled lip, out...
+      new Vector2(neckR * 1.5, h), // ...and up to the mouth
+      new Vector2(0, h), // closed top
+    ];
+  };
   for (let i = 0; i < 14; i++) {
     const c = bottleColors[i % bottleColors.length];
+    const h = 0.2 + (i % 3) * 0.03;
     const bottle = new Mesh(
-      new CylinderGeometry(0.03, 0.034, 0.2 + (i % 3) * 0.03, 8),
+      new LatheGeometry(bottleProfile(h, 0.034, i % 2 === 0), 12),
       new MeshStandardMaterial({
         color: c,
         emissive: c,
@@ -321,7 +344,7 @@ export function buildPub(world: World): PubRefs {
         roughness: 0.2,
       }),
     );
-    bottle.position.set(-2.3 + i * 0.36, 1.465 + (0.2 + (i % 3) * 0.03) / 2, -D + 0.14);
+    bottle.position.set(-2.3 + i * 0.36, 1.465, -D + 0.14);
     root.add(bottle);
   }
 
