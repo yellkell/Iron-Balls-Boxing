@@ -575,10 +575,10 @@ export const BOUNDARY = {
 
 /** Aim Training: pop-up targets across the gap; optionally they shoot back. */
 export const TRAINING = {
-  sessionTime: 90, // seconds per training run
+  sessionTime: 60, // seconds per training run (90 played too long)
   spawnInterval: 1.6, // base seconds between target pops (speeds up)
   minInterval: 0.75, // fastest spawn cadence at full ramp
-  rampTime: 60, // seconds to ramp from base to fastest
+  rampTime: 40, // seconds to ramp from base to fastest — full pace for the last third
   maxLive: 4, // most targets up at once
   holdTime: 2.6, // seconds a target stays up before retreating
   discRadius: 0.18, // bullseye disc hit radius
@@ -588,7 +588,7 @@ export const TRAINING = {
   streakBonus: 25, // extra points per current streak step
   // The OCTA DRONE: a small strafing gold octagon plate (pub octa-hunt style)
   // that only joins the mix in the closing stretch — lead the shot, bank big.
-  bonusWindow: 30, // drones appear when this many seconds remain
+  bonusWindow: 15, // drones appear when this many seconds remain
   droneChance: 0.35, // spawn roll share once the window opens
   dronePoints: 300,
   droneRadius: 0.13, // small — a genuine skill shot
