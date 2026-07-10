@@ -23,9 +23,15 @@ const modules = import.meta.glob('../assets/tutor/*.mp3', {
 }) as Record<string, string>;
 
 const urls: Record<string, string> = {};
+/** Line id → its take stems. Extra takes share the id with a `_N` suffix
+ *  (e.g. 'e100' → ['e100', 'e100_2']); a play picks one at random. */
+const takes: Record<string, string[]> = {};
 for (const [path, url] of Object.entries(modules)) {
   const stem = (path.split('/').pop() ?? '').replace(/\.mp3$/i, '');
-  if (stem) urls[stem] = url;
+  if (!stem) continue;
+  urls[stem] = url;
+  const base = stem.replace(/_\d+$/, '');
+  (takes[base] ??= []).push(stem);
 }
 
 const buffers: Record<string, AudioBuffer> = {};
@@ -84,7 +90,10 @@ export function sayTutorLine(id: string, text: string): number {
   const est = estimateLineSeconds(text);
   const ctx = audioContext();
   if (!ctx) return est;
-  const buf = buffers[id];
+  // Lines with several recorded takes rotate at random per play.
+  const stems = takes[id];
+  const stem = stems && stems.length > 1 ? stems[Math.floor(Math.random() * stems.length)] : id;
+  const buf = buffers[stem] ?? buffers[id];
   if (!buf) {
     void load(ctx); // not decoded yet — kick a load for next time
     return est;

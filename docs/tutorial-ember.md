@@ -41,8 +41,8 @@ adopted the player on sight.
 
 ### Recording / delivery spec
 
-- One file per line, named exactly by the **ID** column below
-  (e.g. `e011-hello.wav`). We transcode to mp3 into `src/assets/tutor/`.
+- One file per line, named by the line's **code** (e.g. `e011.wav`); extra
+  takes add `_2`, `_3`… We transcode to mp3 into `src/assets/tutor/`.
 - 48 kHz mono WAV, dry (no reverb — spatialisation happens in-engine via the
   HRTF panner so her voice comes *from the orb*).
 - 2–3 takes per line; for the praise pool (E-100s) give as much variety of
