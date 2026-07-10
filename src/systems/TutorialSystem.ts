@@ -69,7 +69,7 @@ import { BALL_H, BALL_W, clickBalls, drawBalls, wrapText } from '../menu/menu.js
 const TUT_BOT_HP = 55;
 
 /** Where Ember drops below this HP she calls the finish. */
-const BOT_WOBBLE_HP = 15;
+const BOT_WOBBLE_HP = 20;
 
 type Beat =
   | 'attention'
