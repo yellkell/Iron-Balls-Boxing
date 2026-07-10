@@ -46,7 +46,7 @@ export const LINES = {
   // Beat 3 — recall
   recall: {
     id: 'e040',
-    text: 'Pull the trigger again to call it home. Littering is a crime in Gasket.',
+    text: 'Pull the trigger again to call it home. Littering is a crime.',
   },
   recallDone: {
     id: 'e041',

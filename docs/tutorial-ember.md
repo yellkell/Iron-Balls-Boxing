@@ -275,7 +275,7 @@ smiling.
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e040-recall` | "Pull the trigger again to call it home. Littering is a **crime** in Gasket." | Deadpan on the second sentence. | Beat start. |
+| `e040-recall` | "Pull the trigger again to call it home. Littering is a **crime**." | Deadpan on the second sentence. | Beat start. |
 | `e041-recall-done` | "Caught. Throw, recall, catch. That's the heartbeat of everything. **Well done.**" | Quiet approval; the summary matters, keep it clear. | Clean catch. |
 
 ### Beat 4 — Block
