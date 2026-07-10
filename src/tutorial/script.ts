@@ -33,7 +33,7 @@ export const LINES = {
   // Beat 2 — throw
   throwIt: {
     id: 'e030-throw',
-    text: "See this rust bucket? Punch towards him, and release the trigger at the end of the swing. I'll mark the spot.",
+    text: "See this rust bucket? Throw towards them, and release the trigger at the end of the swing. I'll mark the spot.",
   },
   throwDone: { id: 'e031-throw-done', text: 'Good job. He felt that.' },
   throwSoft: {
