@@ -420,10 +420,12 @@ export class GameStateSystem extends createSystem({
     for (const e of [c.me, c.them]) e.setValue(Health, 'current', e.getValue(Health, 'max') ?? 100);
     match.roundTimer = MATCH.roundTime;
     match.resultTimer = 0;
-    match.message = 'FIGHT';
+    // The tutorial opens on Ember's quiet attention beat, not a bout — no
+    // FIGHT plate mid-arena, no announcer bark, no bell.
+    match.message = app.tutorial ? '' : 'FIGHT';
     match.phase = 'playing';
     match.resetCount += 1;
-    sfx.roundBell();
+    if (!app.tutorial) sfx.roundBell();
     if (app.mode === 'net') this.echoState();
   }
 
