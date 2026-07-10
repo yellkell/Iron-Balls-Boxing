@@ -316,7 +316,7 @@ smiling.
 | `e080-grad` | "That's everything I've got, and look at you now. Knock him down, and you're done. **Make me proud, Rookie.**" | Proud but level; the send-off rises just a shade as she lifts to her perch. | READY clicked on the loadout panel; fight begins. |
 | `e081-fight-hit` | "There it is." | Quick, satisfied. | First hit landed (once). |
 | `e082-fight-taken` | "Shake it off. You're **iron**, remember?" | Warm, steadying, brief. | First time the player is hit (once). |
-| `e083-fight-low` | "He's wobbling. **Finish it.**" | Cool urgency — the closest she gets to intensity. | Bot under 15 HP (once). |
+| `e083-fight-low` | "It's done for. **Finish it.**" | Cool urgency — the closest she gets to intensity. | Bot under 15 HP (once). |
 | `e084-win` | "Down goes the rust bucket. **Well done, well done, well done.** Go check out the locker and the store, get yourself some drip. Gasket's waiting for you, Clanker." | The three "well done"s stay level — the repetition is the celebration. Fond close. | Bot KO'd; return to menu after. |
 | `e085-lose` | "Up you get. He's been at this for years. You, about ten minutes. Come back swinging. **I'll be here.**" | Soft, certain, no pity. The promise is the retry hook. | Player KO'd. |
 

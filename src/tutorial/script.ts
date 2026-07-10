@@ -95,7 +95,7 @@ export const LINES = {
   },
   fightHit: { id: 'e081-fight-hit', text: 'There it is.' },
   fightTaken: { id: 'e082-fight-taken', text: "Shake it off. You're iron, remember?" },
-  fightLow: { id: 'e083-fight-low', text: "He's wobbling. Finish it." },
+  fightLow: { id: 'e083-fight-low', text: "It's done for. Finish it." },
   win: {
     id: 'e084-win',
     text: "Down goes the rust bucket. Well done, well done, well done. Go check out the locker and the store, get yourself some drip. Gasket's waiting for you, Clanker.",
