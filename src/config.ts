@@ -53,6 +53,9 @@ export const PROGRESSION = {
   // FIRST time each titan is felled, XP and coins pay DOUBLE (see
   // net/leaderboard.ts reportCampaign).
   campaign: 25,
+  // Graduating the tutorial (first completion only, win or lose): a warm
+  // welcome-to-Gasket — more than a bout, not enough to skip earning.
+  tutorial: 30,
 };
 
 /**
@@ -67,6 +70,9 @@ export const PROGRESSION = {
 export const CURRENCY = {
   /** Coins banked per completed game (any mode, win or loss). */
   perGame: 10,
+  /** One-time graduation gift for finishing the tutorial — enough to feel
+   *  the store's pull ('get yourself some drip') without skipping the grind. */
+  tutorial: 50,
 };
 
 /**

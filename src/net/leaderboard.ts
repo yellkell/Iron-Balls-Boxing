@@ -16,7 +16,7 @@
  */
 
 import { FIREBASE_ENABLED, firebaseConfig } from './firebaseConfig.js';
-import { xpForArcade, xpForBot, xpForCampaign, xpForMatch, xpForTraining } from '../menu/progression.js';
+import { xpForArcade, xpForBot, xpForCampaign, xpForMatch, xpForTraining, xpForTutorial } from '../menu/progression.js';
 import { addCoins } from '../menu/wallet.js';
 import { CURRENCY, type ArcadeMode } from '../config.js';
 
@@ -543,5 +543,17 @@ export function reportTraining(score: number): void {
   addCoins(CURRENCY.perGame);
   if (newBest) profile.training = score;
   writeMine({ training: profile.training, xp: profile.xp });
+  void refreshLeaderboard(true);
+}
+
+/**
+ * The tutorial GRADUATION — the one-time welcome payout (the caller guards
+ * the one-time part via app.tutorialDone). Win or lose: running the whole
+ * thing is the achievement, exactly like the unlock.
+ */
+export function reportTutorial(): void {
+  profile.xp += xpForTutorial();
+  addCoins(CURRENCY.tutorial);
+  writeMine({ xp: profile.xp });
   void refreshLeaderboard(true);
 }

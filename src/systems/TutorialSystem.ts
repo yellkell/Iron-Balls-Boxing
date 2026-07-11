@@ -46,6 +46,8 @@ import { Health } from '../components/Health.js';
 import { match } from '../combat/matchState.js';
 import { ballCommands, opponents } from '../combat/opponentBus.js';
 import { app, saveTutorialDone } from '../menu/appState.js';
+import { reportTutorial } from '../net/leaderboard.js';
+import { playCash } from '../audio/cash.js';
 import { startTutorialMusic, stopTutorialMusic } from '../audio/tutorialMusic.js';
 import { CAMPAIGN, FIREBALL, MATCH, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { UI, buttonPlate, plate, stencilFont } from '../ui/industrial.js';
@@ -634,7 +636,8 @@ export class TutorialSystem extends createSystem({
     // single round (it runs right after the KO frame's collision — the round
     // bell is unavoidable) but the match can never progress past it: wrapup
     // holds the round-over breather open, then exits to menu before anything
-    // else runs, so stats and coins are never touched.
+    // else runs. Match stats/ELO stay untouched — the only payout is the
+    // deliberate one-time graduation gift in runWrapup.
     if (botHp <= 0 || myHp <= 0) {
       this.say(botHp <= 0 ? 'win' : 'lose');
       this.goto('wrapup');
@@ -651,9 +654,15 @@ export class TutorialSystem extends createSystem({
     this.podium();
     if (this.speechIdle() || this.beatT > 12) {
       // Ran the whole thing, win or lose — that unseals the rest of the game
-      // (MenuSystem's pre-tutorial gate). A mid-run forfeit never gets here.
-      app.tutorialDone = true;
-      saveTutorialDone();
+      // (MenuSystem's pre-tutorial gate) and, the FIRST time only, pays the
+      // graduation gift: coins for the store she just plugged, plus XP.
+      // A mid-run forfeit never gets here.
+      if (!app.tutorialDone) {
+        app.tutorialDone = true;
+        saveTutorialDone();
+        reportTutorial();
+        playCash(); // the money sting — she DID say to get some drip
+      }
       this.end(false); // her voice (if a clip is playing) finishes on its own
       app.tutorial = false;
       app.state = 'menu';
