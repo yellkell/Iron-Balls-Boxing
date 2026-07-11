@@ -285,6 +285,10 @@ function panelBg(
   });
   hazardStrip(ctx, 36, 34, 52, 16, UI.amber);
   ctx.textAlign = 'left';
+  // Pin the baseline: the canvas ctx is REUSED across repaints, and hover
+  // paths leave different textBaseline behind — an inherited baseline made
+  // the title hop up and down as the pointer moved.
+  ctx.textBaseline = 'middle';
   ctx.font = stencilFont(40);
   ctx.fillStyle = accent;
   ctx.fillText(title, 104, 44);
@@ -1171,13 +1175,6 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   const row = leaderboard.viewRow ?? myProfileRow();
   const own = row.me;
   const tier = tierForXp(row.xp);
-  // The rank emblem sits at ACHIEVEMENT scale — one honour among the chips
-  // flanking it, not the towering centrepiece it used to be.
-  const badge = rankBadge(tier.index);
-  if (badge) {
-    const s = 48 * rankBadgeZoom(tier.index);
-    ctx.drawImage(badge, BW / 2 - s / 2, 190 - s / 2, s, s);
-  }
 
   // Achievements flank the emblem: season honours stacked left (best first,
   // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the
@@ -1201,9 +1198,18 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   ctx.font = stencilFont(38);
   ctx.fillStyle = UI.emberBright;
   ctx.fillText(row.name, BW / 2, 286);
+  // The rank emblem rides BESIDE the tier name — an accent, not a centrepiece.
+  // (It used to fill the middle of the card, where it collided with the
+  // achievement tooltips; that band now stays clear.)
   ctx.font = stencilFont(24);
   ctx.fillStyle = UI.amber;
   ctx.fillText(tier.name, BW / 2, 320);
+  const badge = rankBadge(tier.index);
+  if (badge) {
+    const s = 34 * rankBadgeZoom(tier.index);
+    const bx = BW / 2 - ctx.measureText(tier.name).width / 2 - 26;
+    ctx.drawImage(badge, bx - s / 2, 320 - s / 2, s, s);
+  }
   ctx.font = '700 22px system-ui, sans-serif';
   ctx.fillStyle = UI.amberSoft;
   ctx.fillText(`${row.score} LP       ${row.xp} XP`, BW / 2, 352);

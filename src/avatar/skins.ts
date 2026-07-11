@@ -119,8 +119,9 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // championship-crimson deck.
   { id: 'champion', name: 'CHAMPION', neon: 0xfff3cf, slab: 0x8c2620, earnedBy: 'FELL GOLIATH' },
   // TIDEBREAKER — never sold. Felling GOOPLIATH with a raid squad slicks the
-  // deck bottle-green under bright gel piping.
-  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x0f3b22, earnedBy: 'FELL RAID GOOPLIATH' },
+  // deck bottle-green under bright gel piping, GOOPLIATH's own drop splashed
+  // big across it (built in arena.ts, shown by its skinTag).
+  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x14522c, earnedBy: 'FELL RAID GOOPLIATH' },
   // BLAZING — never sold. Clear any run or raid on the blazing breaker:
   // fire-red piping over scorched steel, wearing a raised flame across the
   // deck (built in arena.ts, shown by its skinTag).

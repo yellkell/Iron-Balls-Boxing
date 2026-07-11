@@ -216,38 +216,40 @@ export function drawPlatformIcon(ctx: CanvasRenderingContext2D, skin: PlatformSk
     ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
     ctx.fillText('XD', cx, cy + r * 0.04);
   }
-  // BLAZING wears its flame; TIDEBREAKER its gel drop.
+  // BLAZING wears its flame — the same leaning-tongue silhouette as the
+  // leaderboard's blazing feat marker: an outer tongue in the pad's neon and
+  // a hot amber core.
   if (skin.id === 'blazing') {
-    ctx.save();
-    ctx.translate(cx, cy);
-    const f = r * 1.1;
-    ctx.beginPath();
-    ctx.moveTo(0, 0.5 * f);
-    ctx.quadraticCurveTo(0.46 * f, 0.42 * f, 0.4 * f, 0.05 * f);
-    ctx.quadraticCurveTo(0.36 * f, -0.12 * f, 0.16 * f, -0.1 * f);
-    ctx.quadraticCurveTo(0.34 * f, -0.26 * f, 0.2 * f, -0.46 * f);
-    ctx.quadraticCurveTo(0.1 * f, -0.56 * f, 0, -0.62 * f);
-    ctx.quadraticCurveTo(-0.2 * f, -0.42 * f, -0.12 * f, -0.16 * f);
-    ctx.quadraticCurveTo(-0.3 * f, -0.2 * f, -0.36 * f, 0.02 * f);
-    ctx.quadraticCurveTo(-0.46 * f, 0.38 * f, 0, 0.5 * f);
-    ctx.closePath();
-    ctx.fillStyle = hex(skin.neon);
-    ctx.fill();
-    ctx.restore();
+    const tongue = (h: number, colour: string): void => {
+      const w = h * 0.62;
+      const by = cy + r * 0.62; // flame base, tip reaching up
+      ctx.beginPath();
+      ctx.moveTo(cx, by);
+      ctx.bezierCurveTo(cx - w * 0.55, by - h * 0.12, cx - w * 0.42, by - h * 0.55, cx - w * 0.1, by - h * 0.62);
+      ctx.bezierCurveTo(cx - w * 0.28, by - h * 0.8, cx + w * 0.02, by - h * 0.9, cx + w * 0.08, by - h);
+      ctx.bezierCurveTo(cx + w * 0.42, by - h * 0.68, cx + w * 0.55, by - h * 0.3, cx, by);
+      ctx.closePath();
+      ctx.fillStyle = colour;
+      ctx.fill();
+    };
+    tongue(r * 1.3, hex(skin.neon));
+    tongue(r * 0.72, '#ffb000');
   }
+  // TIDEBREAKER wears GOOPLIATH's gel drop, dark-rimmed so it pops off the
+  // bottle-green deck.
   if (skin.id === 'tidebreaker') {
-    ctx.save();
-    ctx.translate(cx, cy);
-    const d = r * 0.62;
+    const d = r * 0.72;
     ctx.beginPath();
-    ctx.moveTo(0, -d);
-    ctx.quadraticCurveTo(0.9 * d, 0.05 * d, 0.62 * d, 0.5 * d);
-    ctx.arc(0, 0.28 * d, 0.7 * d, -0.35, Math.PI + 0.35);
-    ctx.quadraticCurveTo(-0.9 * d, 0.05 * d, 0, -d);
+    ctx.moveTo(cx, cy - d);
+    ctx.quadraticCurveTo(cx + 0.95 * d, cy + 0.1 * d, cx + 0.55 * d, cy + 0.55 * d);
+    ctx.quadraticCurveTo(cx, cy + 0.98 * d, cx - 0.55 * d, cy + 0.55 * d);
+    ctx.quadraticCurveTo(cx - 0.95 * d, cy + 0.1 * d, cx, cy - d);
     ctx.closePath();
     ctx.fillStyle = hex(skin.neon);
     ctx.fill();
-    ctx.restore();
+    ctx.lineWidth = Math.max(1.5, r * 0.07);
+    ctx.strokeStyle = 'rgba(6,20,12,0.8)';
+    ctx.stroke();
   }
   // SYNTHWAVE wears its neon deck grid (clipped to the pad outline).
   if (skin.id === 'synthwave') {

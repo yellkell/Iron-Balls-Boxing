@@ -1092,9 +1092,14 @@ function buildKnightChest(accent: number): Group {
   const yoke = new Mesh(new BoxGeometry(0.36, 0.17, 0.07), chassisMat(accent, 0.05));
   yoke.position.set(0, 0.01, -0.13);
   g.add(yoke);
-  const point = new Mesh(new ConeGeometry(0.13, 0.18, 4), chassisMat(accent, 0.05));
+  // Bake the 45° spin into the GEOMETRY so the flat faces meet the squash:
+  // yawing the MESH put the base's diagonal on the depth axis and the thin
+  // scale skewed it — the old chest point read as a wonky triangle jutting out.
+  const pointGeo = new ConeGeometry(0.13, 0.18, 4);
+  pointGeo.rotateY(Math.PI / 4);
+  const point = new Mesh(pointGeo, chassisMat(accent, 0.05));
   point.scale.set(1, 1, 0.5);
-  point.rotation.set(Math.PI, Math.PI / 4, 0); // 4-sided plate, apex pointing DOWN
+  point.rotation.x = Math.PI; // apex pointing DOWN
   point.position.set(0, -0.14, -0.12);
   g.add(point);
   for (let i = 0; i < 6; i++) {
@@ -1137,9 +1142,13 @@ function buildKnightChest(accent: number): Group {
   const body = new Mesh(new BoxGeometry(0.28, 0.3, 0.04), chassisMat(accent, 0.05));
   body.position.set(0, 0.05, 0);
   shield.add(body);
-  const tip = new Mesh(new ConeGeometry(0.16, 0.2, 4), chassisMat(accent, 0.05));
+  // Same geometry-baked spin as the chest point — mesh-level yaw + z-squash
+  // skewed this into the lopsided triangle poking out of the knight's back.
+  const tipGeo = new ConeGeometry(0.16, 0.2, 4);
+  tipGeo.rotateY(Math.PI / 4);
+  const tip = new Mesh(tipGeo, chassisMat(accent, 0.05));
   tip.scale.set(1, 1, 0.28);
-  tip.rotation.set(Math.PI, Math.PI / 4, 0); // apex pointing DOWN
+  tip.rotation.x = Math.PI; // apex pointing DOWN
   tip.position.set(0, -0.12, 0.002);
   shield.add(tip);
   // Riveted rim studs up the two long edges.
