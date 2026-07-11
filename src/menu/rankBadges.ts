@@ -1,6 +1,6 @@
 /**
  * The Bronze→Overlord rank-badge art (src/assets/ranks/00-bronze.png …
- * 08-overlord.png). Vite bundles each PNG to a hashed URL; we kick off the
+ * 07-overlord.png). Vite bundles each PNG to a hashed URL; we kick off the
  * image loads on import and hand the lobby the right emblem for a tier index.
  * `rankBadge` returns an image only once decoded, so canvas panels draw it the
  * moment it's ready and skip it before then (the lobby redraws on a cadence).
@@ -14,7 +14,7 @@ const modules = import.meta.glob('../assets/ranks/*.png', {
   import: 'default',
 }) as Record<string, string>;
 
-// Filenames are zero-padded (00…08), so a plain sort is tier order.
+// Filenames are zero-padded (00…07), so a plain sort is tier order.
 const urls = Object.keys(modules)
   .sort()
   .map((k) => modules[k]);
