@@ -521,7 +521,7 @@ function buildPantherHead(accent: number): Group {
 function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
-  g.scale.setScalar(1.5); // carried proud — as big as the bear
+  g.scale.setScalar(1.4); // carried proud — a touch under the bear (1.5 read too big)
   g.position.y = 0.05; // highest carry of the three — the low nape ruff needs the clearance
 
   // (No neck column: the spanning cylinder read as a strange dark cone under
