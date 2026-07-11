@@ -655,11 +655,11 @@ export function buildPub(world: World): PubRefs {
   // so the wonky roll stays in-plane while the group turns it to face the room.
   const POSTER_W = 0.55;
   const POSTER_H = 0.78;
-  const placePoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
+  const placePoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number, w = POSTER_W, h = POSTER_H): void => {
     const holder = new Group();
     holder.position.set(x, y, z);
     holder.rotation.y = ry;
-    holder.add(buildPoster(url, POSTER_W, POSTER_H, tilt));
+    holder.add(buildPoster(url, w, h, tilt));
     root.add(holder);
   };
   const EAST = W - 0.04; // proud of the east wall, facing −x into the room
@@ -671,9 +671,12 @@ export function buildPub(world: World): PubRefs {
   placePoster('posters/balls.png', EAST, 1.58, -0.6, RY_E, 0);
   placePoster('posters/eagle.jpg', EAST, 1.5, 1.1, RY_E, -0.07);
   placePoster('posters/shrink.jpg', EAST, 1.55, 2.6, RY_E, 0.03);
-  // West wall, either side of the doorway.
-  placePoster('posters/balls.png', WEST, 1.5, -1.5, RY_W, 0.05);
-  placePoster('posters/split.png', WEST, 1.55, 2.7, RY_W, -0.04);
+  // West wall, either side of the doorway — the BLASTON promos (a tip of the
+  // hat to the game the fight hall's platform duels descend from), landscape
+  // boxes so the wide art hangs big instead of letterboxing into a portrait
+  // slot. These replaced a second copy of balls/split — no more repeats.
+  placePoster('posters/blaston.jpg', WEST, 1.5, -1.5, RY_W, 0.05, 0.92, 0.55);
+  placePoster('posters/blaston-f2p.jpg', WEST, 1.55, 2.7, RY_W, -0.04, 0.92, 0.55);
 
   // --- the fight hall through the west door ---------------------------------
   const { consolePanels, fightDisplay, fightDisplay2, fightRims, fightSlabs, discoball } = buildFightHall(root);
