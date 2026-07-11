@@ -23,20 +23,22 @@ export const GAME_TITLE = 'FIRE FIGHT';
  */
 export const PROGRESSION = {
   // Tiers are paced in GAMES, not flat XP: an average real bout banks ~25 XP
-  // (win 35 / loss 15), so the thresholds below land each rank at roughly —
-  //   Silver 4 · Gold 15 · Plat 30 · Diamond 50 · Master 80
-  //   Grandmaster 120 · Legendary 170 · Overlord 270   (games played)
-  // Early ranks come quick; the climb stretches toward Overlord.
+  // (win 50 / loss 25), so the thresholds below land each rank at roughly —
+  //   Silver 4 · Gold 16 · Plat 40 · Diamond 80
+  //   Master 140 · Legendary 230 · Overlord 360   (games played)
+  // Early ranks come quick; the climb stretches HARD toward Overlord. The old
+  // curve (Overlord at 6750) fell over when the campaign landed — its short,
+  // endlessly re-runnable titan bouts paid full match XP and everyone shot to
+  // the top rank — so the top end is stretched AND campaign pays less (below).
   tiers: [
     { name: 'BRONZE', xp: 0 },
     { name: 'SILVER', xp: 100 },
-    { name: 'GOLD', xp: 375 },
-    { name: 'PLATINUM', xp: 750 },
-    { name: 'DIAMOND', xp: 1250 },
-    { name: 'MASTER', xp: 2000 },
-    { name: 'GRANDMASTER', xp: 3000 },
-    { name: 'LEGENDARY', xp: 4250 },
-    { name: 'OVERLORD', xp: 6750 },
+    { name: 'GOLD', xp: 400 },
+    { name: 'PLATINUM', xp: 1000 },
+    { name: 'DIAMOND', xp: 2000 },
+    { name: 'MASTER', xp: 3500 },
+    { name: 'LEGENDARY', xp: 5750 },
+    { name: 'OVERLORD', xp: 9000 },
   ],
 
   // A real 1v1: 25 to show up, +25 to win → 25 on a loss, 50 on a win.
@@ -49,10 +51,12 @@ export const PROGRESSION = {
   quickMatch: 25,
   // Arcade 2v2 / FFA: a flat 25 for taking part, win or lose.
   arcade: 25,
-  // An ARCADE campaign titan bout: the same flat 25, win or lose — but the
-  // FIRST time each titan is felled, XP and coins pay DOUBLE (see
-  // net/leaderboard.ts reportCampaign).
-  campaign: 25,
+  // An ARCADE campaign titan bout: 10, win or lose — the FIRST time each titan
+  // is felled it pays DOUBLE (see net/leaderboard.ts reportCampaign). Priced
+  // BELOW a real bout on purpose: titan bouts are short and infinitely
+  // re-runnable, and at full match rate they were an XP farm that carried the
+  // whole town to Overlord.
+  campaign: 10,
   // Graduating the tutorial (first completion only, win or lose): a warm
   // welcome-to-Gasket — more than a bout, not enough to skip earning.
   tutorial: 30,

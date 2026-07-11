@@ -346,7 +346,7 @@ export class PromotionSystem extends createSystem({}) {
     ctx.fillStyle = UI.amber;
     ctx.fillText('PROMOTED', w / 2, 48);
 
-    // Fit the tier name to width so a long one (GRANDMASTER) never overflows.
+    // Fit the tier name to width so a long one (LEGENDARY) never overflows.
     const px = fitStencilText(ctx, tierName, w - 72, 60, 28);
     ctx.font = stencilFont(px);
     ctx.lineWidth = 10;
