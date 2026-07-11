@@ -195,6 +195,9 @@ interface LocalBall {
   attach: number;
   /** Size scale (grow > 1, shrink < 1) + damage scale carried by the effect. */
   scl: number;
+  /** Where scl is heading: a grow ball swells toward this over the return
+   *  (ATTACH.growSwellTime) instead of snapping huge at recall. */
+  sclTarget: number;
   dmgScale: number;
   /** Fan slot for a split recall (0 = the main ball; shards take 1..N-1). */
   shardIndex: number;
@@ -1098,6 +1101,7 @@ export class FightSystem extends createSystem({}) {
         recallLock: 0,
         attach: 0,
         scl: 1,
+        sclTarget: 1,
         dmgScale: 1,
         shardIndex: 0,
         curl: new Vector3(),
@@ -1163,6 +1167,7 @@ export class FightSystem extends createSystem({}) {
       ball.attach = ATTACH.split;
       ball.shardIndex = 0;
       ball.scl = ATTACH.splitSize;
+      ball.sclTarget = ATTACH.splitSize;
       ball.dmgScale = 1 / ATTACH.splitCount;
       ball.visual.group.scale.setScalar(ATTACH.splitSize);
       const team = this.teamFor(pub.myId);
@@ -1177,12 +1182,16 @@ export class FightSystem extends createSystem({}) {
     }
     const dist = ball.pos.distanceTo(_grip);
     if (type === ATTACH.grow) {
+      // Grow SWELLS in over the return — scl chases sclTarget in the
+      // RETURNING case rather than snapping huge the instant you recall.
       const t = Math.min(1, Math.max(0, dist / ATTACH.growRange));
-      ball.scl = 1 + (ATTACH.growSize - 1) * t;
+      ball.scl = 1;
+      ball.sclTarget = 1 + (ATTACH.growSize - 1) * t;
       ball.dmgScale = (FIREBALL.damage - ATTACH.damageSwing * t) / FIREBALL.damage;
     } else {
       const t = Math.min(1, Math.max(0, dist / ATTACH.fullRange));
       ball.scl = 1 - (1 - ATTACH.shrinkSize) * t;
+      ball.sclTarget = ball.scl;
       ball.dmgScale = (FIREBALL.damage + ATTACH.damageSwing * t) / FIREBALL.damage;
     }
     ball.attach = type;
@@ -1194,6 +1203,7 @@ export class FightSystem extends createSystem({}) {
   private revertBall(ball: LocalBall): void {
     ball.attach = 0;
     ball.scl = 1;
+    ball.sclTarget = 1;
     ball.dmgScale = 1;
     ball.shardIndex = 0;
     ball.curl.set(0, 0, 0);
@@ -1367,6 +1377,12 @@ export class FightSystem extends createSystem({}) {
         }
         case RETURNING: {
           this.homeToward(ball.pos, _grip, ball.attach === ATTACH.split, ball.shardIndex, delta);
+          // A grow ball swells toward its recall-distance size on the way home
+          // (the streamed scl carries the live size to everyone else's view).
+          if (ball.attach === ATTACH.grow && ball.scl < ball.sclTarget) {
+            ball.scl = Math.min(ball.sclTarget, ball.scl + ((ball.sclTarget - 1) * delta) / ATTACH.growSwellTime);
+            ball.visual.group.scale.setScalar(ball.scl);
+          }
           break;
         }
         case DEAD:

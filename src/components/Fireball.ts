@@ -47,6 +47,12 @@ export const Fireball = createComponent(
     damage: { type: Types.Float32, default: 20 },
     radius: { type: Types.Float32, default: 0.09 },
     /**
+     * Where `radius` is heading: a recalled GROW ball starts at base size and
+     * swells toward this over the return flight (ATTACH.growSwellTime) instead
+     * of snapping huge the instant it turns around. 0 = not swelling.
+     */
+    radiusTarget: { type: Types.Float32, default: 0 },
+    /**
      * 1 = a throwaway ball (training targets' return fire): it is destroyed
      * when spent instead of falling Dead and being recallable.
      */

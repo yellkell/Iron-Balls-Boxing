@@ -250,7 +250,10 @@ export const ATTACH = {
    *  attachment, so a normal recall (~3 m out) already comes back visibly
    *  swollen and a long throw hits the cap well before the back cage. */
   growRange: 7.0,
-  growSize: 4.0, // up to quadruple size on a long recall
+  growSize: 3.5, // up to 3.5x size on a long recall
+  /** A recalled grow ball doesn't snap to size — it SWELLS toward its target
+   *  over this many seconds of the return flight, so you watch it balloon. */
+  growSwellTime: 0.5,
   shrinkSize: 1 / 3, // down to a third of the size on a long recall
   damageSwing: 10, // ±10 damage at full range
   splitCount: 3, // total balls a split becomes
