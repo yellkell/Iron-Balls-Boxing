@@ -1155,6 +1155,13 @@ export class TutorialSystem extends createSystem({
   private makeCaption(): void {
     this.caption = this.makePanel(CAP_W, CAP_H, 0.68, 'ember-caption');
     this.caption.mesh.visible = false;
+    // The caption often overlaps the console panels (she hovers above them
+    // while talking there). At the shared renderOrder, three.js sorted the
+    // two by camera distance — so lifting your head flipped which drew on
+    // top and the plate popped opaque. Pin the caption ABOVE the panels
+    // (but under the orb's glow at 22) and keep it out of the depth buffer.
+    this.caption.mesh.renderOrder = 21;
+    (this.caption.mesh.material as MeshBasicMaterial).depthWrite = false;
   }
 
   private removeCaption(): void {
