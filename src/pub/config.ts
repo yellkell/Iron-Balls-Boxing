@@ -242,6 +242,18 @@ export const PROP_PHYS = {
   maxThrowSpeed: 16, // m/s cap on release velocity
   restitution: 0.32, // glass bounce energy retention
   settleSpeed: 0.6, // below this on contact a glass settles
+  /** Glass tumble: rad/s of spin per m/s of release speed (axis from the
+   *  throw direction), capped and damped on every bounce — a lobbed pint
+   *  turns over in the air like a real one instead of gliding frozen. */
+  spinFromThrow: 1.5,
+  spinMax: 13,
+  /** Angular energy kept per bounce. */
+  spinDamping: 0.5,
+  /** How fast a landed glass rights itself (exponential ease rate) — it used
+   *  to SNAP bolt upright the frame it settled. */
+  uprightEase: 6,
+  /** Ground friction while a glass slides between bounces. */
+  slideFriction: 2.2,
   dartMaxSpeed: 26, // darts fly faster + flatter than a lobbed glass
   /** Release-velocity boost for darts — a flick of the wrist gets real zip. */
   dartThrowGain: 1.55,
