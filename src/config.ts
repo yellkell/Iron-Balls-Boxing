@@ -84,6 +84,13 @@ export const LADDER = {
   brawlWin: 20, // 2v2 win
   ffaWin: 25, // an FFA win is one-in-four — it pays a little extra
   brawlLoss: 6, // either brawl's defeat, floored at 0
+  /** SOFT RESET: a new season carries your final LP over — capped here, so
+   *  the summit restarts within reach while the climb below survives. */
+  seasonCarryCap: 2000,
+  /** INACTIVITY: every full block of this many days without a ranked bout… */
+  decayDays: 5,
+  /** …hands back this much LP (applied lazily at login, floored at 0). */
+  decayLp: 5,
 };
 
 /**

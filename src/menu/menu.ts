@@ -36,7 +36,7 @@ import {
   goopliathUnlocked,
   stageUnlocked,
 } from '../campaign/campaignState.js';
-import { ATTACH, DIFFICULTY, DIFFICULTY_ORDER, GAME_TITLE, hueToColor, type ArcadeMode, type Difficulty } from '../config.js';
+import { ATTACH, DIFFICULTY, DIFFICULTY_ORDER, GAME_TITLE, SEASON, hueToColor, seasonIndex, type ArcadeMode, type Difficulty } from '../config.js';
 import {
   LEADERBOARD_VISIBLE_ROWS,
   SEASON_AWARDS,
@@ -1014,11 +1014,27 @@ function drawBoardRows(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     ctx.fillStyle = UI.textDim;
     ctx.font = '600 22px system-ui, sans-serif';
     ctx.fillText(leaderboard.status || 'no entries yet', BW / 2, rowY0 + 4 * BOARD_ROW_STEP);
+  } else if (leaderboard.tab === 'ranked') {
+    // The season clock — the ladder plays for trophies, so show the bell.
+    ctx.fillStyle = UI.amberSoft;
+    ctx.font = '700 18px system-ui, sans-serif';
+    ctx.fillText(`${seasonLabel()} · tap a name for their profile`, BW / 2, 514);
   } else {
     ctx.fillStyle = UI.steelDim;
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.fillText('tap a name to open their profile', BW / 2, 514);
   }
+}
+
+/** "SEASON 2 · ENDS IN 41D 7H" — the ranked footer's countdown. */
+function seasonLabel(): string {
+  const idx = seasonIndex();
+  const endMs = SEASON.epochUtc + idx * SEASON.lengthDays * 86_400_000;
+  const left = Math.max(0, endMs - Date.now());
+  const days = Math.floor(left / 86_400_000);
+  const hours = Math.floor((left % 86_400_000) / 3_600_000);
+  const clock = days > 0 ? `${days}D ${hours}H` : hours > 0 ? `${hours}H` : 'UNDER AN HOUR';
+  return `SEASON ${idx} · ENDS IN ${clock}`;
 }
 
 /** Season-trophy chip styling, best first (matches SEASON_AWARDS order). */

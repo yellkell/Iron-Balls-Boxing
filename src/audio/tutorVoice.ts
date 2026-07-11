@@ -127,6 +127,13 @@ export function tutorVoiceActive(): boolean {
   return current !== null;
 }
 
+/** True once `id`'s clip is decoded and ready to speak — the tutorial's
+ *  opening beat waits (briefly) on its first line so a fresh install's
+ *  "Over here." is heard, not just captioned. */
+export function tutorLineReady(id: string): boolean {
+  return !!buffers[id];
+}
+
 /** Cut the current line (beat skipped, tutorial ended). */
 export function stopTutorVoice(): void {
   try {
