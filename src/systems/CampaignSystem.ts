@@ -2873,8 +2873,9 @@ export class CampaignSystem extends createSystem({
       if (this.isAuthority() && solo && this.raid()) {
         reportRun('goopliath', this.runClock, this.squadNames(), this.activeDifficulty(), false);
       }
-      // Every raider banks the clear badge (easy earns nothing).
-      reportRunClear(solo ? 'goopliath' : 'raid', this.activeDifficulty());
+      // Every raider banks the clear badge (easy earns nothing); a hardcore
+      // titan raid burns the shield red.
+      reportRunClear(solo ? 'goopliath' : 'raid', this.activeDifficulty(), !solo && app.raidHardcore);
       this.hud.title(
         solo ? 'THE TIDE RECEDES' : 'RAID CLEARED',
         (solo
@@ -2889,7 +2890,7 @@ export class CampaignSystem extends createSystem({
       const hardcore = app.campaignMode === 'hardcore';
       const record = recordRunTime(hardcore, this.runClock);
       reportRun('gauntlet', this.runClock, [myName()], this.activeDifficulty(), hardcore);
-      reportRunClear('gauntlet', this.activeDifficulty()); // the profile badge
+      reportRunClear('gauntlet', this.activeDifficulty(), hardcore); // the profile badge
       if (!hardcore && !campaignProgress.hardcoreUnlocked) {
         campaignProgress.hardcoreUnlocked = true;
         saveCampaignProgress();

@@ -1303,10 +1303,14 @@ export class MenuSystem extends createSystem({}) {
       0.95,
       _head.z + _fwd.z * 0.55 + rz * 0.38,
     );
-    this.panel.mesh.lookAt(_head);
-    // From waist height a full lookAt lies the panel back like a lectern —
-    // keep a bit of that tilt but bring it most of the way upright.
-    this.panel.mesh.rotation.x *= 0.45;
+    // Dead upright, yawed squarely toward the head — no pitch, no roll. Any
+    // head-derived tilt (lookAt, damped pitch) bakes in whatever your head
+    // was doing when you pressed A, so the panel came out leaning. A vertical
+    // board at waist height reads fine from standing eye level.
+    const dx = _head.x - this.panel.mesh.position.x;
+    const dz = _head.z - this.panel.mesh.position.z;
+    this.panel.mesh.rotation.order = 'YXZ';
+    this.panel.mesh.rotation.set(0, Math.atan2(dx, dz), 0);
   }
 
   // --- controller pointers -------------------------------------------------

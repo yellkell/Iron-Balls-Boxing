@@ -824,7 +824,7 @@ const ARCADE_SUBS: Array<[LeaderboardTab, string, MenuAction]> = [
   ['training', 'AIM', 'lb-training'],
   ['gauntlet', 'GAUNTLET', 'lb-gauntlet'],
   ['raid', 'RAID', 'lb-raid'],
-  ['goopliath', 'GOOPLIATH', 'lb-goopliath'],
+  ['goopliath', 'GOOP RAID', 'lb-goopliath'],
 ];
 const ARCADE_SUB_TABS = ARCADE_SUBS.map(([id]) => id);
 const SUB_Y = 140;
@@ -1046,6 +1046,37 @@ const AWARD_STYLE: Record<SeasonAward, { label: string; color: string }> = {
   top25: { label: 'TOP 25', color: UI.steel },
 };
 
+/** The clear-badge glyphs: star (gauntlet), shield (raid), drop (Goopliath). */
+function drawClearGlyph(ctx: CanvasRenderingContext2D, kind: 'star' | 'shield' | 'drop', cx: number, cy: number, r: number, color: string): void {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  if (kind === 'star') {
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rad = i % 2 === 0 ? r : r * 0.44;
+      const x = cx + Math.cos(ang) * rad;
+      const y = cy + Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+  } else if (kind === 'shield') {
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r * 0.85, cy - r * 0.6);
+    ctx.lineTo(cx + r * 0.85, cy + r * 0.15);
+    ctx.quadraticCurveTo(cx + r * 0.7, cy + r * 0.75, cx, cy + r);
+    ctx.quadraticCurveTo(cx - r * 0.7, cy + r * 0.75, cx - r * 0.85, cy + r * 0.15);
+    ctx.lineTo(cx - r * 0.85, cy - r * 0.6);
+  } else {
+    // The gel drop: a teardrop — round belly, pinched crown.
+    ctx.moveTo(cx, cy - r);
+    ctx.quadraticCurveTo(cx + r * 0.9, cy + r * 0.05, cx + r * 0.62, cy + r * 0.5);
+    ctx.arc(cx, cy + r * 0.28, r * 0.7, -0.35, Math.PI + 0.35);
+    ctx.quadraticCurveTo(cx - r * 0.9, cy + r * 0.05, cx, cy - r);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 /** A small feat chip: coloured plate + label (+ ×N for repeat honours). */
 function drawFeatChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, label: string, color: string, count = 1, flame = false): void {
   plate(ctx, x, y, w, 26, { cut: 6, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
@@ -1075,19 +1106,25 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
     drawFeatChip(ctx, 52, ay, 108, AWARD_STYLE[key].label, AWARD_STYLE[key].color, count);
     ay += 30;
   }
-  // Clear badges, right of the emblem — only the HIGHEST tier each, and
-  // blazing wears the flame.
-  const clears: Array<[string, number]> = [
-    ['GAUNTLET', row.gauntletBest ?? 0],
-    ['RAID', row.raidBest ?? 0],
-    ['GOOPLIATH', row.goopBest ?? 0],
+  // Clear badges, right of the emblem — SYMBOLS, not words: a star for the
+  // gauntlet, a shield for raids, a droplet for the tide. Tier tints the
+  // glyph (steel → amber → ember); clearing the badge's tier HARDCORE burns
+  // it red, and blazing wears the flame at its ear. Only the HIGHEST tier
+  // each ever shows.
+  const clears: Array<['star' | 'shield' | 'drop', number, number]> = [
+    ['star', row.gauntletBest ?? 0, row.gauntletBestHc ?? 0],
+    ['shield', row.raidBest ?? 0, row.raidBestHc ?? 0],
+    ['drop', row.goopBest ?? 0, 0],
   ];
   let by = 138;
-  for (const [label, tierN] of clears) {
+  for (const [glyph, tierN, hcTier] of clears) {
     if (!tierN) continue;
-    const color = tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
-    drawFeatChip(ctx, BW - 52 - 118, by, 118, label, color, 1, tierN >= 3);
-    by += 30;
+    const color = hcTier >= tierN ? UI.danger : tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
+    const bx = BW - 52 - 44;
+    plate(ctx, bx, by, 44, 36, { cut: 8, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
+    drawClearGlyph(ctx, glyph, bx + 22, by + 19, 12, color);
+    if (tierN >= 3) drawFlame(ctx, bx + 40, by + 6, 14);
+    by += 42;
   }
 
   ctx.textAlign = 'center';
