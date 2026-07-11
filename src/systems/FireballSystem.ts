@@ -217,7 +217,11 @@ export class FireballSystem extends createSystem({
   private equip(ball: Entity, owner: number, hand: Hand, eff: AttachEffect): void {
     ball.setValue(Fireball, 'attach', eff.att);
     ball.setValue(Fireball, 'damage', eff.dmg);
-    ball.setValue(Fireball, 'radius', FIREBALL.radius * eff.scl);
+    // GROW swells in over the return flight (the Returning case drives radius
+    // toward radiusTarget) — every other effect takes its size immediately.
+    const grow = eff.att === ATTACH.grow;
+    ball.setValue(Fireball, 'radius', grow ? FIREBALL.radius : FIREBALL.radius * eff.scl);
+    ball.setValue(Fireball, 'radiusTarget', grow ? FIREBALL.radius * eff.scl : 0);
     ball.setValue(Fireball, 'shardIndex', 0);
     if (eff.att === ATTACH.split) {
       const pos = ball.object3D!.position;
@@ -247,6 +251,7 @@ export class FireballSystem extends createSystem({
     ball.setValue(Fireball, 'shardIndex', 0);
     ball.setValue(Fireball, 'damage', FIREBALL.damage);
     ball.setValue(Fireball, 'radius', FIREBALL.radius);
+    ball.setValue(Fireball, 'radiusTarget', 0);
     ball.object3D?.scale.setScalar(1);
   }
 
@@ -642,6 +647,16 @@ export class FireballSystem extends createSystem({
         this.handPose(owner, hand);
         const shard = (ball.getValue(Fireball, 'shard') ?? 0) === 1;
         const attach = ball.getValue(Fireball, 'attach') ?? 0;
+
+        // A grow ball SWELLS toward its recall-distance size on the way home.
+        const targetR = ball.getValue(Fireball, 'radiusTarget') ?? 0;
+        if (attach === ATTACH.grow && targetR > 0) {
+          const r = ball.getValue(Fireball, 'radius') ?? FIREBALL.radius;
+          if (r < targetR) {
+            const step = ((targetR - FIREBALL.radius) * delta) / ATTACH.growSwellTime;
+            ball.setValue(Fireball, 'radius', Math.min(targetR, r + step));
+          }
+        }
 
         // Home toward the hand. Split balls fan out around the return path,
         // the fan collapsing to the fist as they close so they read as three.
