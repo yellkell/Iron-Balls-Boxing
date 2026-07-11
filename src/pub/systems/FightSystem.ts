@@ -1933,21 +1933,19 @@ export class FightSystem extends createSystem({}) {
     const clk = counting
       ? `R${f.round}`
       : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    // Round AND match verdicts share the plain WIN/DRAW/LOSS trio — the
+    // verdict plates carry them (a loss shows nothing, arena-style).
     const headline = counting
       ? secs > 0
         ? `${secs}`
         : 'FIGHT'
       : f.phase === 'fighting'
         ? 'FIGHT'
-        : f.phase === 'roundOver'
-          ? !f.winner
-            ? 'DRAW'
-            : f.winner === pub.myId
-            ? 'WIN'
-            : 'LOSS'
+        : !f.winner
+          ? 'DRAW'
           : f.winner === pub.myId
-            ? 'YOU WIN'
-            : 'YOU LOSE';
+            ? 'WIN'
+            : 'LOSS';
 
     // Skip the canvas redraw + GPU upload when nothing visible changed.
     const key = `${myName}|${oppName}|${f.hp[side]}|${f.hp[opp]}|${f.score[side]}|${f.score[opp]}|${clk}|${headline}`;
@@ -2008,15 +2006,19 @@ export class FightSystem extends createSystem({}) {
         ctx.textAlign = 'center';
         ctx.shadowColor = 'rgba(0,0,0,0.85)';
         ctx.shadowBlur = 12;
-        const fightArt = headline === 'FIGHT' ? countdownArt('FIGHT') : null;
-        if (fightArt) {
+        // Every headline is a neon plate now: FIGHT from the countdown set,
+        // WIN/DRAW from the verdict set. A LOSS shows nothing at all
+        // (arena-style — the winner gets the fanfare); the stencil text only
+        // ever appears as a fallback while a plate is still decoding.
+        const plate = headline === 'FIGHT' ? countdownArt('FIGHT') : verdictArt(headline);
+        if (plate) {
           const bandW = w * 0.36;
           const boxH = h * 0.52;
           ctx.save();
           ctx.translate((w - bandW) / 2, h * 0.3 - boxH / 2);
-          drawContentPlate(ctx, fightArt, bandW, boxH, h * 0.42, 4);
+          drawContentPlate(ctx, plate, bandW, boxH, h * 0.42, 4);
           ctx.restore();
-        } else {
+        } else if (headline !== 'LOSS') {
           const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
           metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
         }
