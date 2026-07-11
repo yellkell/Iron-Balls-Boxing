@@ -2336,11 +2336,14 @@ function drawDiffChips(
   hoverAction: MenuAction | null,
   prefix: string,
   interactive: boolean,
+  sealed = false,
 ): void {
   DIFFICULTY_ORDER.forEach((tier, i) => {
     const cx = x + i * (chipW + gap);
-    const open = difficultyUnlocked(tier);
-    const on = tier === current;
+    // A SEALED row (no run to apply it to yet) draws every chip locked —
+    // difficulty means nothing until the gauntlet opens.
+    const open = !sealed && difficultyUnlocked(tier);
+    const on = !sealed && tier === current;
     const accent = hexCss(DIFFICULTY[tier].accent);
     const hot = interactive && open && hoverAction === (`${prefix}${tier}` as MenuAction);
     plate(ctx, cx, y, chipW, h, {
@@ -2500,13 +2503,15 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
 
   // Run difficulty — governs the gauntlet + hardcore runs below (EASY always
   // open, HARD/BLAZING earned by clearing the run a tier down). BLAZING wedges
-  // GOOPLIATH into the lineup 2nd-to-last.
+  // GOOPLIATH into the lineup 2nd-to-last. Single bouts ignore it entirely, so
+  // the whole row stays SEALED until the gauntlet opens and it means something.
+  const runsOpen = gauntletUnlocked();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.font = stencilFont(20);
-  ctx.fillStyle = UI.textDim;
+  ctx.fillStyle = runsOpen ? UI.textDim : UI.steelDim;
   ctx.fillText('DIFFICULTY', 48, DIFF_ROW.y + DIFF_ROW.h / 2);
-  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', true);
+  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', runsOpen, !runsOpen);
 
   // The timed runs — unlocked by clearing the gauntlet, then by finishing it.
   drawRunRow(
@@ -2563,7 +2568,9 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   const inBtn = (b: { x: number; y: number; w: number; h: number }): boolean =>
     x >= b.x && x <= b.x + b.w && y >= b.y - 5 && y <= b.y + b.h + 5;
   if (inBtn(CAMP_CLOSE)) return 'campaign-close';
-  const diff = hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-');
+  // The whole difficulty row sleeps until the gauntlet opens (no run for a
+  // pick to govern) — until then no chip hit-tests, not just the locked ones.
+  const diff = gauntletUnlocked() ? hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-') : null;
   if (diff) return diff;
   if (inBtn(RUN_BTN) && gauntletUnlocked()) return 'campaign-speedrun';
   if (inBtn(HARD_BTN) && campaignProgress.hardcoreUnlocked) return 'campaign-hardcore';
