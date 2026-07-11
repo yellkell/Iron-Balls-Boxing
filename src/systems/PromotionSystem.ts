@@ -31,7 +31,7 @@ import {
 } from 'three';
 import { app } from '../menu/appState.js';
 import { tierForXp } from '../menu/progression.js';
-import { rankBadgeTexture } from '../menu/rankBadges.js';
+import { rankBadgeTexture, rankBadgeZoom } from '../menu/rankBadges.js';
 import { myStats, profileReady } from '../net/leaderboard.js';
 import { glowSprite } from '../materials/glow.js';
 import { emberBurst, spawnEmber } from '../fx/fire.js';
@@ -94,6 +94,7 @@ export class PromotionSystem extends createSystem({}) {
     mat.map = tex;
     mat.opacity = 1;
     mat.needsUpdate = true;
+    this.badge!.scale.setScalar(rankBadgeZoom(from));
 
     this.to = to;
     this.drawLabel(tierForXp(myStats().xp).name);
@@ -148,6 +149,7 @@ export class PromotionSystem extends createSystem({}) {
       if (tex) {
         badgeMat.map = tex;
         badgeMat.needsUpdate = true;
+        this.badge!.scale.setScalar(rankBadgeZoom(this.to));
       }
       emberBurst(_badgePos, 70, false);
       emberBurst(_badgePos, 28, true);

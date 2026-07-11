@@ -53,6 +53,7 @@ import {
 import { createNameKeyboard, type NameKeyboard } from '../menu/keyboard.js';
 import {
   avatarOwned,
+  clearShopPreview,
   customization,
   myAvatarSkin,
   ownAvatar,
@@ -62,6 +63,7 @@ import {
   setAvatarLight,
   setAvatarSkin,
   setPlatformSkin,
+  setShopPreview,
 } from '../menu/customization.js';
 import { canAfford, coins, spendCoins } from '../menu/wallet.js';
 import { playCash, preloadCash } from '../audio/cash.js';
@@ -73,13 +75,15 @@ import { setVoiceEnabled, voiceEnabled } from '../audio/voicePref.js';
 import { buildBoxer, setAvatarAccent, solveTorso, type BoxerRig } from '../avatar/boxer.js';
 import {
   AVATAR_SKINS,
+  OPPONENT_DEFAULT_PLATFORM,
   PLATFORM_SKINS,
   applyAvatarSkin,
   applyPlatformSkin,
   platformSkin,
+  resolveAvatarSkin,
 } from '../avatar/skins.js';
 import { match } from '../combat/matchState.js';
-import { applyArenaLayout } from '../arena/arena.js';
+import { applyArenaLayout, tintPlatform } from '../arena/arena.js';
 import { mesh } from '../net/mesh.js';
 import { UI } from '../ui/industrial.js';
 import { net } from '../net/client.js';
@@ -103,7 +107,7 @@ import {
   setProfileView,
 } from '../net/leaderboard.js';
 import { gazette, markGazetteRead, refreshGazette } from '../net/gazette.js';
-import { hueToColor, pubUrl } from '../config.js';
+import { hueToColor, pubUrl, teamColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 
 const _origin = new Vector3();
@@ -156,6 +160,8 @@ export class MenuSystem extends createSystem({}) {
   private kbMode: 'name' | 'note' = 'name';
   private mirror?: { group: Group; rig: BoxerRig };
   private skinVersion = 0;
+  /** The opponent pad is modelling a STORE platform try-on (needs restoring). */
+  private oppPadPreviewed = false;
   private boardScrollCooldown = 0;
   private boardScrollDir = 0;
   private newsScrollCooldown = 0;
@@ -835,12 +841,14 @@ export class MenuSystem extends createSystem({}) {
       case 'custom-close':
         customization.open = false;
         customization.shopOpen = false;
+        clearShopPreview(); // the try-on goes back on the rack
         break;
       case 'open-shop':
         customization.shopOpen = true;
         break;
       case 'open-locker':
         customization.shopOpen = false;
+        clearShopPreview();
         break;
       case 'tab-avatars':
         customization.tab = 'avatars';
@@ -890,18 +898,42 @@ export class MenuSystem extends createSystem({}) {
           app.state = 'playing';
           break;
         }
-        // shop-av-N: equip an avatar. shop-pf-N: equip a platform if owned,
-        // else try to buy it.
+        // shop-buy-av-N / shop-buy-pf-N: the BUY button on a previewed STORE
+        // tile — the actual purchase.
+        if (action.startsWith('shop-buy-av-')) {
+          const skin = AVATAR_SKINS[Number(action.slice('shop-buy-av-'.length))];
+          if (skin && !skin.locked && !avatarOwned(skin.id)) {
+            this.buyOrEquipAvatar(skin.id, skin.price ?? 0);
+            if (avatarOwned(skin.id)) clearShopPreview(); // bought — it's really yours now
+          }
+          break;
+        }
+        if (action.startsWith('shop-buy-pf-')) {
+          const skin = PLATFORM_SKINS[Number(action.slice('shop-buy-pf-'.length))];
+          if (skin && !skin.earnedBy && !platformOwned(skin.id)) {
+            this.buyOrEquipPlatform(skin.id, skin.price ?? 0);
+            if (platformOwned(skin.id)) clearShopPreview();
+          }
+          break;
+        }
+        // shop-av-N / shop-pf-N: a LOCKER tap equips what you own; a STORE tap
+        // on an unowned skin TRIES IT ON — the mirror (or your pad) models it
+        // and the tile grows its BUY button. Nothing is spent on a tap.
         if (action.startsWith('shop-av-')) {
           const skin = AVATAR_SKINS[Number(action.slice(8))];
-          if (skin && !skin.locked) this.buyOrEquipAvatar(skin.id, skin.price ?? 0);
+          if (!skin || skin.locked) break;
+          if (customization.shopOpen && !avatarOwned(skin.id)) setShopPreview('avatar', skin.id);
+          else this.buyOrEquipAvatar(skin.id, skin.price ?? 0);
           break;
         }
         if (action.startsWith('shop-pf-')) {
           const skin = PLATFORM_SKINS[Number(action.slice(8))];
-          // Earned-only skins (the CHAMPION pad) can't be bought — the tile
-          // is a teaser until the campaign awards it.
-          if (skin && (!skin.earnedBy || platformOwned(skin.id))) {
+          if (!skin) break;
+          if (customization.shopOpen && !platformOwned(skin.id)) {
+            // Even the earned-only CHAMPION pad can be tried on — its tile
+            // just never grows a BUY button (the campaign awards it).
+            setShopPreview('platform', skin.id);
+          } else if (!skin.earnedBy || platformOwned(skin.id)) {
             this.buyOrEquipPlatform(skin.id, skin.price ?? 0);
           }
           break;
@@ -1033,13 +1065,33 @@ export class MenuSystem extends createSystem({}) {
     if (skinChanged) {
       this.skinVersion = customization.version;
       const av = myAvatarSkin(); // chosen shape + custom colour
-      const pf = platformSkin(customization.platform);
+      // A STORE try-on dresses the MIRROR only (your own body keeps what you
+      // actually own) in the previewed shape — with your colour picks, so it
+      // shows exactly what you'd get.
+      const pv = customization.preview;
+      const mirrorAv = pv?.kind === 'avatar' ? resolveAvatarSkin(pv.id, customization.colorHue, customization.colorLight) : av;
       for (const name of names) {
         const obj = this.scene.getObjectByName(name);
-        if (obj) applyAvatarSkin(obj, av);
+        if (obj) applyAvatarSkin(obj, name === 'mirror-avatar' ? mirrorAv : av);
       }
       const pad = this.scene.getObjectByName('player-platform');
-      if (pad) applyPlatformSkin(pad, pf);
+      if (pad) applyPlatformSkin(pad, platformSkin(customization.platform));
+      // A platform try-on models on the OPPONENT's pad across the gap — the
+      // whole deck in view at once, no craning at your own feet. When the
+      // try-on ends, the pad goes back to the house look the lobby paints
+      // (full re-apply first: a premium slab tint or deck ornament would
+      // survive a plain re-tint).
+      const oppPad = this.scene.getObjectByName('opponent-platform');
+      if (oppPad) {
+        if (pv?.kind === 'platform') {
+          applyPlatformSkin(oppPad, platformSkin(pv.id));
+          this.oppPadPreviewed = true;
+        } else if (this.oppPadPreviewed) {
+          this.oppPadPreviewed = false;
+          applyPlatformSkin(oppPad, OPPONENT_DEFAULT_PLATFORM);
+          tintPlatform(oppPad, teamColor(1));
+        }
+      }
       this.accentHue = Number.NaN;
     }
 

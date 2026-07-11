@@ -216,6 +216,57 @@ export function drawPlatformIcon(ctx: CanvasRenderingContext2D, skin: PlatformSk
     ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
     ctx.fillText('XD', cx, cy + r * 0.04);
   }
+  // BLAZING wears its flame; TIDEBREAKER its gel drop.
+  if (skin.id === 'blazing') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    const f = r * 1.1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5 * f);
+    ctx.quadraticCurveTo(0.46 * f, 0.42 * f, 0.4 * f, 0.05 * f);
+    ctx.quadraticCurveTo(0.36 * f, -0.12 * f, 0.16 * f, -0.1 * f);
+    ctx.quadraticCurveTo(0.34 * f, -0.26 * f, 0.2 * f, -0.46 * f);
+    ctx.quadraticCurveTo(0.1 * f, -0.56 * f, 0, -0.62 * f);
+    ctx.quadraticCurveTo(-0.2 * f, -0.42 * f, -0.12 * f, -0.16 * f);
+    ctx.quadraticCurveTo(-0.3 * f, -0.2 * f, -0.36 * f, 0.02 * f);
+    ctx.quadraticCurveTo(-0.46 * f, 0.38 * f, 0, 0.5 * f);
+    ctx.closePath();
+    ctx.fillStyle = hex(skin.neon);
+    ctx.fill();
+    ctx.restore();
+  }
+  if (skin.id === 'tidebreaker') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    const d = r * 0.62;
+    ctx.beginPath();
+    ctx.moveTo(0, -d);
+    ctx.quadraticCurveTo(0.9 * d, 0.05 * d, 0.62 * d, 0.5 * d);
+    ctx.arc(0, 0.28 * d, 0.7 * d, -0.35, Math.PI + 0.35);
+    ctx.quadraticCurveTo(-0.9 * d, 0.05 * d, 0, -d);
+    ctx.closePath();
+    ctx.fillStyle = hex(skin.neon);
+    ctx.fill();
+    ctx.restore();
+  }
+  // SYNTHWAVE wears its neon deck grid (clipped to the pad outline).
+  if (skin.id === 'synthwave') {
+    ctx.save();
+    ctx.clip(); // the octagon path is still current
+    ctx.strokeStyle = hex(skin.neon);
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (let i = -2; i <= 2; i++) {
+      const o = i * r * 0.36;
+      ctx.moveTo(cx - r, cy + o);
+      ctx.lineTo(cx + r, cy + o);
+      ctx.moveTo(cx + o, cy - r);
+      ctx.lineTo(cx + o, cy + r);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
   // The VOLT pad wears its lightning bolt.
   if (skin.id === 'volt') {
     ctx.save();

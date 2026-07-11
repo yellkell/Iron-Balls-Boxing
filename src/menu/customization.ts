@@ -133,7 +133,25 @@ export const customization = {
   shopOpen: false,
   /** Which tab the shop / locker shows. 'colour' and 'arena' are locker-only. */
   tab: 'avatars' as 'avatars' | 'platforms' | 'colour' | 'arena',
+  /** STORE try-on: the unowned skin the mirror (avatar) or your pad (platform)
+   *  is modelling right now; its tile grows a BUY button. Nothing is owned or
+   *  equipped until the buy — cleared on purchase and when the store closes. */
+  preview: null as { kind: 'avatar' | 'platform'; id: string } | null,
 };
+
+/** Try an unowned skin on: the mirror models an avatar, your own pad a platform. */
+export function setShopPreview(kind: 'avatar' | 'platform', id: string): void {
+  if (customization.preview?.kind === kind && customization.preview.id === id) return;
+  customization.preview = { kind, id };
+  customization.version += 1;
+}
+
+/** Put the try-on back on the rack (bought it, or walked away). */
+export function clearShopPreview(): void {
+  if (!customization.preview) return;
+  customization.preview = null;
+  customization.version += 1;
+}
 
 /** Set the custom armour hue (0..1), or -1 to revert to the skin's default. */
 export function setAvatarColor(hue: number): void {

@@ -20,7 +20,7 @@ import {
 } from 'three';
 import { app, DEFAULT_ACCENT_HUE, saveBallArc, saveBallAttach, type AppEnvironment } from './appState.js';
 import { avatarOwned, customization, platformOwned } from './customization.js';
-import { rankBadge } from './rankBadges.js';
+import { rankBadge, rankBadgeZoom } from './rankBadges.js';
 import { coinImage } from './coinIcon.js';
 import { canAfford, coins } from './wallet.js';
 import { tierForXp } from './progression.js';
@@ -193,6 +193,9 @@ export type MenuAction =
   /** Tap an avatar tile (equip) or a platform tile (buy if unowned, else equip). */
   | `shop-av-${number}`
   | `shop-pf-${number}`
+  /** The BUY button on a previewed (tried-on) STORE tile. */
+  | `shop-buy-av-${number}`
+  | `shop-buy-pf-${number}`
   /** Open / close the Gasket Gazette. */
   | 'open-gazette'
   | 'gazette-close'
@@ -1006,8 +1009,12 @@ function drawBoardRows(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     // Rank number, then a small rank emblem (nudged down so its bottom lines
     // up with the row text — text is middle-baselined at y), then the name.
     ctx.fillText(`${offset + i + 1}.`, 48, y);
-    const badge = rankBadge(tierForXp(r.xp).index);
-    if (badge) ctx.drawImage(badge, 84, y + 12 - 30, 30, 30);
+    const rowTier = tierForXp(r.xp).index;
+    const rowBadge = rankBadge(rowTier);
+    if (rowBadge) {
+      const s = 30 * rankBadgeZoom(rowTier);
+      ctx.drawImage(rowBadge, 99 - s / 2, y - 3 - s / 2, s, s);
+    }
     ctx.fillText(r.name, 126, y);
     ctx.textAlign = 'right';
     ctx.fillText(String(r.value), BW - 56, y);
@@ -1167,7 +1174,10 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   // The rank emblem sits at ACHIEVEMENT scale — one honour among the chips
   // flanking it, not the towering centrepiece it used to be.
   const badge = rankBadge(tier.index);
-  if (badge) ctx.drawImage(badge, BW / 2 - 24, 166, 48, 48);
+  if (badge) {
+    const s = 48 * rankBadgeZoom(tier.index);
+    ctx.drawImage(badge, BW / 2 - s / 2, 190 - s / 2, s, s);
+  }
 
   // Achievements flank the emblem: season honours stacked left (best first,
   // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the
@@ -2326,11 +2336,14 @@ function drawDiffChips(
   hoverAction: MenuAction | null,
   prefix: string,
   interactive: boolean,
+  sealed = false,
 ): void {
   DIFFICULTY_ORDER.forEach((tier, i) => {
     const cx = x + i * (chipW + gap);
-    const open = difficultyUnlocked(tier);
-    const on = tier === current;
+    // A SEALED row (no run to apply it to yet) draws every chip locked —
+    // difficulty means nothing until the gauntlet opens.
+    const open = !sealed && difficultyUnlocked(tier);
+    const on = !sealed && tier === current;
     const accent = hexCss(DIFFICULTY[tier].accent);
     const hot = interactive && open && hoverAction === (`${prefix}${tier}` as MenuAction);
     plate(ctx, cx, y, chipW, h, {
@@ -2490,13 +2503,15 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
 
   // Run difficulty — governs the gauntlet + hardcore runs below (EASY always
   // open, HARD/BLAZING earned by clearing the run a tier down). BLAZING wedges
-  // GOOPLIATH into the lineup 2nd-to-last.
+  // GOOPLIATH into the lineup 2nd-to-last. Single bouts ignore it entirely, so
+  // the whole row stays SEALED until the gauntlet opens and it means something.
+  const runsOpen = gauntletUnlocked();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.font = stencilFont(20);
-  ctx.fillStyle = UI.textDim;
+  ctx.fillStyle = runsOpen ? UI.textDim : UI.steelDim;
   ctx.fillText('DIFFICULTY', 48, DIFF_ROW.y + DIFF_ROW.h / 2);
-  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', true);
+  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', runsOpen, !runsOpen);
 
   // The timed runs — unlocked by clearing the gauntlet, then by finishing it.
   drawRunRow(
@@ -2553,7 +2568,9 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   const inBtn = (b: { x: number; y: number; w: number; h: number }): boolean =>
     x >= b.x && x <= b.x + b.w && y >= b.y - 5 && y <= b.y + b.h + 5;
   if (inBtn(CAMP_CLOSE)) return 'campaign-close';
-  const diff = hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-');
+  // The whole difficulty row sleeps until the gauntlet opens (no run for a
+  // pick to govern) — until then no chip hit-tests, not just the locked ones.
+  const diff = gauntletUnlocked() ? hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-') : null;
   if (diff) return diff;
   if (inBtn(RUN_BTN) && gauntletUnlocked()) return 'campaign-speedrun';
   if (inBtn(HARD_BTN) && campaignProgress.hardcoreUnlocked) return 'campaign-hardcore';
@@ -2995,19 +3012,30 @@ function panelItems(locker: boolean): { items: DisplayItem[]; soon: PanRect | nu
   return { items, soon: null };
 }
 
+/** The BUY button strip inside a previewed STORE tile. */
+function buyRect(r: PanRect): PanRect {
+  return { x: r.x + 10, y: r.y + r.h - 32, w: r.w - 20, h: 26 };
+}
+
+/** Is this tile the skin the STORE is currently trying on? */
+function tilePreviewed(it: DisplayItem): boolean {
+  return customization.preview?.kind === it.kind && customization.preview.id === it.skin.id;
+}
+
 /** One cosmetic tile: a picture, its name, and a status footer. */
-function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: MenuAction | null): void {
+function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: MenuAction | null, locker: boolean): void {
   const r = it.rect;
   const avatar = it.kind === 'avatar';
   const accent = avatar ? (it.skin as AvatarSkin).accent : (it.skin as PlatformSkin).neon;
   const css = hexCss(accent);
   const equipped = avatar ? customization.avatar === it.skin.id : customization.platform === it.skin.id;
   const owned = avatar ? avatarOwned(it.skin.id) : platformOwned(it.skin.id);
+  const previewed = !locker && tilePreviewed(it);
   const hot = hoverAction === it.action;
   plate(ctx, r.x, r.y, r.w, r.h, {
     cut: 10,
-    fill: equipped ? 'rgba(20,22,30,0.94)' : hot ? 'rgba(20,22,30,0.9)' : 'rgba(10,11,15,0.72)',
-    stroke: equipped || hot ? css : UI.steel,
+    fill: equipped || previewed ? 'rgba(20,22,30,0.94)' : hot ? 'rgba(20,22,30,0.9)' : 'rgba(10,11,15,0.72)',
+    stroke: equipped || previewed || hot ? css : UI.steel,
     rivets: false,
   });
   const icx = r.x + r.w / 2;
@@ -3023,8 +3051,9 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     fs -= 1;
     ctx.font = `700 ${fs}px system-ui, sans-serif`;
   }
-  ctx.fillStyle = equipped || hot ? css : UI.text;
-  ctx.fillText(it.skin.name, icx, r.y + r.h * 0.72);
+  ctx.fillStyle = equipped || previewed || hot ? css : UI.text;
+  // The BUY button needs the footer strip, so a previewed name rides higher.
+  ctx.fillText(it.skin.name, icx, r.y + r.h * (previewed ? 0.62 : 0.72));
 
   const fy = r.y + r.h - 14;
   ctx.font = '800 12px system-ui, sans-serif';
@@ -3035,9 +3064,25 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     ctx.fillStyle = 'rgba(232,236,242,0.5)';
     ctx.fillText('EQUIP', icx, fy);
   } else if ((it.skin as PlatformSkin).earnedBy) {
-    // Earned, never sold — the tile says how to win it (the CHAMPION pad).
+    // Earned, never sold — the tile says how to win it, shrunk to fit
+    // ('FELL RAID GOOPLIATH' runs the full tile).
+    const msg = (it.skin as PlatformSkin).earnedBy as string;
+    let efs = 12;
+    while (efs > 8 && ctx.measureText(msg).width > r.w - 12) {
+      efs -= 1;
+      ctx.font = `800 ${efs}px system-ui, sans-serif`;
+    }
     ctx.fillStyle = UI.steelDim;
-    ctx.fillText((it.skin as PlatformSkin).earnedBy as string, icx, fy);
+    ctx.fillText(msg, icx, fy);
+  } else if (previewed) {
+    // Tried on (the mirror / your pad is modelling it) — the price row grows
+    // into the actual BUY button.
+    const price = (it.skin as { price?: number }).price ?? 0;
+    const b = buyRect(r);
+    const buyAction = `shop-buy-${avatar ? 'av' : 'pf'}-${it.index}`;
+    buttonPlate(ctx, b.x, b.y, b.w, b.h, `BUY  ${price}`, canAfford(price) ? UI.amber : UI.steel, hoverAction === buyAction, !canAfford(price));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
   } else {
     const price = (it.skin as { price?: number }).price ?? 0;
     const str = String(price);
@@ -3272,12 +3317,17 @@ function hitArenaTab(x: number, y: number): MenuAction | null {
 
 function drawGrid(ctx: CanvasRenderingContext2D, locker: boolean, hoverAction: MenuAction | null): void {
   const { items, soon } = panelItems(locker);
-  for (const it of items) drawTile(ctx, it, hoverAction);
+  for (const it of items) drawTile(ctx, it, hoverAction, locker);
   if (soon) drawSoonTile(ctx, soon);
 }
 
 function gridHit(x: number, y: number, locker: boolean): MenuAction | null {
   for (const it of panelItems(locker).items) {
+    // A previewed STORE tile's BUY strip claims its own action (earned-only
+    // tiles never grow one — nothing to buy).
+    if (!locker && tilePreviewed(it) && !(it.skin as PlatformSkin).earnedBy && inPanRect(x, y, buyRect(it.rect))) {
+      return `shop-buy-${it.kind === 'avatar' ? 'av' : 'pf'}-${it.index}` as MenuAction;
+    }
     if (inPanRect(x, y, it.rect)) return it.action;
   }
   return null;
