@@ -55,9 +55,10 @@ export class CountdownSystem extends createSystem({}) {
     this.canvas.height = 512;
     this.texture = new CanvasTexture(this.canvas);
     this.texture.minFilter = LinearFilter;
-    // ~2.6 m wide in the air — reads across the arena, not a HUD chip.
+    // ~1.8 m wide in the air — reads across the arena without filling the
+    // gap between the fighters (the old 2.6 m plate loomed).
     this.board = new Mesh(
-      new PlaneGeometry(2.6, 1.3),
+      new PlaneGeometry(1.82, 0.91),
       new MeshBasicMaterial({ map: this.texture, transparent: true, depthWrite: false }),
     );
     // Above the fireball pass (core renderOrder 1 / corona 2): the plate
@@ -83,7 +84,7 @@ export class CountdownSystem extends createSystem({}) {
     const glowTex = new CanvasTexture(glowCanvas);
     glowTex.minFilter = LinearFilter;
     this.glow = new Mesh(
-      new PlaneGeometry(3.6, 2.1),
+      new PlaneGeometry(2.52, 1.47),
       new MeshBasicMaterial({
         map: glowTex,
         transparent: true,

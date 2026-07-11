@@ -263,27 +263,51 @@ export function makePlatform(color: number): Group {
   group.add(grid);
 
   // BLAZING: a big flame licking across the deck — the earned pad for
-  // clearing anything on the blazing breaker. Same raised neon-core
-  // treatment as the VOLT bolt, so it burns the skin's red (and team-tints
-  // on opponent pads).
-  const flameShape = new Shape();
-  const FS = 1.15; // flame footprint scale
-  flameShape.moveTo(0, -0.5 * FS);
-  flameShape.quadraticCurveTo(0.46 * FS, -0.42 * FS, 0.4 * FS, -0.05 * FS); // right belly
-  flameShape.quadraticCurveTo(0.36 * FS, 0.12 * FS, 0.16 * FS, 0.1 * FS); // notch in…
-  flameShape.quadraticCurveTo(0.34 * FS, 0.26 * FS, 0.2 * FS, 0.46 * FS); // …side tongue
-  flameShape.quadraticCurveTo(0.1 * FS, 0.56 * FS, 0, 0.62 * FS); // the tip
-  flameShape.quadraticCurveTo(-0.2 * FS, 0.42 * FS, -0.12 * FS, 0.16 * FS); // left tongue
-  flameShape.quadraticCurveTo(-0.3 * FS, 0.2 * FS, -0.36 * FS, -0.02 * FS); // left notch
-  flameShape.quadraticCurveTo(-0.46 * FS, -0.38 * FS, 0, -0.5 * FS); // left belly home
-  const flameMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
-  flameMat.userData.role = 'neon-core';
-  const flame = new Mesh(new ShapeGeometry(flameShape), flameMat);
+  // clearing anything on the blazing breaker. The SAME leaning-tongue
+  // silhouette as the leaderboard's blazing feat marker (drawFlame), as an
+  // outer tongue + a hot inner core: the outer is neon-core (whitened, like
+  // the fins/bolt), the core neon-halo (the pure saturated neon) so the two
+  // tones survive skin and team re-tints.
+  const flameTongue = (h: number): Shape => {
+    const w = h * 0.62;
+    const s = new Shape();
+    s.moveTo(0, 0);
+    s.bezierCurveTo(-w * 0.55, h * 0.12, -w * 0.42, h * 0.55, -w * 0.1, h * 0.62);
+    s.bezierCurveTo(-w * 0.28, h * 0.8, w * 0.02, h * 0.9, w * 0.08, h);
+    s.bezierCurveTo(w * 0.42, h * 0.68, w * 0.55, h * 0.3, 0, 0);
+    return s;
+  };
+  const FLAME_H = 1.15;
+  const flame = new Group();
+  const outerMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  outerMat.userData.role = 'neon-core';
+  const outer = new Mesh(new ShapeGeometry(flameTongue(FLAME_H)), outerMat);
+  const coreMat = new MeshBasicMaterial({ color: new Color(color) });
+  coreMat.userData.role = 'neon-halo';
+  const core = new Mesh(new ShapeGeometry(flameTongue(FLAME_H * 0.55)), coreMat);
+  core.position.z = 0.001; // proud of the outer tongue
+  flame.add(outer, core);
   flame.rotation.x = -Math.PI / 2; // flat on the deck, tip toward the foe
-  flame.position.y = DECK_TOP + 0.001;
+  flame.position.set(0, DECK_TOP + 0.001, FLAME_H / 2); // shape grows +y → -z; recentre
   flame.userData.skinTag = 'blazing';
   flame.visible = false;
   group.add(flame);
+
+  // TIDEBREAKER: GOOPLIATH's gel drop, big on the deck — the raid trophy pad.
+  const D = 0.52;
+  const gel = new Shape();
+  gel.moveTo(0, D); // pinched crown
+  gel.quadraticCurveTo(0.95 * D, -0.1 * D, 0.55 * D, -0.55 * D);
+  gel.quadraticCurveTo(0, -0.98 * D, -0.55 * D, -0.55 * D); // round belly
+  gel.quadraticCurveTo(-0.95 * D, -0.1 * D, 0, D);
+  const gelMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  gelMat.userData.role = 'neon-core';
+  const drop = new Mesh(new ShapeGeometry(gel), gelMat);
+  drop.rotation.x = -Math.PI / 2; // crown pointing at the foe
+  drop.position.y = DECK_TOP + 0.001;
+  drop.userData.skinTag = 'tidebreaker';
+  drop.visible = false;
+  group.add(drop);
 
   // EMBER: the classic look — banding + bolts, no extra furniture.
   return group;
