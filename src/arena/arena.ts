@@ -264,10 +264,10 @@ export function makePlatform(color: number): Group {
 
   // BLAZING: a big flame licking across the deck — the earned pad for
   // clearing anything on the blazing breaker. The SAME leaning-tongue
-  // silhouette as the leaderboard's blazing feat marker (drawFlame), as an
-  // outer tongue + a hot inner core: the outer is neon-core (whitened, like
-  // the fins/bolt), the core neon-halo (the pure saturated neon) so the two
-  // tones survive skin and team re-tints.
+  // silhouette as the leaderboard's blazing feat marker (drawFlame): an
+  // outer tongue in neon-core (retints with the skin/team like the
+  // fins/bolt) and a hot AMBER core with no retint role at all — fire's
+  // heart stays yellow, matching the store tile, whatever the pad wears.
   const flameTongue = (h: number): Shape => {
     const w = h * 0.62;
     const s = new Shape();
@@ -282,8 +282,7 @@ export function makePlatform(color: number): Group {
   const outerMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
   outerMat.userData.role = 'neon-core';
   const outer = new Mesh(new ShapeGeometry(flameTongue(FLAME_H)), outerMat);
-  const coreMat = new MeshBasicMaterial({ color: new Color(color) });
-  coreMat.userData.role = 'neon-halo';
+  const coreMat = new MeshBasicMaterial({ color: 0xffb000 }); // no role: never retinted
   const core = new Mesh(new ShapeGeometry(flameTongue(FLAME_H * 0.55)), coreMat);
   core.position.z = 0.001; // proud of the outer tongue
   flame.add(outer, core);
