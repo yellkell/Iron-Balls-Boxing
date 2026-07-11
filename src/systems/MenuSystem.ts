@@ -75,6 +75,7 @@ import { setVoiceEnabled, voiceEnabled } from '../audio/voicePref.js';
 import { buildBoxer, setAvatarAccent, solveTorso, type BoxerRig } from '../avatar/boxer.js';
 import {
   AVATAR_SKINS,
+  OPPONENT_DEFAULT_PLATFORM,
   PLATFORM_SKINS,
   applyAvatarSkin,
   applyPlatformSkin,
@@ -82,7 +83,7 @@ import {
   resolveAvatarSkin,
 } from '../avatar/skins.js';
 import { match } from '../combat/matchState.js';
-import { applyArenaLayout } from '../arena/arena.js';
+import { applyArenaLayout, tintPlatform } from '../arena/arena.js';
 import { mesh } from '../net/mesh.js';
 import { UI } from '../ui/industrial.js';
 import { net } from '../net/client.js';
@@ -106,7 +107,7 @@ import {
   setProfileView,
 } from '../net/leaderboard.js';
 import { gazette, markGazetteRead, refreshGazette } from '../net/gazette.js';
-import { hueToColor, pubUrl } from '../config.js';
+import { hueToColor, pubUrl, teamColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 
 const _origin = new Vector3();
@@ -159,6 +160,8 @@ export class MenuSystem extends createSystem({}) {
   private kbMode: 'name' | 'note' = 'name';
   private mirror?: { group: Group; rig: BoxerRig };
   private skinVersion = 0;
+  /** The opponent pad is modelling a STORE platform try-on (needs restoring). */
+  private oppPadPreviewed = false;
   private boardScrollCooldown = 0;
   private boardScrollDir = 0;
   private newsScrollCooldown = 0;
@@ -1064,16 +1067,31 @@ export class MenuSystem extends createSystem({}) {
       const av = myAvatarSkin(); // chosen shape + custom colour
       // A STORE try-on dresses the MIRROR only (your own body keeps what you
       // actually own) in the previewed shape — with your colour picks, so it
-      // shows exactly what you'd get. A platform try-on repaints YOUR pad.
+      // shows exactly what you'd get.
       const pv = customization.preview;
       const mirrorAv = pv?.kind === 'avatar' ? resolveAvatarSkin(pv.id, customization.colorHue, customization.colorLight) : av;
-      const pf = platformSkin(pv?.kind === 'platform' ? pv.id : customization.platform);
       for (const name of names) {
         const obj = this.scene.getObjectByName(name);
         if (obj) applyAvatarSkin(obj, name === 'mirror-avatar' ? mirrorAv : av);
       }
       const pad = this.scene.getObjectByName('player-platform');
-      if (pad) applyPlatformSkin(pad, pf);
+      if (pad) applyPlatformSkin(pad, platformSkin(customization.platform));
+      // A platform try-on models on the OPPONENT's pad across the gap — the
+      // whole deck in view at once, no craning at your own feet. When the
+      // try-on ends, the pad goes back to the house look the lobby paints
+      // (full re-apply first: a premium slab tint or deck ornament would
+      // survive a plain re-tint).
+      const oppPad = this.scene.getObjectByName('opponent-platform');
+      if (oppPad) {
+        if (pv?.kind === 'platform') {
+          applyPlatformSkin(oppPad, platformSkin(pv.id));
+          this.oppPadPreviewed = true;
+        } else if (this.oppPadPreviewed) {
+          this.oppPadPreviewed = false;
+          applyPlatformSkin(oppPad, OPPONENT_DEFAULT_PLATFORM);
+          tintPlatform(oppPad, teamColor(1));
+        }
+      }
       this.accentHue = Number.NaN;
     }
 
