@@ -53,10 +53,20 @@ function ensureSpeaker(id: string): Speaker | null {
   return speaker;
 }
 
+/** Punters YOU have muted/blocked — their frames are dropped at the door.
+ *  (Driven per frame by PubPlayerSystem from the persisted social lists.) */
+const mutedSpeakers = new Set<string>();
+
+export function setVoiceSpeakerMuted(id: string, muted: boolean): void {
+  if (muted) mutedSpeakers.add(id);
+  else mutedSpeakers.delete(id);
+}
+
 /** Decode (just int16→float) and queue one PCM frame from punter `id`. */
 export function pushVoiceFrame(id: string, frame: ArrayBuffer): void {
   if (frame.byteLength <= 8) return;
   if (!VOICE_ON) return; // voice chat turned off in the main menu — hear no one
+  if (mutedSpeakers.has(id)) return; // muted/blocked punter — dropped unheard
   const ctx = audioContext();
   if (!ctx) return;
   // Voice may be the first thing to wake the graph in a quiet pub.

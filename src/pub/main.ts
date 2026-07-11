@@ -33,6 +33,7 @@ import { buildProps, PropSystem } from './systems/PropSystem.js';
 import { CoinSystem } from './systems/CoinSystem.js';
 import { BartenderSystem } from './systems/BartenderSystem.js';
 import { DartsSystem } from './systems/DartsSystem.js';
+import { SocialSystem } from './systems/SocialSystem.js';
 import { FightSystem } from './systems/FightSystem.js';
 import { PubPlayerSystem } from './systems/PubPlayerSystem.js';
 import { DroneHuntSystem } from './systems/DroneHuntSystem.js';
@@ -124,6 +125,8 @@ World.create(container, {
   world.registerSystem(TvSystem);
   world.registerSystem(FightSystem);
   world.registerSystem(BartenderSystem);
+  // The A-button SOCIAL panel: mute/block anyone in the room (store safety).
+  world.registerSystem(SocialSystem);
   // Animates and self-destructs transient effects (clap gesture cues, fire
   // impacts) and drives the fire particle pools. Without it, the white clap
   // flash spawns but never fades — leaving a permanent mark in the room.
