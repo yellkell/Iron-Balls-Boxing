@@ -80,7 +80,33 @@ export const LADDER = {
   upsetMax: 10, // toppling a giant pays up to +this on top of the base
   upsetMin: -5, // farming rookies pays down to −this off the base
   botWin: 2, // token LP for a quick-match win over the bot
+  // The brawl ladders (2v2 / FFA — no per-mode rating, so no upset math):
+  brawlWin: 20, // 2v2 win
+  ffaWin: 25, // an FFA win is one-in-four — it pays a little extra
+  brawlLoss: 6, // either brawl's defeat, floored at 0
 };
+
+/**
+ * RANKED ladder SEASONS: LP banks into a per-season field and the board shows
+ * the season in progress. When a season closes, finishers take a profile
+ * trophy — 1ST / 2ND / 3RD for the podium, TOP 10 for 4–10, TOP 25 for 11–25
+ * — and repeat honours stack (the chip shows ×N).
+ */
+export const SEASON = {
+  /** Season 1 opened with the ladder itself. 90 days each, forever. */
+  epochUtc: Date.UTC(2026, 6, 6), // Mon 6 Jul 2026
+  lengthDays: 90,
+};
+
+/** The season in progress at `now` (1-based; never below 1). */
+export function seasonIndex(now = Date.now()): number {
+  return Math.max(1, 1 + Math.floor((now - SEASON.epochUtc) / (SEASON.lengthDays * 86_400_000)));
+}
+
+/** The player-doc field carrying a season's ladder points. */
+export function seasonScoreField(idx: number): string {
+  return `score_s${idx}`;
+}
 
 export const CURRENCY = {
   /** Coins banked per completed game (any mode, win or loss). */

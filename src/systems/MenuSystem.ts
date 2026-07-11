@@ -753,7 +753,7 @@ export class MenuSystem extends createSystem({}) {
         break;
       case 'lb-arcade': {
         // ARCADE opens onto its currently-showing sub-board, else AIM.
-        const arcadeSubs = ['training', 'gauntlet', 'hardcore', 'raid', 'raidHardcore'] as const;
+        const arcadeSubs = ['training', 'gauntlet', 'raid'] as const;
         setLeaderboardTab(
           (arcadeSubs as readonly string[]).includes(leaderboard.tab) ? leaderboard.tab : 'training',
         );
@@ -765,14 +765,8 @@ export class MenuSystem extends createSystem({}) {
       case 'lb-gauntlet':
         setLeaderboardTab('gauntlet');
         break;
-      case 'lb-hardcore':
-        setLeaderboardTab('hardcore');
-        break;
       case 'lb-raid':
         setLeaderboardTab('raid');
-        break;
-      case 'lb-raidhc':
-        setLeaderboardTab('raidHardcore');
         break;
       case 'lb-duo':
         setLeaderboardTab('duo');

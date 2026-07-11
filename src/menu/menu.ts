@@ -39,6 +39,7 @@ import {
 import { ATTACH, DIFFICULTY, DIFFICULTY_ORDER, GAME_TITLE, hueToColor, type ArcadeMode, type Difficulty } from '../config.js';
 import {
   LEADERBOARD_VISIBLE_ROWS,
+  SEASON_AWARDS,
   boardScroll,
   isRunTab,
   leaderboard,
@@ -46,6 +47,8 @@ import {
   myProfileRow,
   runRows,
   type LeaderboardTab,
+  type RunRow,
+  type SeasonAward,
 } from '../net/leaderboard.js';
 import { gazette, type GazetteArticle } from '../net/gazette.js';
 import { mesh } from '../net/mesh.js';
@@ -153,9 +156,7 @@ export type MenuAction =
   | 'lb-ffa'
   /** ARCADE PvE run-time sub-boards. */
   | 'lb-gauntlet'
-  | 'lb-hardcore'
   | 'lb-raid'
-  | 'lb-raidhc'
   | 'lb-profile'
   | `lb-row-${number}`
   | 'edit-note'
@@ -816,13 +817,12 @@ const BATTLE_SUBS: Array<[LeaderboardTab, string, MenuAction]> = [
   ['duo', '2V2', 'lb-duo'],
   ['ffa', 'FFA', 'lb-ffa'],
 ];
-/** ARCADE sub-tabs: AIM plus the four PvE run-time boards. */
+/** ARCADE sub-tabs: AIM plus the two PvE run-time boards (hardcore and the
+ *  higher difficulties ride the same boards wearing their symbols). */
 const ARCADE_SUBS: Array<[LeaderboardTab, string, MenuAction]> = [
   ['training', 'AIM', 'lb-training'],
   ['gauntlet', 'GAUNTLET', 'lb-gauntlet'],
-  ['hardcore', 'HARDCORE', 'lb-hardcore'],
   ['raid', 'RAID', 'lb-raid'],
-  ['raidHardcore', 'RAID HC', 'lb-raidhc'],
 ];
 const ARCADE_SUB_TABS = ARCADE_SUBS.map(([id]) => id);
 const SUB_Y = 140;
@@ -897,8 +897,47 @@ function boardRowY0(): number {
   return activeSubs() ? BOARD_ROW_Y0 + SUB_H + 8 : BOARD_ROW_Y0;
 }
 
+/** A little procedural flame — the BLAZING mark, wherever feats are shown. */
+export function drawFlame(ctx: CanvasRenderingContext2D, cx: number, baseY: number, h: number): void {
+  const w = h * 0.62;
+  const flame = (hh: number, ww: number, color: string): void => {
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY);
+    ctx.bezierCurveTo(cx - ww * 0.55, baseY - hh * 0.12, cx - ww * 0.42, baseY - hh * 0.55, cx - ww * 0.1, baseY - hh * 0.62);
+    ctx.bezierCurveTo(cx - ww * 0.28, baseY - hh * 0.8, cx + ww * 0.02, baseY - hh * 0.9, cx + ww * 0.08, baseY - hh);
+    ctx.bezierCurveTo(cx + ww * 0.42, baseY - hh * 0.68, cx + ww * 0.55, baseY - hh * 0.3, cx, baseY);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
+  flame(h, w, UI.ember); // the outer tongue
+  flame(h * 0.55, w * 0.6, UI.amber); // the hot core
+}
+
+/** The feat markers a run row wears: flame (blazing) / HARD chip, + HC. */
+function drawRunFeats(ctx: CanvasRenderingContext2D, r: RunRow, xRight: number, y: number): number {
+  let x = xRight;
+  ctx.textAlign = 'right';
+  ctx.font = '800 14px system-ui, sans-serif';
+  if (r.hardcore) {
+    ctx.fillStyle = UI.danger;
+    ctx.fillText('HC', x, y);
+    x -= ctx.measureText('HC').width + 10;
+  }
+  if (r.difficulty === 'blazing') {
+    drawFlame(ctx, x - 7, y + 9, 20);
+    x -= 22;
+  } else if (r.difficulty === 'hard') {
+    ctx.fillStyle = UI.amber;
+    ctx.fillText('HARD', x, y);
+    x -= ctx.measureText('HARD').width + 10;
+  }
+  return x;
+}
+
 /** A run board — one row per completed run: rank, the whole squad, the clock
- *  (lowest time on top). Names are dimmed small; the time is the headline. */
+ *  (lowest time on top). Names are dimmed small; the time is the headline;
+ *  hardcore / hard / blazing feats wear their marks beside the clock. */
 function drawRunRows(ctx: CanvasRenderingContext2D): void {
   const rows = runRows();
   const offset = boardScroll();
@@ -913,22 +952,25 @@ function drawRunRows(ctx: CanvasRenderingContext2D): void {
     ctx.font = '600 22px system-ui, sans-serif';
     ctx.fillStyle = r.me ? UI.emberBright : UI.textDim;
     ctx.fillText(`${offset + i + 1}.`, 48, y);
+    // The clock — the headline, right-aligned — then the feat marks, then
+    // however much room is left goes to the squad names.
+    ctx.textAlign = 'right';
+    ctx.font = '700 22px system-ui, sans-serif';
+    ctx.fillStyle = r.me ? UI.emberBright : UI.amber;
+    ctx.fillText(fmtRunTime(r.seconds), BW - 56, y);
+    const featLeft = drawRunFeats(ctx, r, BW - 56 - 95, y);
     // The squad — every runner on the row, shrunk to share the middle.
+    ctx.textAlign = 'left';
     const names = r.names.join('  ·  ') || '—';
     let px = 20;
     ctx.font = `600 ${px}px system-ui, sans-serif`;
-    const nameMax = BW - 96 - 150;
+    const nameMax = featLeft - 90 - 12;
     while (px > 11 && ctx.measureText(names).width > nameMax) {
       px -= 1;
       ctx.font = `600 ${px}px system-ui, sans-serif`;
     }
     ctx.fillStyle = r.me ? UI.text : 'rgba(232,236,242,0.82)';
     ctx.fillText(names, 90, y);
-    // The clock — the headline, right-aligned.
-    ctx.textAlign = 'right';
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillStyle = r.me ? UI.emberBright : UI.amber;
-    ctx.fillText(fmtRunTime(r.seconds), BW - 56, y);
   });
   ctx.textAlign = 'center';
   if (!rows.length) {
@@ -977,13 +1019,57 @@ function drawBoardRows(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
   }
 }
 
-/** The PROFILE face: a player's big emblem, tier, LP/XP and their note. */
+/** Season-trophy chip styling, best first (matches SEASON_AWARDS order). */
+const AWARD_STYLE: Record<SeasonAward, { label: string; color: string }> = {
+  first: { label: '1ST', color: '#d9a832' }, // championship gold
+  second: { label: '2ND', color: '#c8d2dc' }, // silver
+  third: { label: '3RD', color: '#c97a1e' }, // bronze
+  top10: { label: 'TOP 10', color: UI.amber },
+  top25: { label: 'TOP 25', color: UI.steel },
+};
+
+/** A small feat chip: coloured plate + label (+ ×N for repeat honours). */
+function drawFeatChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, label: string, color: string, count = 1, flame = false): void {
+  plate(ctx, x, y, w, 26, { cut: 6, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 14px system-ui, sans-serif';
+  ctx.fillStyle = color;
+  const text = count > 1 ? `${label} ×${count}` : label;
+  ctx.fillText(text, x + w / 2 + (flame ? 7 : 0), y + 14);
+  if (flame) drawFlame(ctx, x + w / 2 - ctx.measureText(text).width / 2 - 4, y + 22, 17);
+}
+
+/** The PROFILE face: a player's big emblem, tier, LP/XP, their season
+ *  trophies (left of the emblem), clear badges (right) and their note. */
 function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const row = leaderboard.viewRow ?? myProfileRow();
   const own = row.me;
   const tier = tierForXp(row.xp);
   const badge = rankBadge(tier.index);
   if (badge) ctx.drawImage(badge, BW / 2 - 58, 134, 116, 116);
+
+  // Season honours, stacked left of the emblem — best first, ×N for repeats.
+  let ay = 138;
+  for (const key of SEASON_AWARDS) {
+    const count = row.awards?.[key] ?? 0;
+    if (!count || ay > 228) continue;
+    drawFeatChip(ctx, 52, ay, 108, AWARD_STYLE[key].label, AWARD_STYLE[key].color, count);
+    ay += 30;
+  }
+  // Clear badges, right of the emblem — only the HIGHEST tier each, and
+  // blazing wears the flame.
+  const clears: Array<[string, number]> = [
+    ['GAUNTLET', row.gauntletBest ?? 0],
+    ['RAID', row.raidBest ?? 0],
+  ];
+  let by = 138;
+  for (const [label, tierN] of clears) {
+    if (!tierN) continue;
+    const color = tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
+    drawFeatChip(ctx, BW - 52 - 118, by, 118, label, color, 1, tierN >= 3);
+    by += 30;
+  }
 
   ctx.textAlign = 'center';
   ctx.font = stencilFont(38);
