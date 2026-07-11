@@ -303,6 +303,9 @@ export function buttonPlate(
   ctx.shadowBlur = 0;
   ctx.font = stencilFont(Math.round(h * 0.4));
   ctx.textAlign = 'center';
+  // Pin the baseline too — a caller mid-flow with an 'alphabetic' baseline
+  // (the tutorial console's title) used to push the label low off-centre.
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = disabled ? 'rgba(180,186,196,0.38)' : hot ? accent : UI.text;
   if (hot && !disabled) {
     ctx.shadowColor = accent;
