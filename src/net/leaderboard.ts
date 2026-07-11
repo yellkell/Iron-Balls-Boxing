@@ -38,6 +38,8 @@ export interface LbRow {
   gauntletBest: number;
   /** Highest raid clear, same tiers. */
   raidBest: number;
+  /** Highest GOOPLIATH-raid clear, same tiers. */
+  goopBest: number;
   /** The player's self-written note, shown on their profile. */
   note: string;
 }
@@ -56,15 +58,18 @@ export type LeaderboardTab =
   | 'ffa'
   | 'gauntlet'
   | 'raid'
+  | 'goopliath'
   | 'profile';
 /** Score/count boards (one numeric value per PLAYER doc). */
 type DataTab = 'ranked' | 'xp' | 'training' | 'duo' | 'ffa';
 /** RUN-TIME boards — each row is one completed RUN (a squad + a clock), not a
- *  player. Ranked by lowest cumulative fight time. One board per mode:
- *  hardcore and higher difficulties ride the same board wearing their
- *  symbols; EASY runs never rank at all. */
-export type RunTab = 'gauntlet' | 'raid';
-const RUN_TABS: RunTab[] = ['gauntlet', 'raid'];
+ *  player. Ranked by lowest cumulative fight time. One board per mode —
+ *  GOOPLIATH raids race their own clock (one long fight is a different race
+ *  from a five-titan run, so they never share a board with titan raids).
+ *  Hardcore and higher difficulties ride their board wearing symbols; EASY
+ *  runs never rank at all. */
+export type RunTab = 'gauntlet' | 'raid' | 'goopliath';
+const RUN_TABS: RunTab[] = ['gauntlet', 'raid', 'goopliath'];
 /** Firestore collection per run board (separate collections keep the query a
  *  plain single-field orderBy — no composite index needed). The old
  *  runHardcore / runRaidHardcore collections are retired — hardcore runs now
@@ -72,6 +77,7 @@ const RUN_TABS: RunTab[] = ['gauntlet', 'raid'];
 const RUN_COLLECTION: Record<RunTab, string> = {
   gauntlet: 'runGauntlet',
   raid: 'runRaid',
+  goopliath: 'runGoopliath',
 };
 
 /** One entry on a run board: the whole squad (one name for a solo gauntlet,
@@ -103,6 +109,7 @@ export const leaderboard = {
   ffa: [] as LbRow[],
   gauntlet: [] as RunRow[],
   raid: [] as RunRow[],
+  goopliath: [] as RunRow[],
   scroll: {
     ranked: 0,
     xp: 0,
@@ -111,6 +118,7 @@ export const leaderboard = {
     ffa: 0,
     gauntlet: 0,
     raid: 0,
+    goopliath: 0,
   } as Record<DataTab | RunTab, number>,
   status: FIREBASE_ENABLED ? 'loading…' : 'leaderboard offline',
   /** Whose profile the PROFILE face shows; null = your own. */
@@ -137,6 +145,7 @@ const profile = {
   awardedThrough: 0,
   gauntletBest: 0,
   raidBest: 0,
+  goopBest: 0,
 };
 
 /** Your own profile as a board row (for the PROFILE face when viewing self). */
@@ -151,6 +160,7 @@ export function myProfileRow(): LbRow {
     awards: profile.awards,
     gauntletBest: profile.gauntletBest,
     raidBest: profile.raidBest,
+    goopBest: profile.goopBest,
     note: profile.note,
   };
 }
@@ -173,7 +183,7 @@ function isDataTab(tab: LeaderboardTab): tab is DataTab {
 }
 
 export function isRunTab(tab: LeaderboardTab): tab is RunTab {
-  return tab === 'gauntlet' || tab === 'raid';
+  return tab === 'gauntlet' || tab === 'raid' || tab === 'goopliath';
 }
 
 export function leaderboardRows(tab: LeaderboardTab = leaderboard.tab): LbRow[] {
@@ -358,6 +368,7 @@ export function initLeaderboard(): void {
         profile.awardedThrough = (d.awardedThrough as number) ?? season - 1;
         profile.gauntletBest = (d.gauntletBest as number) ?? 0;
         profile.raidBest = (d.raidBest as number) ?? 0;
+        profile.goopBest = (d.goopBest as number) ?? 0;
         // A locally renamed player syncs the doc's stale callsign.
         if ((d.name as string) !== profile.name) writeMine({});
         // Seasons that closed since our last visit: claim any honours.
@@ -377,6 +388,7 @@ export function initLeaderboard(): void {
           awardedThrough: season - 1,
           gauntletBest: 0,
           raidBest: 0,
+          goopBest: 0,
           updatedAt: h.fs.serverTimestamp(),
         });
       }
@@ -412,6 +424,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
           awards: (d.data().awards as Partial<Record<SeasonAward, number>>) ?? {},
           gauntletBest: (d.data().gauntletBest as number) ?? 0,
           raidBest: (d.data().raidBest as number) ?? 0,
+          goopBest: (d.data().goopBest as number) ?? 0,
           note: (d.data().note as string) ?? '',
         }))
         // Every board shows anyone who's banked anything. (RANKED is ladder
@@ -453,7 +466,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
         return leaderboard[tab]; // keep whatever we last had
       }
     };
-    const [rk, xp, tr, du, ff, gt, rd] = await Promise.all([
+    const [rk, xp, tr, du, ff, gt, rd, gp] = await Promise.all([
       pull(seasonScoreField(seasonIndex())), // RANKED: the season in progress
       pull('xp'),
       pull('training'),
@@ -461,6 +474,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
       pull('ffa'),
       pullRuns('gauntlet'),
       pullRuns('raid'),
+      pullRuns('goopliath'),
     ]);
     leaderboard.ranked = rk;
     leaderboard.xp = xp;
@@ -469,6 +483,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
     leaderboard.ffa = ff;
     leaderboard.gauntlet = gt;
     leaderboard.raid = rd;
+    leaderboard.goopliath = gp;
     (['ranked', 'xp', 'training', 'duo', 'ffa', ...RUN_TABS] as const).forEach(clampLeaderboardScroll);
     leaderboard.status = '';
   } catch {
@@ -508,13 +523,13 @@ export function reportRun(tab: RunTab, seconds: number, names: string[], difficu
 const CLEAR_TIER: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, blazing: 3 };
 
 /**
- * A full RUN was WON (gauntlet or raid): raise that family's profile badge
- * to this difficulty's tier if it's the best yet. Only the highest tier ever
- * shows on the profile — blazing wears the flame.
+ * A full RUN was WON (gauntlet, titan raid, or Goopliath raid): raise that
+ * family's profile badge to this difficulty's tier if it's the best yet.
+ * Only the highest tier ever shows on the profile — blazing wears the flame.
  */
-export function reportRunClear(kind: 'gauntlet' | 'raid', difficulty: Difficulty): void {
+export function reportRunClear(kind: 'gauntlet' | 'raid' | 'goopliath', difficulty: Difficulty): void {
   const tier = CLEAR_TIER[difficulty];
-  const field = kind === 'gauntlet' ? 'gauntletBest' : 'raidBest';
+  const field = kind === 'gauntlet' ? 'gauntletBest' : kind === 'raid' ? 'raidBest' : 'goopBest';
   if (tier <= profile[field]) return;
   profile[field] = tier;
   writeMine({ [field]: tier });

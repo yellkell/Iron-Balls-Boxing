@@ -157,6 +157,7 @@ export type MenuAction =
   /** ARCADE PvE run-time sub-boards. */
   | 'lb-gauntlet'
   | 'lb-raid'
+  | 'lb-goopliath'
   | 'lb-profile'
   | `lb-row-${number}`
   | 'edit-note'
@@ -823,6 +824,7 @@ const ARCADE_SUBS: Array<[LeaderboardTab, string, MenuAction]> = [
   ['training', 'AIM', 'lb-training'],
   ['gauntlet', 'GAUNTLET', 'lb-gauntlet'],
   ['raid', 'RAID', 'lb-raid'],
+  ['goopliath', 'GOOPLIATH', 'lb-goopliath'],
 ];
 const ARCADE_SUB_TABS = ARCADE_SUBS.map(([id]) => id);
 const SUB_Y = 140;
@@ -1062,6 +1064,7 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   const clears: Array<[string, number]> = [
     ['GAUNTLET', row.gauntletBest ?? 0],
     ['RAID', row.raidBest ?? 0],
+    ['GOOPLIATH', row.goopBest ?? 0],
   ];
   let by = 138;
   for (const [label, tierN] of clears) {

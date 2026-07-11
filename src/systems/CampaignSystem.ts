@@ -2867,8 +2867,14 @@ export class CampaignSystem extends createSystem({
       if (this.isAuthority() && !solo) {
         reportRun('raid', this.runClock, this.squadNames(), this.activeDifficulty(), app.raidHardcore);
       }
+      // A GOOPLIATH raid races its OWN board — one long fight is a different
+      // race from a five-titan run. (Hardcore means nothing to a single
+      // fight, so the tide's rows never wear the HC mark.)
+      if (this.isAuthority() && solo && this.raid()) {
+        reportRun('goopliath', this.runClock, this.squadNames(), this.activeDifficulty(), false);
+      }
       // Every raider banks the clear badge (easy earns nothing).
-      if (!solo) reportRunClear('raid', this.activeDifficulty());
+      reportRunClear(solo ? 'goopliath' : 'raid', this.activeDifficulty());
       this.hud.title(
         solo ? 'THE TIDE RECEDES' : 'RAID CLEARED',
         (solo
