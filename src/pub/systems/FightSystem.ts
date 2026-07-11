@@ -766,10 +766,17 @@ export class FightSystem extends createSystem({}) {
         continue;
       }
       const cool = this.teamFor(id) === 1;
+      const k = 1 - Math.exp(-NET.smoothing * delta);
       for (const g of shards) {
         g.hitCooldown = Math.max(0, g.hitCooldown - delta);
-        g.visual.group.position.copy(g.pos);
-        this.driveFireLook(g.visual, g.pos, RETURNING, g, delta, cool);
+        // Ease to the streamed point like the main balls (a raw copy stepped
+        // at packet rate); a real teleport — fresh fan, round reset — snaps.
+        if (g.visual.group.position.distanceToSquared(g.pos) > 4) {
+          g.visual.group.position.copy(g.pos);
+        } else {
+          g.visual.group.position.lerp(g.pos, k);
+        }
+        this.driveFireLook(g.visual, g.visual.group.position, RETURNING, g, delta, cool);
       }
     }
   }

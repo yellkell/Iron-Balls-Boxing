@@ -22,6 +22,16 @@ export interface RemotePunter {
   head: PoseTuple;
   left: PoseTuple;
   right: PoseTuple;
+  /**
+   * Dead-reckoning: per-part velocity estimated packet-to-packet and the
+   * seconds since the last snap. FIGHTERS' rigs lead their stream by this
+   * (like the fireballs do), so dodges and punches render where they ARE
+   * instead of a tick behind; the casual crowd ignores it.
+   */
+  headVel: [number, number, number];
+  leftVel: [number, number, number];
+  rightVel: [number, number, number];
+  snapAge: number;
 }
 
 /** Scene references built by environment.ts, consumed by the systems. */
