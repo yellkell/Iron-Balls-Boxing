@@ -18,7 +18,7 @@
 import { FIREBASE_ENABLED, firebaseConfig } from './firebaseConfig.js';
 import { xpForArcade, xpForBot, xpForCampaign, xpForMatch, xpForTraining, xpForTutorial } from '../menu/progression.js';
 import { addCoins } from '../menu/wallet.js';
-import { CURRENCY, type ArcadeMode } from '../config.js';
+import { CURRENCY, LADDER, type ArcadeMode } from '../config.js';
 
 export interface LbRow {
   /** The player's doc id — identifies them when their row is clicked. */
@@ -29,8 +29,9 @@ export interface LbRow {
   me: boolean;
   /** Cumulative XP — drives the rank badge on every board + the profile. */
   xp: number;
-  /** Skill rating, for the profile card. */
-  elo: number;
+  /** RANKED ladder points, for the profile card. (Raw ELO is a hidden
+   *  matchmaking signal and never leaves this module for display.) */
+  score: number;
   /** The player's self-written note, shown on their profile. */
   note: string;
 }
@@ -111,11 +112,6 @@ export const rival = { name: 'RIVAL', elo: 1000, avatarSkin: '', platformSkin: '
 
 const ELO_K = 32;
 
-/** Leaderboard score banked per win. A real 1v1 pays a full +20; a practice
- *  win over the bot is a token +2 — enough to chart, not enough to farm. */
-const SCORE_WIN = 20;
-const SCORE_BOT_WIN = 2;
-
 /** Arcade brawl boards (2v2 / FFA): a win banks +11, just showing up banks +1
  *  either way — so the boards reward turning out, and reward winning more. */
 const ARCADE_WIN = 11;
@@ -128,10 +124,10 @@ export function myProfileRow(): LbRow {
   return {
     uid: profile.id,
     name: profile.name,
-    value: profile.elo,
+    value: profile.score,
     me: true,
     xp: profile.xp,
-    elo: profile.elo,
+    score: profile.score,
     note: profile.note,
   };
 }
@@ -361,7 +357,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
   const { fs, db } = h;
   try {
     const players = fs.collection(db, 'players');
-    const pull = async (field: 'elo' | 'xp' | 'training' | 'duo' | 'ffa'): Promise<LbRow[]> => {
+    const pull = async (field: 'score' | 'xp' | 'training' | 'duo' | 'ffa'): Promise<LbRow[]> => {
       const snap = await fs.getDocs(fs.query(players, fs.orderBy(field, 'desc'), fs.limit(LEADERBOARD_FETCH_LIMIT)));
       return snap.docs
         .map((d) => ({
@@ -370,12 +366,12 @@ export async function refreshLeaderboard(force = false): Promise<void> {
           value: (d.data()[field] as number) ?? 0,
           me: d.id === profile.id,
           xp: (d.data().xp as number) ?? 0,
-          elo: (d.data().elo as number) ?? 1000,
+          score: (d.data().score as number) ?? 0,
           note: (d.data().note as string) ?? '',
         }))
-        // Ranked shows only players whose rating has actually moved (played a
-        // real bout); XP/training boards show anyone who's earned anything.
-        .filter((r) => (field === 'elo' ? r.value !== 1000 : r.value > 0));
+        // Every board shows anyone who's banked anything. (RANKED is ladder
+        // points now — raw ELO stays hidden, a matchmaking signal only.)
+        .filter((r) => r.value > 0);
     };
     // RUN boards: each is its own collection of finished runs, ranked by the
     // lowest cumulative fight time. A row is a whole squad, so "me" is my
@@ -407,7 +403,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
       }
     };
     const [rk, xp, tr, du, ff, gt, hc, rd, rh] = await Promise.all([
-      pull('elo'),
+      pull('score'),
       pull('xp'),
       pull('training'),
       pull('duo'),
@@ -475,12 +471,16 @@ function writeMine(fields: Record<string, unknown>): void {
 }
 
 /**
- * A finished REAL 1v1: a win banks a flat +20 on the board; losing costs
- * nothing visible. The hidden ELO still moves both ways (rival-quality signal
- * for matchmaking) but no longer weights the score.
+ * A finished REAL 1v1: the public LADDER moves — a win pays LADDER.win plus
+ * an upset bonus read off the (hidden) rating gap, a loss hands a little
+ * back and never drags below zero. The raw ELO itself still moves both ways
+ * underneath as the matchmaking signal, but it is never shown anywhere.
  */
 export function reportResult(win: boolean, oppElo: number): void {
-  if (win) profile.score += SCORE_WIN;
+  // Upset bonus from the PRE-match gap: toppling a giant pays extra, farming
+  // rookies pays less — the ladder carries a whiff of skill without the sting.
+  const upset = Math.max(LADDER.upsetMin, Math.min(LADDER.upsetMax, Math.round((oppElo - profile.elo) / LADDER.upsetDiv)));
+  profile.score = Math.max(0, profile.score + (win ? LADDER.win + upset : -LADDER.loss));
   const expected = 1 / (1 + Math.pow(10, (oppElo - profile.elo) / 400));
   profile.elo = Math.max(100, Math.round(profile.elo + ELO_K * ((win ? 1 : 0) - expected)));
   profile.xp += xpForMatch(win); // every real bout feeds the rank ladder
@@ -491,11 +491,11 @@ export function reportResult(win: boolean, oppElo: number): void {
 
 /**
  * A finished quick match vs the BOT: banks XP either way (win 15 / loss 5) so
- * the mode always rewards, plus a token score on a win. No ELO movement — the
- * bot has no rating.
+ * the mode always rewards, plus token ladder points on a win. No ELO movement
+ * — the bot has no rating.
  */
 export function reportBotResult(win: boolean): void {
-  if (win) profile.score += SCORE_BOT_WIN;
+  if (win) profile.score += LADDER.botWin;
   profile.xp += xpForBot();
   addCoins(CURRENCY.perGame);
   writeMine({ score: profile.score, xp: profile.xp });

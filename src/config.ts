@@ -67,6 +67,21 @@ export const PROGRESSION = {
  * localStorage number shared by the arena and the pub, since both pages are
  * same-origin).
  */
+/**
+ * RANKED ladder points — the public face of the 1v1 ladder. Raw ELO stays a
+ * HIDDEN matchmaking signal (it never shows anywhere); the board ranks LP:
+ * wins pay (more against stronger rivals), losses nick a little back, and
+ * nobody ever drops below zero — a ladder to climb, not a rating to fear.
+ */
+export const LADDER = {
+  win: 20, // base LP per real 1v1 win
+  loss: 8, // LP handed back on a real defeat (floored at 0 — never punitive)
+  upsetDiv: 25, // hidden-ELO gap per bonus LP ((their elo − yours) / this)
+  upsetMax: 10, // toppling a giant pays up to +this on top of the base
+  upsetMin: -5, // farming rookies pays down to −this off the base
+  botWin: 2, // token LP for a quick-match win over the bot
+};
+
 export const CURRENCY = {
   /** Coins banked per completed game (any mode, win or loss). */
   perGame: 10,

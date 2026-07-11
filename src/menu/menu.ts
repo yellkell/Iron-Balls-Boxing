@@ -977,7 +977,7 @@ function drawBoardRows(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
   }
 }
 
-/** The PROFILE face: a player's big emblem, tier, ELO/XP and their note. */
+/** The PROFILE face: a player's big emblem, tier, LP/XP and their note. */
 function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const row = leaderboard.viewRow ?? myProfileRow();
   const own = row.me;
@@ -994,7 +994,7 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   ctx.fillText(tier.name, BW / 2, 320);
   ctx.font = '700 22px system-ui, sans-serif';
   ctx.fillStyle = UI.amberSoft;
-  ctx.fillText(`${row.elo} ELO       ${row.xp} XP`, BW / 2, 352);
+  ctx.fillText(`${row.score} LP       ${row.xp} XP`, BW / 2, 352);
 
   // Progress toward the next rank emblem.
   segmentBar(ctx, 80, 366, BW - 160, 16, tier.progress, UI.ember);
