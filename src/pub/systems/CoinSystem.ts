@@ -21,7 +21,7 @@
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
-import { CylinderGeometry, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { CanvasTexture, CylinderGeometry, Mesh, MeshStandardMaterial, Quaternion, SRGBColorSpace, Vector3 } from 'three';
 import { Panel } from '../panel.js';
 import { coinImage } from '../../menu/coinIcon.js';
 import { addCoins, coins as wallet, spendCoins } from '../../menu/wallet.js';
@@ -110,30 +110,73 @@ interface WristTag {
   shown: number;
 }
 
+/** A coin face: brushed gold with a stamped letter — H one side, T the other,
+ *  so a flipped coin can actually CALL heads or tails. Dark letter with a
+ *  light offset ghost beneath reads as engraving, not print. */
+function coinFaceTexture(letter: string): CanvasTexture {
+  const s = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = s;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffc23a';
+  ctx.fillRect(0, 0, s, s);
+  // A faint milled ring inside the rim.
+  ctx.strokeStyle = 'rgba(122,84,16,0.5)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.round(s * 0.52)}px Georgia, 'Times New Roman', serif`;
+  // Lit lower edge first (the stamp's relief), then the sunken face.
+  ctx.fillStyle = 'rgba(255,240,190,0.85)';
+  ctx.fillText(letter, s / 2 + 1.5, s / 2 + 3.5);
+  ctx.fillStyle = '#6e4a10';
+  ctx.fillText(letter, s / 2, s / 2 + 2);
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}
+
+let coinMats: [MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial] | undefined;
+
+/** One shared material trio for every coin: milled side, H face up, T face
+ *  down. (The grab glow re-tints per MESH via cloned materials below.) */
+function coinMaterials(): [MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial] {
+  if (coinMats) return coinMats;
+  const base = { metalness: 1, roughness: 0.3, emissive: 0x4a3200, emissiveIntensity: 0.4 } as const;
+  coinMats = [
+    new MeshStandardMaterial({ color: 0xffc23a, ...base }),
+    new MeshStandardMaterial({ color: 0xffffff, map: coinFaceTexture('H'), ...base }),
+    new MeshStandardMaterial({ color: 0xffffff, map: coinFaceTexture('T'), ...base }),
+  ];
+  return coinMats;
+}
+
 function buildCoinMesh(): Mesh {
   const geo = new CylinderGeometry(COIN_R, COIN_R, COIN_THICK, 20);
-  const mat = new MeshStandardMaterial({
-    color: 0xffc23a,
-    metalness: 1,
-    roughness: 0.3,
-    emissive: 0x4a3200,
-    emissiveIntensity: 0.4,
-  });
-  return new Mesh(geo, mat);
+  // Cylinder groups: [side, top cap, bottom cap] — H heads-up, T tails-down.
+  // Each coin CLONES the trio (textures shared) so the grab glow stays per-coin.
+  return new Mesh(geo, coinMaterials().map((m) => m.clone()) as MeshStandardMaterial[]);
 }
 
 /** Glow a coin warm (or back to its rest sheen) — its "you can grab me" cue,
  *  matching how the pints and darts light up. */
 function setCoinGlow(mesh: Mesh, on: boolean): void {
-  const m = mesh.material as MeshStandardMaterial & { userData: { glowBase?: number } };
-  if (on) {
-    if (m.userData.glowBase === undefined) m.userData.glowBase = m.emissiveIntensity;
-    m.emissive.setHex(0xfff2dc);
-    m.emissiveIntensity = 1.15;
-  } else if (m.userData.glowBase !== undefined) {
-    m.emissive.setHex(0x4a3200);
-    m.emissiveIntensity = m.userData.glowBase;
-    m.userData.glowBase = undefined;
+  const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as (MeshStandardMaterial & {
+    userData: { glowBase?: number };
+  })[];
+  for (const m of mats) {
+    if (on) {
+      if (m.userData.glowBase === undefined) m.userData.glowBase = m.emissiveIntensity;
+      m.emissive.setHex(0xfff2dc);
+      m.emissiveIntensity = 1.15;
+    } else if (m.userData.glowBase !== undefined) {
+      m.emissive.setHex(0x4a3200);
+      m.emissiveIntensity = m.userData.glowBase;
+      m.userData.glowBase = undefined;
+    }
   }
 }
 
@@ -313,7 +356,9 @@ export class CoinSystem extends createSystem({}) {
 
   private disposeCoinMesh(mesh: Mesh): void {
     this.scene.remove(mesh);
-    (mesh.material as MeshStandardMaterial).dispose();
+    // Coins carry a material TRIO (side + the H/T faces); the face textures
+    // are shared module-wide and stay alive.
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.dispose();
     mesh.geometry.dispose();
   }
 
@@ -622,7 +667,7 @@ export class CoinSystem extends createSystem({}) {
     if (!coin) return;
     if (this.litCoin?.id === id) this.litCoin = null;
     this.scene.remove(coin.mesh);
-    (coin.mesh.material as MeshStandardMaterial).dispose();
+    for (const m of Array.isArray(coin.mesh.material) ? coin.mesh.material : [coin.mesh.material]) m.dispose();
     coin.mesh.geometry.dispose();
     this.floor.delete(id);
     clearRestCircle(`coin:${id}`);

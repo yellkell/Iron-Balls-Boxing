@@ -47,6 +47,11 @@ interface PropRec {
   active: boolean;
   mode: Mode;
   vel: Vector3;
+  /** Glass tumble (world-space axis, length = rad/s) — seeded from the throw,
+   *  damped on bounces, eased away once it settles. */
+  angVel: Vector3;
+  /** Seconds left of the settle's upright ease (0 = standing straight). */
+  uprighting: number;
   ring: { pos: Vector3; t: number }[];
   stuckTimer: number;
   fadeTimer: number;
@@ -75,6 +80,8 @@ const INTO_BOARD = new Vector3(0, 0, -1);
 const raycaster = new Raycaster();
 const _a = new Vector3();
 const _b = new Vector3();
+const _spinQ = new Quaternion();
+const _identityQ = new Quaternion();
 const _rayOrigin = new Vector3();
 const _rayDir = new Vector3();
 const _toProp = new Vector3();
@@ -157,6 +164,8 @@ function addProp(
     active,
     mode: 'rest',
     vel: new Vector3(),
+    angVel: new Vector3(),
+    uprighting: 0,
     ring: [],
     stuckTimer: 0,
     fadeTimer: 0,
@@ -315,6 +324,14 @@ export class PropSystem extends createSystem({
           }
           break;
         case 'rest':
+          // A freshly settled glass eases upright rather than snapping there.
+          if (rec.uprighting > 0) {
+            rec.mesh.quaternion.slerp(_identityQ, 1 - Math.exp(-PROP_PHYS.uprightEase * delta));
+            if (rec.mesh.quaternion.angleTo(_identityQ) < 0.01) {
+              rec.mesh.quaternion.identity();
+              rec.uprighting = 0;
+            }
+          }
           break;
       }
     }
@@ -354,6 +371,8 @@ export class PropSystem extends createSystem({
     rec.mode = 'held';
     rec.manualHand = null;
     rec.hasNetTarget = false;
+    rec.uprighting = 0; // held pose follows the hand, no more self-righting
+    rec.angVel.set(0, 0, 0);
     rec.ring = [];
     rec.stuckTimer = 0;
     rec.fadeTimer = 0;
@@ -535,6 +554,8 @@ export class PropSystem extends createSystem({
     rec.mode = 'held';
     rec.manualHand = hand;
     rec.hasNetTarget = false;
+    rec.uprighting = 0;
+    rec.angVel.set(0, 0, 0);
     rec.ring = [];
     rec.stuckTimer = 0;
     rec.fadeTimer = 0;
@@ -577,6 +598,17 @@ export class PropSystem extends createSystem({
 
     rec.mode = 'flight';
     rec.manualHand = null;
+    // A lobbed pint tumbles about the axis perpendicular to its flight (end
+    // over end, like the real throw), scaled by how hard it left the hand.
+    if (rec.kind === 'glass') {
+      _a.set(0, 1, 0).cross(rec.vel);
+      const speed = rec.vel.length();
+      if (_a.lengthSq() > 1e-6 && speed > 0.5) {
+        rec.angVel.copy(_a.normalize()).multiplyScalar(Math.min(PROP_PHYS.spinMax, speed * PROP_PHYS.spinFromThrow));
+      } else {
+        rec.angVel.set(0, 0, 0);
+      }
+    }
     if (rec.vel.lengthSq() > 4) throwWhoosh();
     pubSendRaw({ t: 'release', id: rec.id });
   }
@@ -614,6 +646,7 @@ export class PropSystem extends createSystem({
     if (p.y > PUB.ceiling - 0.08) {
       p.y = PUB.ceiling - 0.08;
       rec.vel.y *= -PROP_PHYS.restitution;
+      rec.angVel.multiplyScalar(PROP_PHYS.spinDamping);
     }
 
     // Floor + table/bar tops (glass origin is its base).
@@ -637,24 +670,42 @@ export class PropSystem extends createSystem({
           this.settleGlass(rec);
           return;
         }
-        rec.vel.y = -rec.vel.y * PROP_PHYS.restitution;
-        rec.vel.x *= 0.6;
-        rec.vel.z *= 0.6;
-        glassTap(true);
+        if (rec.vel.y < -0.35) {
+          // A real impact: bounce, shed energy, ring the glass.
+          rec.vel.y = -rec.vel.y * PROP_PHYS.restitution;
+          rec.vel.x *= 0.6;
+          rec.vel.z *= 0.6;
+          rec.angVel.multiplyScalar(PROP_PHYS.spinDamping);
+          glassTap(true);
+        } else {
+          // Skimming: hold the surface and let friction grind it to a stop
+          // instead of micro-bouncing (and tapping) every frame.
+          rec.vel.y = 0;
+          const f = Math.exp(-PROP_PHYS.slideFriction * delta);
+          rec.vel.x *= f;
+          rec.vel.z *= f;
+          rec.angVel.multiplyScalar(f);
+        }
       }
     }
 
-    // A thrown pint tumbles a little.
-    if (rec.vel.lengthSq() > 0.5) {
-      rec.mesh.rotation.x += delta * rec.vel.z * 2;
-      rec.mesh.rotation.z -= delta * rec.vel.x * 2;
+    // Integrate the tumble: a real angular velocity carried from the throw,
+    // shed at each bounce — not the old per-frame velocity-coupled wobble.
+    const w = rec.angVel.length();
+    if (w > 1e-3) {
+      _spinQ.setFromAxisAngle(_a.copy(rec.angVel).divideScalar(w), w * delta);
+      rec.mesh.quaternion.premultiply(_spinQ);
     }
   }
 
   /** Settle a glass: stand it upright, stack it if it landed on another. */
   private settleGlass(rec: PropRec): void {
     const p = rec.mesh.position;
-    rec.mesh.quaternion.identity();
+    // Right itself over a couple of beats (the rest case eases it) instead of
+    // snapping bolt upright the frame it stops; the wire carries the FINAL
+    // upright pose so remotes land in the same place.
+    rec.uprighting = 1;
+    rec.angVel.set(0, 0, 0);
 
     // Stack: if we settled within reach of a glass column, sit on TOP of its
     // HIGHEST glass — crown the stack, never wedge into a mid-level slot. Only
@@ -707,7 +758,7 @@ export class PropSystem extends createSystem({
 
     rec.mode = 'rest';
     rec.vel.set(0, 0, 0);
-    this.sendSettle(rec);
+    this.sendSettle(rec, true);
   }
 
   /** Base height a falling glass should nest at if a resting glass sits in its
@@ -811,10 +862,12 @@ export class PropSystem extends createSystem({
     });
   }
 
-  private sendSettle(rec: PropRec): void {
+  private sendSettle(rec: PropRec, upright = false): void {
     if (!pub.online) return;
     const p = rec.mesh.position;
-    const q = rec.mesh.quaternion;
+    // An upright settle (a glass) broadcasts its FINAL standing pose — the
+    // local mesh may still be mid-ease toward it.
+    const q = upright ? _identityQ : rec.mesh.quaternion;
     pubSendRaw({
       t: 'settle',
       id: rec.id,

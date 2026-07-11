@@ -736,6 +736,18 @@ wss.on('connection', (ws, req) => {
         me.head = msg.head;
         me.left = msg.left;
         me.right = msg.right;
+        // Fast-path a FIGHTER's pose straight to their opponent, skipping the
+        // 20 Hz snapshot tick: fighters stream at the arena's denser rate, and
+        // dodges should read across the pit with no batching latency. The
+        // crowd still gets everyone on the normal tick, and the client's snap
+        // handler already takes partial lists, so old clients just work.
+        if (fight.phase !== 'idle') {
+          const side = fight.sides.indexOf(myId);
+          if (side !== -1) {
+            const foe = players.get(fight.sides[1 - side]);
+            if (foe) send(foe.ws, { t: 'snap', poses: [[myId, msg.head, msg.left, msg.right]] });
+          }
+        }
         break;
       case 'grab': {
         const prop = props.get(msg.id);

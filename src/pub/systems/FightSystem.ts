@@ -766,10 +766,17 @@ export class FightSystem extends createSystem({}) {
         continue;
       }
       const cool = this.teamFor(id) === 1;
+      const k = 1 - Math.exp(-NET.smoothing * delta);
       for (const g of shards) {
         g.hitCooldown = Math.max(0, g.hitCooldown - delta);
-        g.visual.group.position.copy(g.pos);
-        this.driveFireLook(g.visual, g.pos, RETURNING, g, delta, cool);
+        // Ease to the streamed point like the main balls (a raw copy stepped
+        // at packet rate); a real teleport — fresh fan, round reset — snaps.
+        if (g.visual.group.position.distanceToSquared(g.pos) > 4) {
+          g.visual.group.position.copy(g.pos);
+        } else {
+          g.visual.group.position.lerp(g.pos, k);
+        }
+        this.driveFireLook(g.visual, g.visual.group.position, RETURNING, g, delta, cool);
       }
     }
   }
@@ -1926,21 +1933,19 @@ export class FightSystem extends createSystem({}) {
     const clk = counting
       ? `R${f.round}`
       : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    // Round AND match verdicts share the plain WIN/DRAW/LOSS trio — the
+    // verdict plates carry them (a loss shows nothing, arena-style).
     const headline = counting
       ? secs > 0
         ? `${secs}`
         : 'FIGHT'
       : f.phase === 'fighting'
         ? 'FIGHT'
-        : f.phase === 'roundOver'
-          ? !f.winner
-            ? 'DRAW'
-            : f.winner === pub.myId
-            ? 'WIN'
-            : 'LOSS'
+        : !f.winner
+          ? 'DRAW'
           : f.winner === pub.myId
-            ? 'YOU WIN'
-            : 'YOU LOSE';
+            ? 'WIN'
+            : 'LOSS';
 
     // Skip the canvas redraw + GPU upload when nothing visible changed.
     const key = `${myName}|${oppName}|${f.hp[side]}|${f.hp[opp]}|${f.score[side]}|${f.score[opp]}|${clk}|${headline}`;
@@ -1985,8 +1990,9 @@ export class FightSystem extends createSystem({}) {
       }
 
       // Centre column. During the 3-2-1 it's the NEON COUNTDOWN PLATE (matching
-      // the rest of the game); otherwise the verdict headline over the round
-      // clock — both bare (no plate), shadowed for legibility.
+      // the rest of the game); otherwise the headline over the round clock —
+      // and a FIGHT headline uses the neon FIGHT plate too, not stencilled
+      // text (the pub HUD was the one place still spelling it out).
       const cx = w * 0.5;
       const art = counting ? countdownArt(secs > 0 ? `${secs}` : 'FIGHT') : null;
       if (art) {
@@ -2000,8 +2006,22 @@ export class FightSystem extends createSystem({}) {
         ctx.textAlign = 'center';
         ctx.shadowColor = 'rgba(0,0,0,0.85)';
         ctx.shadowBlur = 12;
-        const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
-        metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
+        // Every headline is a neon plate now: FIGHT from the countdown set,
+        // WIN/DRAW from the verdict set. A LOSS shows nothing at all
+        // (arena-style — the winner gets the fanfare); the stencil text only
+        // ever appears as a fallback while a plate is still decoding.
+        const plate = headline === 'FIGHT' ? countdownArt('FIGHT') : verdictArt(headline);
+        if (plate) {
+          const bandW = w * 0.36;
+          const boxH = h * 0.52;
+          ctx.save();
+          ctx.translate((w - bandW) / 2, h * 0.3 - boxH / 2);
+          drawContentPlate(ctx, plate, bandW, boxH, h * 0.42, 4);
+          ctx.restore();
+        } else if (headline !== 'LOSS') {
+          const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
+          metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
+        }
         ctx.font = stencilFont(76);
         ctx.fillStyle = UI.text;
         ctx.fillText(clk, cx, h * 0.68);

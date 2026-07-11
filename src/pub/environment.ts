@@ -23,6 +23,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   PlaneGeometry,
   PointLight,
   SphereGeometry,
@@ -31,6 +32,7 @@ import {
   Vector2,
 } from 'three';
 import { IBLGradient, type World } from '@iwsdk/core';
+import { collapseStatic } from '../arena/merge.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { OCTAGON_VERTICES, PALETTE, teamColor } from '../config.js';
 import { diamondPlateTextures } from '../materials/diamondPlate.js';
@@ -653,11 +655,11 @@ export function buildPub(world: World): PubRefs {
   // so the wonky roll stays in-plane while the group turns it to face the room.
   const POSTER_W = 0.55;
   const POSTER_H = 0.78;
-  const placePoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
+  const placePoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number, w = POSTER_W, h = POSTER_H): void => {
     const holder = new Group();
     holder.position.set(x, y, z);
     holder.rotation.y = ry;
-    holder.add(buildPoster(url, POSTER_W, POSTER_H, tilt));
+    holder.add(buildPoster(url, w, h, tilt));
     root.add(holder);
   };
   const EAST = W - 0.04; // proud of the east wall, facing −x into the room
@@ -669,16 +671,17 @@ export function buildPub(world: World): PubRefs {
   placePoster('posters/balls.png', EAST, 1.58, -0.6, RY_E, 0);
   placePoster('posters/eagle.jpg', EAST, 1.5, 1.1, RY_E, -0.07);
   placePoster('posters/shrink.jpg', EAST, 1.55, 2.6, RY_E, 0.03);
-  // West wall, either side of the doorway.
-  placePoster('posters/balls.png', WEST, 1.5, -1.5, RY_W, 0.05);
-  placePoster('posters/split.png', WEST, 1.55, 2.7, RY_W, -0.04);
+  // West wall, either side of the doorway — the dripping GOOP prints (house
+  // art, GOOPLIATH's own brand), landscape boxes so the wide art hangs big
+  // instead of letterboxing into a portrait slot. These replaced a second
+  // copy of balls/split — no more repeats.
+  placePoster('posters/goop.jpg', WEST, 1.5, -1.5, RY_W, 0.05, 0.92, 0.6);
+  placePoster('posters/goop.jpg', WEST, 1.55, 2.7, RY_W, -0.04, 0.92, 0.6);
 
   // --- the fight hall through the west door ---------------------------------
   const { consolePanels, fightDisplay, fightDisplay2, fightRims, fightSlabs, discoball } = buildFightHall(root);
 
-  world.scene.add(root);
-
-  return {
+  const refs: PubRefs = {
     root,
     dartboard,
     corkSurround,
@@ -704,6 +707,35 @@ export function buildPub(world: World): PubRefs {
     discoball,
     pubTv,
   };
+
+  // --- bake the static shell down --------------------------------------------
+  // The pub is built from hundreds of individual meshes (walls, beams, booths,
+  // stools, bottles…) — each its own draw call — and none of it ever moves.
+  // Collapse everything INERT to one mesh per material look, exempting all the
+  // LIVE objects: every Object3D the refs hand to the systems (raycast targets,
+  // retint meshes, canvas panels), every NAMED subtree (nodes are named exactly
+  // because something animates or looks them up), and the dart-crate mesh
+  // whose material glows when a hand can pull a dart.
+  const keep = new Set<Object3D>();
+  const keepTree = (o: Object3D | null | undefined): void => o?.traverse((c) => keep.add(c));
+  root.traverse((o) => {
+    if (o !== root && o.name) keepTree(o);
+    const m = o as Mesh;
+    if (m.isMesh && m.material === crateWood) keepTree(o);
+  });
+  for (const r of Object.values(refs)) {
+    for (const item of Array.isArray(r) ? r : [r]) {
+      if (item instanceof Object3D) {
+        keepTree(item);
+      } else if (item && typeof item === 'object' && 'mesh' in item && (item as { mesh: unknown }).mesh instanceof Object3D) {
+        keepTree((item as { mesh: Object3D }).mesh); // a Panel — keep its plane
+      }
+    }
+  }
+  collapseStatic(root, (o) => keep.has(o));
+
+  world.scene.add(root);
+  return refs;
 }
 
 /**

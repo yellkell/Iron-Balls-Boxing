@@ -21,7 +21,9 @@
  * key includes the recolour tags (userData.role / .accent) so skin and accent
  * re-tints keep working on the merged material exactly as they did on the
  * originals. Anything that can't merge (multi-material meshes, invisible
- * ornaments, non-mesh nodes) is left in place untouched.
+ * ornaments, non-mesh nodes) is left in place untouched, and a caller can
+ * exempt LIVE objects — raycast targets, retint meshes, animated parts —
+ * with the `skip` predicate.
  */
 
 import { type BufferGeometry, Float32BufferAttribute, Matrix4, Mesh, type Material, type Object3D } from 'three';
@@ -93,7 +95,7 @@ interface Bucket {
  * can't merge stay exactly where they were. Visually identical; far fewer
  * draw calls.
  */
-export function collapseStatic(root: Object3D): void {
+export function collapseStatic(root: Object3D, skip?: (o: Object3D) => boolean): void {
   root.updateMatrixWorld(true);
   const invRoot = new Matrix4().copy(root.matrixWorld).invert();
   const buckets = new Map<string, Bucket>();
@@ -104,6 +106,7 @@ export function collapseStatic(root: Object3D): void {
     // Skip multi-material meshes and anything hidden at build time (per-skin
     // ornaments waiting on their tag) — they keep their own draw call.
     if (!m.isMesh || Array.isArray(m.material) || !m.geometry || !m.visible) return;
+    if (skip?.(m)) return;
     const mat = m.material as Material;
     const key = materialKey(mat);
     let b = buckets.get(key);
@@ -157,12 +160,13 @@ export function collapseStatic(root: Object3D): void {
   }
 }
 
-/** Remove groups the merge left childless — but never a tagged ornament shell
- *  (skinTag visibility toggles need the node even while it's empty). */
+/** Remove GROUPS the merge left childless — but never a tagged ornament shell
+ *  (skinTag visibility toggles need the node even while it's empty), and only
+ *  plain Groups: lights, cameras and other childless leaf nodes stay. */
 function pruneEmptyGroups(o: Object3D): void {
   for (const c of [...o.children]) {
     pruneEmptyGroups(c);
-    if (c.children.length === 0 && !(c as Mesh).isMesh && !c.userData?.skinTag && !c.name) {
+    if ((c as { isGroup?: boolean }).isGroup && c.children.length === 0 && !c.userData?.skinTag && !c.name) {
       c.removeFromParent();
     }
   }

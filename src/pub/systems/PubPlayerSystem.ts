@@ -32,6 +32,9 @@ import { bus, pub, type RemotePunter } from '../state.js';
 
 const SEND_INTERVAL = 0.05; // 20 Hz
 const EASE = 14; // exponential smoothing rate for remote pose targets
+/** Longest a fighter's rig will coast along its estimated velocity between
+ *  pose packets (matches the fireballs' EXTRAP cap philosophy). */
+const POSE_EXTRAP_MAX = 0.1;
 // How far a punter's spine hangs behind their head. The default (BODY_IK's
 // 0.16) is tuned so your OWN torso doesn't block your downward view; on the
 // crowd you watch, that much set-back just reads as the head floating ahead of
@@ -113,11 +116,42 @@ export class PubPlayerSystem extends createSystem({}) {
     onSnap((poses) => {
       for (const [id, head, left, right] of poses) {
         const punter = pub.punters.get(id);
-        if (punter) {
-          punter.head = head;
-          punter.left = left;
-          punter.right = right;
+        if (!punter) continue;
+        // A fighter's pose arrives TWICE — the fast-path relay and the room
+        // tick re-sending the same stored tuple. An exact repeat carries no
+        // new information and would read as velocity ≈ 0, flapping the lead:
+        // skip it wholesale (a real headset never repeats a pose exactly).
+        if (
+          head[0] === punter.head[0] && head[1] === punter.head[1] && head[2] === punter.head[2] &&
+          left[0] === punter.left[0] && left[1] === punter.left[1] && left[2] === punter.left[2] &&
+          right[0] === punter.right[0] && right[1] === punter.right[1] && right[2] === punter.right[2]
+        ) {
+          continue;
         }
+        // Packet-to-packet velocity per part (the fireballs' dead-reckoning
+        // idiom): a stream gap or teleport reads as an absurd speed — zero it
+        // and coast rather than slingshot. Fighters' rigs lead by these.
+        const age = punter.snapAge;
+        const vel = (nw: PoseTuple, old: PoseTuple, out: [number, number, number]): void => {
+          if (age <= 1e-3) return;
+          const vx = (nw[0] - old[0]) / age;
+          const vy = (nw[1] - old[1]) / age;
+          const vz = (nw[2] - old[2]) / age;
+          if (vx * vx + vy * vy + vz * vz > 20 * 20) {
+            out[0] = out[1] = out[2] = 0;
+          } else {
+            out[0] = vx;
+            out[1] = vy;
+            out[2] = vz;
+          }
+        };
+        vel(head, punter.head, punter.headVel);
+        vel(left, punter.left, punter.leftVel);
+        vel(right, punter.right, punter.rightVel);
+        punter.snapAge = 0;
+        punter.head = head;
+        punter.left = left;
+        punter.right = right;
       }
     });
     this.cleanupFuncs.push(
@@ -189,12 +223,22 @@ export class PubPlayerSystem extends createSystem({}) {
 
     for (const punter of pub.punters.values()) {
       const rig = punter.rig;
-      // A fighter (denser pose stream) eases in at the arena's smoothing so the
-      // duel tracks 1:1 with quick match; everyone else stays gently smoothed.
-      const k = pub.fight.sides.includes(punter.id) ? fighterK : crowdK;
+      punter.snapAge += delta;
+      // A fighter (denser pose stream, server fast-path) eases in at the
+      // arena's smoothing so the duel tracks 1:1 with quick match; everyone
+      // else stays gently smoothed. Fighters also LEAD the stream along the
+      // estimated velocity (like the fireballs), capped so a stall coasts
+      // briefly then holds — dodges render where the body IS, not a tick ago.
+      const fighter = pub.fight.sides.includes(punter.id);
+      const k = fighter ? fighterK : crowdK;
+      const lead = fighter ? Math.min(punter.snapAge, POSE_EXTRAP_MAX) : 0;
       // Ease the visible head toward the network target, then solve the torso
       // under it exactly like the arena does.
-      _head.set(punter.head[0], punter.head[1], punter.head[2]);
+      _head.set(
+        punter.head[0] + punter.headVel[0] * lead,
+        punter.head[1] + punter.headVel[1] * lead,
+        punter.head[2] + punter.headVel[2] * lead,
+      );
       _headQ.set(punter.head[3], punter.head[4], punter.head[5], punter.head[6]);
       rig.head.position.lerp(_head, k);
       rig.head.quaternion.slerp(_headQ, k);
@@ -214,8 +258,9 @@ export class PubPlayerSystem extends createSystem({}) {
       );
       for (const hand of [0, 1] as const) {
         const tuple = hand === 0 ? punter.left : punter.right;
+        const velT = hand === 0 ? punter.leftVel : punter.rightVel;
         const glove = rig.gloves[hand];
-        _pos.set(tuple[0], tuple[1], tuple[2]);
+        _pos.set(tuple[0] + velT[0] * lead, tuple[1] + velT[1] * lead, tuple[2] + velT[2] * lead);
         _quat.set(tuple[3], tuple[4], tuple[5], tuple[6]);
         _quat.multiply(HAND_ADDUCTION[hand]);
         glove.position.lerp(_pos, k);
@@ -263,6 +308,10 @@ export class PubPlayerSystem extends createSystem({}) {
       head: p.head,
       left: p.left,
       right: p.right,
+      headVel: [0, 0, 0],
+      leftVel: [0, 0, 0],
+      rightVel: [0, 0, 0],
+      snapAge: 0,
     };
     pub.punters.set(p.id, punter);
     bus.emit('joined', punter);
