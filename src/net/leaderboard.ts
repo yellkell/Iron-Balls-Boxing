@@ -350,13 +350,38 @@ export function initLeaderboard(): void {
       const season = seasonIndex();
       if (snap.exists()) {
         const d = snap.data();
-        // Ladder points are PER SEASON: read the live season's bank. Season 1
-        // inherits the pre-season lifetime score, so launch keeps its ladder —
-        // and self-migrates the doc so the season board sees the old guard.
+        // Ladder points are PER SEASON: read the live season's bank. A new
+        // season SOFT-RESETS — your previous final carries over capped at
+        // LADDER.seasonCarryCap, so the summit restarts within reach (season
+        // 1 seeds from the pre-season lifetime score the same way). The doc
+        // self-migrates so the season board sees the old guard.
         const banked = d[seasonScoreField(season)] as number | undefined;
-        profile.score = banked ?? (season === 1 ? ((d.score as number) ?? 0) : 0);
+        const prevFinal =
+          season === 1 ? ((d.score as number) ?? 0) : ((d[seasonScoreField(season - 1)] as number) ?? 0);
+        profile.score = banked ?? Math.min(LADDER.seasonCarryCap, prevFinal);
         if (banked === undefined && profile.score > 0) {
-          writeMine({ [seasonScoreField(season)]: profile.score });
+          writeMine({ [seasonScoreField(season)]: profile.score, score: profile.score });
+        }
+        // INACTIVITY DECAY, applied lazily: every full decayDays-block since
+        // the last ranked bout hands back decayLp (floored at 0). The anchor
+        // advances by exactly the blocks charged, so idle time never
+        // double-bills and a mid-block return keeps its partial credit.
+        {
+          const dayMs = 86_400_000;
+          let anchor = (d.lastPlayedAt as number) ?? 0;
+          if (!anchor) {
+            anchor = Date.now();
+            writeMine({ lastPlayedAt: anchor });
+          }
+          const blocks = Math.floor((Date.now() - anchor) / (LADDER.decayDays * dayMs));
+          if (blocks > 0) {
+            profile.score = Math.max(0, profile.score - blocks * LADDER.decayLp);
+            writeMine({
+              [seasonScoreField(season)]: profile.score,
+              score: profile.score,
+              lastPlayedAt: anchor + blocks * LADDER.decayDays * dayMs,
+            });
+          }
         }
         profile.elo = (d.elo as number) ?? 1000;
         profile.training = (d.training as number) ?? 0;
@@ -389,6 +414,7 @@ export function initLeaderboard(): void {
           gauntletBest: 0,
           raidBest: 0,
           goopBest: 0,
+          lastPlayedAt: Date.now(),
           updatedAt: h.fs.serverTimestamp(),
         });
       }
@@ -595,8 +621,15 @@ export function reportResult(win: boolean, oppElo: number): void {
   profile.xp += xpForMatch(win); // every real bout feeds the rank ladder
   addCoins(CURRENCY.perGame); // …and the coin wallet, alongside the XP
   // LP banks into the SEASON field (what the board ranks); `score` mirrors it
-  // for older clients and the season-1 seed.
-  writeMine({ [seasonScoreField(seasonIndex())]: profile.score, score: profile.score, elo: profile.elo, xp: profile.xp });
+  // for older clients and the season seed. A ranked bout also re-anchors the
+  // inactivity-decay clock.
+  writeMine({
+    [seasonScoreField(seasonIndex())]: profile.score,
+    score: profile.score,
+    elo: profile.elo,
+    xp: profile.xp,
+    lastPlayedAt: Date.now(),
+  });
   void refreshLeaderboard(true);
 }
 
@@ -609,7 +642,12 @@ export function reportBotResult(win: boolean): void {
   if (win) profile.score += LADDER.botWin;
   profile.xp += xpForBot();
   addCoins(CURRENCY.perGame);
-  writeMine({ [seasonScoreField(seasonIndex())]: profile.score, score: profile.score, xp: profile.xp });
+  writeMine({
+    [seasonScoreField(seasonIndex())]: profile.score,
+    score: profile.score,
+    xp: profile.xp,
+    lastPlayedAt: Date.now(),
+  });
   void refreshLeaderboard(true);
 }
 
