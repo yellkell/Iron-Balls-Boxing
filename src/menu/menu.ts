@@ -20,7 +20,7 @@ import {
 } from 'three';
 import { app, DEFAULT_ACCENT_HUE, saveBallArc, saveBallAttach, type AppEnvironment } from './appState.js';
 import { avatarOwned, customization, platformOwned } from './customization.js';
-import { rankBadge } from './rankBadges.js';
+import { rankBadge, rankBadgeZoom } from './rankBadges.js';
 import { coinImage } from './coinIcon.js';
 import { canAfford, coins } from './wallet.js';
 import { tierForXp } from './progression.js';
@@ -1006,8 +1006,12 @@ function drawBoardRows(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     // Rank number, then a small rank emblem (nudged down so its bottom lines
     // up with the row text — text is middle-baselined at y), then the name.
     ctx.fillText(`${offset + i + 1}.`, 48, y);
-    const badge = rankBadge(tierForXp(r.xp).index);
-    if (badge) ctx.drawImage(badge, 84, y + 12 - 30, 30, 30);
+    const rowTier = tierForXp(r.xp).index;
+    const rowBadge = rankBadge(rowTier);
+    if (rowBadge) {
+      const s = 30 * rankBadgeZoom(rowTier);
+      ctx.drawImage(rowBadge, 99 - s / 2, y - 3 - s / 2, s, s);
+    }
     ctx.fillText(r.name, 126, y);
     ctx.textAlign = 'right';
     ctx.fillText(String(r.value), BW - 56, y);
@@ -1167,7 +1171,10 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   // The rank emblem sits at ACHIEVEMENT scale — one honour among the chips
   // flanking it, not the towering centrepiece it used to be.
   const badge = rankBadge(tier.index);
-  if (badge) ctx.drawImage(badge, BW / 2 - 24, 166, 48, 48);
+  if (badge) {
+    const s = 48 * rankBadgeZoom(tier.index);
+    ctx.drawImage(badge, BW / 2 - s / 2, 190 - s / 2, s, s);
+  }
 
   // Achievements flank the emblem: season honours stacked left (best first,
   // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the

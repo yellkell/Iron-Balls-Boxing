@@ -97,9 +97,13 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   { id: 'plasma', name: 'PLASMA', neon: PALETTE.violet, price: 100 },
   // …the fancier premium pad — gold piping AND a gold-tinted slab.
   { id: 'goldrush', name: 'GOLD RUSH', neon: 0xffc23a, slab: 0xb8902c, price: 100 },
-  // …two more premium repaints: glacier piping over deep-frozen steel, and a
-  // hot-pink grid over a midnight-purple deck.
-  { id: 'frostbite', name: 'FROSTBITE', neon: 0x8ae4ff, slab: 0x2a4a58, price: 250 },
+  // …two more premium repaints. FROSTBITE is FROZEN OVER: glacier piping on a
+  // pale rimed deck — the light slab is what keeps it from reading as just
+  // AZURE again (both wore blue neon on dark steel and told apart badly).
+  { id: 'frostbite', name: 'FROSTBITE', neon: 0x8ae4ff, slab: 0xcfe3ea, slabEmissive: 0x10262e, price: 250 },
+  // SYNTHWAVE: hot-pink piping over a midnight-purple deck, plus a raised
+  // neon GRID etched across it (built in arena.ts, shown by its skinTag) —
+  // the grid is what separates it from PLASMA's plain violet recolour.
   { id: 'synthwave', name: 'SYNTHWAVE', neon: 0xff4fd8, slab: 0x251043, price: 250 },
   // …the storm pad: electric-yellow piping + a big lightning bolt over a
   // jet-black deck (slabEmissive black so the yellow rim doesn't wash the

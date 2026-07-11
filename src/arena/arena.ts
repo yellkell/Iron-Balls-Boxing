@@ -235,6 +235,33 @@ export function makePlatform(color: number): Group {
   bolt.visible = false;
   group.add(bolt);
 
+  // SYNTHWAVE: an outrun neon grid etched across the deck — raised thin bars
+  // (the same unlit neon-core treatment as the fins/bolt, so it team-tints),
+  // clipped to the octagon's outline. This is what keeps the pad from reading
+  // as just another purple recolour next to PLASMA.
+  const grid = new Group();
+  grid.name = 'deck-grid';
+  const gridMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  gridMat.userData.role = 'neon-core';
+  // Half-extent of the deck at an offset, walking the chamfered corners in.
+  const halfW = (z: number): number =>
+    Math.abs(z) <= 0.375 ? 0.82 : 0.82 - (0.82 - 0.34) * ((Math.abs(z) - 0.375) / (0.75 - 0.375));
+  const halfD = (x: number): number =>
+    Math.abs(x) <= 0.375 ? 0.71 : 0.71 - (0.71 - 0.34) * ((Math.abs(x) - 0.375) / (0.86 - 0.375));
+  for (const z of [-0.5, -0.25, 0, 0.25, 0.5]) {
+    const bar = new Mesh(new BoxGeometry(halfW(z) * 2, 0.008, 0.012), gridMat);
+    bar.position.set(0, DECK_TOP, z);
+    grid.add(bar);
+  }
+  for (const x of [-0.6, -0.3, 0, 0.3, 0.6]) {
+    const bar = new Mesh(new BoxGeometry(0.012, 0.008, halfD(x) * 2), gridMat);
+    bar.position.set(x, DECK_TOP, 0);
+    grid.add(bar);
+  }
+  grid.userData.skinTag = 'synthwave';
+  grid.visible = false;
+  group.add(grid);
+
   // EMBER: the classic look — banding + bolts, no extra furniture.
   return group;
 }

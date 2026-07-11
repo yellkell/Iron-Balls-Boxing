@@ -216,6 +216,24 @@ export function drawPlatformIcon(ctx: CanvasRenderingContext2D, skin: PlatformSk
     ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
     ctx.fillText('XD', cx, cy + r * 0.04);
   }
+  // SYNTHWAVE wears its neon deck grid (clipped to the pad outline).
+  if (skin.id === 'synthwave') {
+    ctx.save();
+    ctx.clip(); // the octagon path is still current
+    ctx.strokeStyle = hex(skin.neon);
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (let i = -2; i <= 2; i++) {
+      const o = i * r * 0.36;
+      ctx.moveTo(cx - r, cy + o);
+      ctx.lineTo(cx + r, cy + o);
+      ctx.moveTo(cx + o, cy - r);
+      ctx.lineTo(cx + o, cy + r);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
   // The VOLT pad wears its lightning bolt.
   if (skin.id === 'volt') {
     ctx.save();
