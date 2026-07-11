@@ -1226,13 +1226,14 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   );
 
   // --- WHAT THEY'VE DONE --- two labelled rows: season HONOURS chips, then
-  // CLEARS glyphs (star gauntlet · shield raid · drop Goopliath; hardcore
-  // burns the glyph red, blazing wears the flame). Pointing at any of them
-  // pops a tooltip saying what it's for (drawn last, over everything).
+  // ACHIEVEMENTS glyphs (star gauntlet · shield raid · drop Goopliath;
+  // hardcore burns the glyph red, blazing wears the flame). Pointing at any
+  // of them pops a tooltip saying what it's for (drawn last, over everything).
   const spots = profileBadgeSpots(row);
   const sectionLabel = (text: string, cy: number): void => {
     ctx.textAlign = 'left';
-    ctx.font = '800 13px system-ui, sans-serif';
+    // 12px: ACHIEVEMENTS is the longest label and must clear the chips at x150.
+    ctx.font = '800 12px system-ui, sans-serif';
     ctx.fillStyle = UI.textDim;
     ctx.fillText(text, 48, cy);
   };
@@ -1241,7 +1242,7 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   const honoursBottom = awardSpots.reduce((m, s) => Math.max(m, s.y), PROF_HONOURS_Y);
   const clearsY = clearSpots[0]?.y ?? honoursBottom + PROF_CHIP_H + 10;
   sectionLabel('HONOURS', PROF_HONOURS_Y + PROF_CHIP_H / 2);
-  sectionLabel('CLEARS', clearsY + 18);
+  sectionLabel('ACHIEVEMENTS', clearsY + 18);
   const noneYet = (cy: number): void => {
     ctx.textAlign = 'left';
     ctx.font = '700 13px system-ui, sans-serif';

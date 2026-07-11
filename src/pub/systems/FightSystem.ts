@@ -1992,8 +1992,9 @@ export class FightSystem extends createSystem({}) {
       }
 
       // Centre column. During the 3-2-1 it's the NEON COUNTDOWN PLATE (matching
-      // the rest of the game); otherwise the verdict headline over the round
-      // clock — both bare (no plate), shadowed for legibility.
+      // the rest of the game); otherwise the headline over the round clock —
+      // and a FIGHT headline uses the neon FIGHT plate too, not stencilled
+      // text (the pub HUD was the one place still spelling it out).
       const cx = w * 0.5;
       const art = counting ? countdownArt(secs > 0 ? `${secs}` : 'FIGHT') : null;
       if (art) {
@@ -2007,8 +2008,18 @@ export class FightSystem extends createSystem({}) {
         ctx.textAlign = 'center';
         ctx.shadowColor = 'rgba(0,0,0,0.85)';
         ctx.shadowBlur = 12;
-        const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
-        metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
+        const fightArt = headline === 'FIGHT' ? countdownArt('FIGHT') : null;
+        if (fightArt) {
+          const bandW = w * 0.36;
+          const boxH = h * 0.52;
+          ctx.save();
+          ctx.translate((w - bandW) / 2, h * 0.3 - boxH / 2);
+          drawContentPlate(ctx, fightArt, bandW, boxH, h * 0.42, 4);
+          ctx.restore();
+        } else {
+          const headlinePx = fitStencilText(ctx, headline, w * 0.24, 64, 40);
+          metalText(ctx, headline, cx, h * 0.3, headlinePx, headlineColour, 'center');
+        }
         ctx.font = stencilFont(76);
         ctx.fillStyle = UI.text;
         ctx.fillText(clk, cx, h * 0.68);
