@@ -35,6 +35,12 @@ export function xpForTraining(): number {
   return PROGRESSION.trainingRun;
 }
 
+/** One-time XP for graduating the tutorial — win or lose, going through it
+ *  is the achievement (see TutorialSystem's wrapup). */
+export function xpForTutorial(): number {
+  return PROGRESSION.tutorial;
+}
+
 /** XP for a finished real 1v1 (participation always, win bonus on a win). */
 export function xpForMatch(won: boolean): number {
   return PROGRESSION.matchPlay + (won ? PROGRESSION.matchWin : 0);
