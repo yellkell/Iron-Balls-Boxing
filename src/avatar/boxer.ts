@@ -28,6 +28,7 @@ import {
   Vector3,
 } from 'three';
 import { BODY_IK, PALETTE, teamColor } from '../config.js';
+import { collapseStatic } from '../arena/merge.js';
 import { buildHand } from './hands.js';
 
 /**
@@ -1553,34 +1554,35 @@ export function buildBoxer(team: number, skinId?: string): BoxerRig {
   const ids = skinId && HEAD_BUILDERS[skinId] ? [skinId] : ALL_SKIN_IDS;
   const sole = ids.length === 1; // the one built skin shows without applyAvatarSkin
 
+  // Each skin part is rigid after build (only the hands articulate), so bake
+  // its dozens of plates down to one mesh per material look — the KNIGHT set
+  // alone was ~75 draw calls per bot, and three FFA bots rolling the heavy
+  // skins was a visible frame hit. The tagged group survives the collapse, so
+  // applyAvatarSkin's show-one-skin toggle and the accent/role recolours all
+  // work unchanged.
+  const buildCollapsed = (builder: (accent: number) => Group): Group => {
+    const g = builder(accent);
+    collapseStatic(g);
+    if (sole) g.visible = true;
+    return g;
+  };
+
   // --- Head: a detailed metallic ANIMAL head per built skin (front is −z).
   //     Hitboxes are the BODY_IK spheres and never change, so every fighter is
   //     equally hittable whatever's built. ---
   const head = new Group();
   head.name = 'opponent-head';
-  for (const id of ids) {
-    const g = HEAD_BUILDERS[id](accent);
-    if (sole) g.visible = true;
-    head.add(g);
-  }
+  for (const id of ids) head.add(buildCollapsed(HEAD_BUILDERS[id]));
 
   // --- Torso: a DISTINCT armoured cuirass + hip set per built skin. Same
   //     silhouette envelope and BODY_IK hitbox spheres, equally hittable. ---
   const chest = new Group();
   chest.name = 'opponent-chest';
-  for (const id of ids) {
-    const g = CHEST_BUILDERS[id](accent);
-    if (sole) g.visible = true;
-    chest.add(g);
-  }
+  for (const id of ids) chest.add(buildCollapsed(CHEST_BUILDERS[id]));
 
   const pelvis = new Group();
   pelvis.name = 'opponent-pelvis';
-  for (const id of ids) {
-    const g = PELVIS_BUILDERS[id](accent);
-    if (sole) g.visible = true;
-    pelvis.add(g);
-  }
+  for (const id of ids) pelvis.add(buildCollapsed(PELVIS_BUILDERS[id]));
 
   const torso = new Group();
   torso.name = 'opponent-torso';
