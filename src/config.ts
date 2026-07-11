@@ -240,15 +240,17 @@ export const ATTACH = {
   grow: 2,
   shrink: 3,
   /**
-   * Recall distance (m) at which grow/shrink reach their FULL size/damage
-   * swing — set FAR out (past how deep a ball usually survives) so the effect
-   * ramps very gradually with travel. A normal recall (the ball near your
-   * opponent, ~3 m) barely changes it; even a long throw well past your
-   * opponent only gets part-way, and you need close to the longest possible
-   * shot — the ball sailing deep toward the back cage — to approach the max.
+   * Recall distance (m) at which SHRINK reaches its full size/damage swing —
+   * set FAR out (past how deep a ball usually survives) so the effect ramps
+   * very gradually with travel: you need close to the longest possible shot —
+   * the ball sailing deep toward the back cage — to approach the max.
    */
   fullRange: 14.0,
-  growSize: 3.0, // up to triple size on a long recall
+  /** GROW ramps over its OWN, much shorter distance — it's the spectacle
+   *  attachment, so a normal recall (~3 m out) already comes back visibly
+   *  swollen and a long throw hits the cap well before the back cage. */
+  growRange: 7.0,
+  growSize: 4.0, // up to quadruple size on a long recall
   shrinkSize: 1 / 3, // down to a third of the size on a long recall
   damageSwing: 10, // ±10 damage at full range
   splitCount: 3, // total balls a split becomes

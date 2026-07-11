@@ -1175,11 +1175,13 @@ export class FightSystem extends createSystem({}) {
       }
       return;
     }
-    const t = Math.min(1, Math.max(0, ball.pos.distanceTo(_grip) / ATTACH.fullRange));
+    const dist = ball.pos.distanceTo(_grip);
     if (type === ATTACH.grow) {
+      const t = Math.min(1, Math.max(0, dist / ATTACH.growRange));
       ball.scl = 1 + (ATTACH.growSize - 1) * t;
       ball.dmgScale = (FIREBALL.damage - ATTACH.damageSwing * t) / FIREBALL.damage;
     } else {
+      const t = Math.min(1, Math.max(0, dist / ATTACH.fullRange));
       ball.scl = 1 - (1 - ATTACH.shrinkSize) * t;
       ball.dmgScale = (FIREBALL.damage + ATTACH.damageSwing * t) / FIREBALL.damage;
     }

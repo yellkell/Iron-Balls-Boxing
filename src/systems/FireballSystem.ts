@@ -205,10 +205,11 @@ export class FireballSystem extends createSystem({
     if (type === ATTACH.split) {
       return { att: ATTACH.split, dmg: FIREBALL.damage / ATTACH.splitCount, scl: ATTACH.splitSize };
     }
-    const t = Math.min(1, Math.max(0, dist / ATTACH.fullRange));
     if (type === ATTACH.grow) {
+      const t = Math.min(1, Math.max(0, dist / ATTACH.growRange));
       return { att: ATTACH.grow, dmg: FIREBALL.damage - ATTACH.damageSwing * t, scl: 1 + (ATTACH.growSize - 1) * t };
     }
+    const t = Math.min(1, Math.max(0, dist / ATTACH.fullRange));
     return { att: ATTACH.shrink, dmg: FIREBALL.damage + ATTACH.damageSwing * t, scl: 1 - (1 - ATTACH.shrinkSize) * t };
   }
 
