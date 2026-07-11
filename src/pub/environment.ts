@@ -671,12 +671,12 @@ export function buildPub(world: World): PubRefs {
   placePoster('posters/balls.png', EAST, 1.58, -0.6, RY_E, 0);
   placePoster('posters/eagle.jpg', EAST, 1.5, 1.1, RY_E, -0.07);
   placePoster('posters/shrink.jpg', EAST, 1.55, 2.6, RY_E, 0.03);
-  // West wall, either side of the doorway — the BLASTON promos (a tip of the
-  // hat to the game the fight hall's platform duels descend from), landscape
-  // boxes so the wide art hangs big instead of letterboxing into a portrait
-  // slot. These replaced a second copy of balls/split — no more repeats.
-  placePoster('posters/blaston.jpg', WEST, 1.5, -1.5, RY_W, 0.05, 0.92, 0.55);
-  placePoster('posters/blaston-f2p.jpg', WEST, 1.55, 2.7, RY_W, -0.04, 0.92, 0.55);
+  // West wall, either side of the doorway — the dripping GOOP prints (house
+  // art, GOOPLIATH's own brand), landscape boxes so the wide art hangs big
+  // instead of letterboxing into a portrait slot. These replaced a second
+  // copy of balls/split — no more repeats.
+  placePoster('posters/goop.jpg', WEST, 1.5, -1.5, RY_W, 0.05, 0.92, 0.6);
+  placePoster('posters/goop.jpg', WEST, 1.55, 2.7, RY_W, -0.04, 0.92, 0.6);
 
   // --- the fight hall through the west door ---------------------------------
   const { consolePanels, fightDisplay, fightDisplay2, fightRims, fightSlabs, discoball } = buildFightHall(root);
