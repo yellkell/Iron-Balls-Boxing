@@ -73,7 +73,7 @@ import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customizati
 import { addCoins } from '../menu/wallet.js';
 import { mesh } from '../net/mesh.js';
 import type { PeerMessage } from '../net/protocol.js';
-import { myName, reportCampaign, reportRun } from '../net/leaderboard.js';
+import { myName, reportCampaign, reportRun, reportRunClear } from '../net/leaderboard.js';
 import { announce } from '../audio/announcer.js';
 import { playCash } from '../audio/cash.js';
 import { BOSS_BATTLE_VOLUME, playVictory, startBattleMusic, startFinaleTrack, stopBattleTrack } from '../audio/battleMusic.js';
@@ -2865,8 +2865,16 @@ export class CampaignSystem extends createSystem({
       // squad. (A dedicated GOOPLIATH raid has no titan-run board — the fell
       // itself is the trophy.)
       if (this.isAuthority() && !solo) {
-        reportRun(app.raidHardcore ? 'raidHardcore' : 'raid', this.runClock, this.squadNames());
+        reportRun('raid', this.runClock, this.squadNames(), this.activeDifficulty(), app.raidHardcore);
       }
+      // A GOOPLIATH raid races its OWN board — one long fight is a different
+      // race from a five-titan run. (Hardcore means nothing to a single
+      // fight, so the tide's rows never wear the HC mark.)
+      if (this.isAuthority() && solo && this.raid()) {
+        reportRun('goopliath', this.runClock, this.squadNames(), this.activeDifficulty(), false);
+      }
+      // Every raider banks the clear badge (easy earns nothing).
+      reportRunClear(solo ? 'goopliath' : 'raid', this.activeDifficulty());
       this.hud.title(
         solo ? 'THE TIDE RECEDES' : 'RAID CLEARED',
         (solo
@@ -2880,7 +2888,8 @@ export class CampaignSystem extends createSystem({
       // The run is complete: the clock goes on the boards.
       const hardcore = app.campaignMode === 'hardcore';
       const record = recordRunTime(hardcore, this.runClock);
-      reportRun(hardcore ? 'hardcore' : 'gauntlet', this.runClock, [myName()]);
+      reportRun('gauntlet', this.runClock, [myName()], this.activeDifficulty(), hardcore);
+      reportRunClear('gauntlet', this.activeDifficulty()); // the profile badge
       if (!hardcore && !campaignProgress.hardcoreUnlocked) {
         campaignProgress.hardcoreUnlocked = true;
         saveCampaignProgress();

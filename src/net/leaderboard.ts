@@ -18,7 +18,7 @@
 import { FIREBASE_ENABLED, firebaseConfig } from './firebaseConfig.js';
 import { xpForArcade, xpForBot, xpForCampaign, xpForMatch, xpForTraining, xpForTutorial } from '../menu/progression.js';
 import { addCoins } from '../menu/wallet.js';
-import { CURRENCY, LADDER, type ArcadeMode } from '../config.js';
+import { CURRENCY, LADDER, seasonIndex, seasonScoreField, type ArcadeMode, type Difficulty } from '../config.js';
 
 export interface LbRow {
   /** The player's doc id — identifies them when their row is clicked. */
@@ -32,12 +32,24 @@ export interface LbRow {
   /** RANKED ladder points, for the profile card. (Raw ELO is a hidden
    *  matchmaking signal and never leaves this module for display.) */
   score: number;
+  /** Season honours: counts per trophy — first/second/third/top10/top25. */
+  awards: Partial<Record<SeasonAward, number>>;
+  /** Highest campaign-gauntlet clear: 0 none · 1 normal · 2 hard · 3 blazing. */
+  gauntletBest: number;
+  /** Highest raid clear, same tiers. */
+  raidBest: number;
+  /** Highest GOOPLIATH-raid clear, same tiers. */
+  goopBest: number;
   /** The player's self-written note, shown on their profile. */
   note: string;
 }
 
+/** The season-end honours, best first. */
+export type SeasonAward = 'first' | 'second' | 'third' | 'top10' | 'top25';
+export const SEASON_AWARDS: SeasonAward[] = ['first', 'second', 'third', 'top10', 'top25'];
+
 /** The score boards (BATTLE's 1v1 / 2v2 / ffa, XP), the ARCADE boards (AIM
- *  training plus the four PvE RUN-TIME boards) and a synthetic PROFILE face. */
+ *  training plus the two PvE RUN-TIME boards) and a synthetic PROFILE face. */
 export type LeaderboardTab =
   | 'ranked'
   | 'xp'
@@ -45,30 +57,38 @@ export type LeaderboardTab =
   | 'duo'
   | 'ffa'
   | 'gauntlet'
-  | 'hardcore'
   | 'raid'
-  | 'raidHardcore'
+  | 'goopliath'
   | 'profile';
 /** Score/count boards (one numeric value per PLAYER doc). */
 type DataTab = 'ranked' | 'xp' | 'training' | 'duo' | 'ffa';
 /** RUN-TIME boards — each row is one completed RUN (a squad + a clock), not a
- *  player. Ranked by lowest cumulative fight time. */
-export type RunTab = 'gauntlet' | 'hardcore' | 'raid' | 'raidHardcore';
-const RUN_TABS: RunTab[] = ['gauntlet', 'hardcore', 'raid', 'raidHardcore'];
+ *  player. Ranked by lowest cumulative fight time. One board per mode —
+ *  GOOPLIATH raids race their own clock (one long fight is a different race
+ *  from a five-titan run, so they never share a board with titan raids).
+ *  Hardcore and higher difficulties ride their board wearing symbols; EASY
+ *  runs never rank at all. */
+export type RunTab = 'gauntlet' | 'raid' | 'goopliath';
+const RUN_TABS: RunTab[] = ['gauntlet', 'raid', 'goopliath'];
 /** Firestore collection per run board (separate collections keep the query a
- *  plain single-field orderBy — no composite index needed). */
+ *  plain single-field orderBy — no composite index needed). The old
+ *  runHardcore / runRaidHardcore collections are retired — hardcore runs now
+ *  post here with their `hardcore` flag. */
 const RUN_COLLECTION: Record<RunTab, string> = {
   gauntlet: 'runGauntlet',
-  hardcore: 'runHardcore',
   raid: 'runRaid',
-  raidHardcore: 'runRaidHardcore',
+  goopliath: 'runGoopliath',
 };
 
 /** One entry on a run board: the whole squad (one name for a solo gauntlet,
- *  up to four for a raid) and the run's cumulative fight-time clock. */
+ *  up to five for a raid), the run's cumulative fight-time clock, and the
+ *  feat's markers (difficulty + hardcore) for the row symbols. */
 export interface RunRow {
   names: string[];
   seconds: number;
+  /** 'normal' | 'hard' | 'blazing' (legacy rows read as normal). */
+  difficulty: Difficulty;
+  hardcore: boolean;
   /** My callsign is on this run — the UI highlights it. */
   me: boolean;
 }
@@ -88,9 +108,8 @@ export const leaderboard = {
   duo: [] as LbRow[],
   ffa: [] as LbRow[],
   gauntlet: [] as RunRow[],
-  hardcore: [] as RunRow[],
   raid: [] as RunRow[],
-  raidHardcore: [] as RunRow[],
+  goopliath: [] as RunRow[],
   scroll: {
     ranked: 0,
     xp: 0,
@@ -98,9 +117,8 @@ export const leaderboard = {
     duo: 0,
     ffa: 0,
     gauntlet: 0,
-    hardcore: 0,
     raid: 0,
-    raidHardcore: 0,
+    goopliath: 0,
   } as Record<DataTab | RunTab, number>,
   status: FIREBASE_ENABLED ? 'loading…' : 'leaderboard offline',
   /** Whose profile the PROFILE face shows; null = your own. */
@@ -112,12 +130,23 @@ export const rival = { name: 'RIVAL', elo: 1000, avatarSkin: '', platformSkin: '
 
 const ELO_K = 32;
 
-/** Arcade brawl boards (2v2 / FFA): a win banks +11, just showing up banks +1
- *  either way — so the boards reward turning out, and reward winning more. */
-const ARCADE_WIN = 11;
-const ARCADE_PLAY = 1;
-
-const profile = { id: '', name: '', score: 0, elo: 1000, training: 0, duo: 0, ffa: 0, xp: 0, note: '' };
+const profile = {
+  id: '',
+  name: '',
+  score: 0, // the CURRENT season's ladder points
+  elo: 1000,
+  training: 0,
+  duo: 0,
+  ffa: 0,
+  xp: 0,
+  note: '',
+  awards: {} as Partial<Record<SeasonAward, number>>,
+  /** Last season index whose final standings we've claimed honours for. */
+  awardedThrough: 0,
+  gauntletBest: 0,
+  raidBest: 0,
+  goopBest: 0,
+};
 
 /** Your own profile as a board row (for the PROFILE face when viewing self). */
 export function myProfileRow(): LbRow {
@@ -128,6 +157,10 @@ export function myProfileRow(): LbRow {
     me: true,
     xp: profile.xp,
     score: profile.score,
+    awards: profile.awards,
+    gauntletBest: profile.gauntletBest,
+    raidBest: profile.raidBest,
+    goopBest: profile.goopBest,
     note: profile.note,
   };
 }
@@ -150,7 +183,7 @@ function isDataTab(tab: LeaderboardTab): tab is DataTab {
 }
 
 export function isRunTab(tab: LeaderboardTab): tab is RunTab {
-  return tab === 'gauntlet' || tab === 'hardcore' || tab === 'raid' || tab === 'raidHardcore';
+  return tab === 'gauntlet' || tab === 'raid' || tab === 'goopliath';
 }
 
 export function leaderboardRows(tab: LeaderboardTab = leaderboard.tab): LbRow[] {
@@ -314,18 +347,34 @@ export function initLeaderboard(): void {
     try {
       const ref = h.fs.doc(h.db, 'players', profile.id);
       const snap = await h.fs.getDoc(ref);
+      const season = seasonIndex();
       if (snap.exists()) {
         const d = snap.data();
-        profile.score = (d.score as number) ?? 0;
+        // Ladder points are PER SEASON: read the live season's bank. Season 1
+        // inherits the pre-season lifetime score, so launch keeps its ladder —
+        // and self-migrates the doc so the season board sees the old guard.
+        const banked = d[seasonScoreField(season)] as number | undefined;
+        profile.score = banked ?? (season === 1 ? ((d.score as number) ?? 0) : 0);
+        if (banked === undefined && profile.score > 0) {
+          writeMine({ [seasonScoreField(season)]: profile.score });
+        }
         profile.elo = (d.elo as number) ?? 1000;
         profile.training = (d.training as number) ?? 0;
         profile.duo = (d.duo as number) ?? 0;
         profile.ffa = (d.ffa as number) ?? 0;
         profile.xp = (d.xp as number) ?? 0;
         profile.note = (d.note as string) ?? '';
+        profile.awards = (d.awards as Partial<Record<SeasonAward, number>>) ?? {};
+        profile.awardedThrough = (d.awardedThrough as number) ?? season - 1;
+        profile.gauntletBest = (d.gauntletBest as number) ?? 0;
+        profile.raidBest = (d.raidBest as number) ?? 0;
+        profile.goopBest = (d.goopBest as number) ?? 0;
         // A locally renamed player syncs the doc's stale callsign.
         if ((d.name as string) !== profile.name) writeMine({});
+        // Seasons that closed since our last visit: claim any honours.
+        void claimSeasonAwards(season);
       } else {
+        profile.awardedThrough = season - 1;
         await h.fs.setDoc(ref, {
           name: profile.name,
           score: 0,
@@ -335,6 +384,11 @@ export function initLeaderboard(): void {
           ffa: 0,
           xp: 0,
           note: '',
+          awards: {},
+          awardedThrough: season - 1,
+          gauntletBest: 0,
+          raidBest: 0,
+          goopBest: 0,
           updatedAt: h.fs.serverTimestamp(),
         });
       }
@@ -357,7 +411,7 @@ export async function refreshLeaderboard(force = false): Promise<void> {
   const { fs, db } = h;
   try {
     const players = fs.collection(db, 'players');
-    const pull = async (field: 'score' | 'xp' | 'training' | 'duo' | 'ffa'): Promise<LbRow[]> => {
+    const pull = async (field: string): Promise<LbRow[]> => {
       const snap = await fs.getDocs(fs.query(players, fs.orderBy(field, 'desc'), fs.limit(LEADERBOARD_FETCH_LIMIT)));
       return snap.docs
         .map((d) => ({
@@ -367,10 +421,14 @@ export async function refreshLeaderboard(force = false): Promise<void> {
           me: d.id === profile.id,
           xp: (d.data().xp as number) ?? 0,
           score: (d.data().score as number) ?? 0,
+          awards: (d.data().awards as Partial<Record<SeasonAward, number>>) ?? {},
+          gauntletBest: (d.data().gauntletBest as number) ?? 0,
+          raidBest: (d.data().raidBest as number) ?? 0,
+          goopBest: (d.data().goopBest as number) ?? 0,
           note: (d.data().note as string) ?? '',
         }))
         // Every board shows anyone who's banked anything. (RANKED is ladder
-        // points now — raw ELO stays hidden, a matchmaking signal only.)
+        // points now — per-season, and raw ELO stays hidden for matchmaking.)
         .filter((r) => r.value > 0);
     };
     // RUN boards: each is its own collection of finished runs, ranked by the
@@ -385,15 +443,21 @@ export async function refreshLeaderboard(force = false): Promise<void> {
         const snap = await fs.getDocs(fs.query(col, fs.orderBy('seconds', 'asc'), fs.limit(LEADERBOARD_FETCH_LIMIT)));
         const rows = snap.docs.map((d) => {
           const names = Array.isArray(d.data().names) ? (d.data().names as unknown[]).map(String) : [];
-          return { names, seconds: (d.data().seconds as number) ?? 0, me: names.includes(profile.name) };
+          return {
+            names,
+            seconds: (d.data().seconds as number) ?? 0,
+            difficulty: ((d.data().difficulty as Difficulty) ?? 'normal') as Difficulty,
+            hardcore: !!d.data().hardcore,
+            me: names.includes(profile.name),
+          };
         });
-        // Every finished run is stored, but only a squad's BEST time RANKS —
-        // the board celebrates personal bests, not attempt counts. Rows
-        // arrive fastest-first, so the first row per squad (same names in
-        // any order) is its best; later repeats drop.
+        // Every finished run is stored, but only a squad's BEST time PER FEAT
+        // ranks — the same squad's normal, hard, blazing and hardcore clears
+        // are different achievements, so each keeps its own best row. Rows
+        // arrive fastest-first, so the first per key is its best.
         const seen = new Set<string>();
         return rows.filter((r) => {
-          const key = r.names.map((n) => n.toLowerCase()).sort().join('|');
+          const key = `${r.names.map((n) => n.toLowerCase()).sort().join('|')}|${r.difficulty}|${r.hardcore ? 'hc' : ''}`;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -402,16 +466,15 @@ export async function refreshLeaderboard(force = false): Promise<void> {
         return leaderboard[tab]; // keep whatever we last had
       }
     };
-    const [rk, xp, tr, du, ff, gt, hc, rd, rh] = await Promise.all([
-      pull('score'),
+    const [rk, xp, tr, du, ff, gt, rd, gp] = await Promise.all([
+      pull(seasonScoreField(seasonIndex())), // RANKED: the season in progress
       pull('xp'),
       pull('training'),
       pull('duo'),
       pull('ffa'),
       pullRuns('gauntlet'),
-      pullRuns('hardcore'),
       pullRuns('raid'),
-      pullRuns('raidHardcore'),
+      pullRuns('goopliath'),
     ]);
     leaderboard.ranked = rk;
     leaderboard.xp = xp;
@@ -419,9 +482,8 @@ export async function refreshLeaderboard(force = false): Promise<void> {
     leaderboard.duo = du;
     leaderboard.ffa = ff;
     leaderboard.gauntlet = gt;
-    leaderboard.hardcore = hc;
     leaderboard.raid = rd;
-    leaderboard.raidHardcore = rh;
+    leaderboard.goopliath = gp;
     (['ranked', 'xp', 'training', 'duo', 'ffa', ...RUN_TABS] as const).forEach(clampLeaderboardScroll);
     leaderboard.status = '';
   } catch {
@@ -435,8 +497,9 @@ export async function refreshLeaderboard(force = false): Promise<void> {
  * a solo gauntlet/hardcore, up to four for a raid — the raid HOST posts it once
  * for the group so the squad ranks together on their run). No-op offline.
  */
-export function reportRun(tab: RunTab, seconds: number, names: string[]): void {
-  const clean = names.map((n) => String(n).slice(0, 12)).filter(Boolean).slice(0, 4);
+export function reportRun(tab: RunTab, seconds: number, names: string[], difficulty: Difficulty, hardcore: boolean): void {
+  if (difficulty === 'easy') return; // easy runs play, but never rank
+  const clean = names.map((n) => String(n).slice(0, 12)).filter(Boolean).slice(0, 5);
   if (!clean.length) return;
   void (async () => {
     const h = await firestore();
@@ -445,6 +508,8 @@ export function reportRun(tab: RunTab, seconds: number, names: string[]): void {
       await h.fs.addDoc(h.fs.collection(h.db, RUN_COLLECTION[tab]), {
         names: clean,
         seconds: Math.max(0, Math.round(seconds * 10) / 10),
+        difficulty,
+        hardcore,
         at: h.fs.serverTimestamp(),
       });
       await refreshLeaderboard(true);
@@ -452,6 +517,50 @@ export function reportRun(tab: RunTab, seconds: number, names: string[]): void {
       /* unreachable — the board just won't carry this run */
     }
   })();
+}
+
+/** Clear-badge tier per difficulty (easy earns nothing — same as ranking). */
+const CLEAR_TIER: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, blazing: 3 };
+
+/**
+ * A full RUN was WON (gauntlet, titan raid, or Goopliath raid): raise that
+ * family's profile badge to this difficulty's tier if it's the best yet.
+ * Only the highest tier ever shows on the profile — blazing wears the flame.
+ */
+export function reportRunClear(kind: 'gauntlet' | 'raid' | 'goopliath', difficulty: Difficulty): void {
+  const tier = CLEAR_TIER[difficulty];
+  const field = kind === 'gauntlet' ? 'gauntletBest' : kind === 'raid' ? 'raidBest' : 'goopBest';
+  if (tier <= profile[field]) return;
+  profile[field] = tier;
+  writeMine({ [field]: tier });
+}
+
+/**
+ * Season honours: every closed season we haven't evaluated yet gets one read
+ * of its FROZEN final standings (the per-season score field never moves
+ * again once the season ends); a top-25 finish self-awards the trophy.
+ * Repeat honours stack — the profile chip shows ×N.
+ */
+async function claimSeasonAwards(current: number): Promise<void> {
+  if (profile.awardedThrough >= current - 1) return;
+  const h = await firestore();
+  if (!h) return;
+  const { fs, db } = h;
+  try {
+    const players = fs.collection(db, 'players');
+    for (let s = Math.max(1, profile.awardedThrough + 1); s < current; s++) {
+      const snap = await fs.getDocs(fs.query(players, fs.orderBy(seasonScoreField(s), 'desc'), fs.limit(25)));
+      const rank = snap.docs.findIndex((d) => d.id === profile.id) + 1; // 0 = unplaced
+      if (rank >= 1) {
+        const key: SeasonAward = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : rank <= 10 ? 'top10' : 'top25';
+        profile.awards[key] = (profile.awards[key] ?? 0) + 1;
+      }
+    }
+    profile.awardedThrough = current - 1;
+    writeMine({ awards: profile.awards, awardedThrough: profile.awardedThrough });
+  } catch {
+    /* standings unreachable — we'll try again next launch */
+  }
 }
 
 function writeMine(fields: Record<string, unknown>): void {
@@ -485,7 +594,9 @@ export function reportResult(win: boolean, oppElo: number): void {
   profile.elo = Math.max(100, Math.round(profile.elo + ELO_K * ((win ? 1 : 0) - expected)));
   profile.xp += xpForMatch(win); // every real bout feeds the rank ladder
   addCoins(CURRENCY.perGame); // …and the coin wallet, alongside the XP
-  writeMine({ score: profile.score, elo: profile.elo, xp: profile.xp });
+  // LP banks into the SEASON field (what the board ranks); `score` mirrors it
+  // for older clients and the season-1 seed.
+  writeMine({ [seasonScoreField(seasonIndex())]: profile.score, score: profile.score, elo: profile.elo, xp: profile.xp });
   void refreshLeaderboard(true);
 }
 
@@ -498,24 +609,34 @@ export function reportBotResult(win: boolean): void {
   if (win) profile.score += LADDER.botWin;
   profile.xp += xpForBot();
   addCoins(CURRENCY.perGame);
-  writeMine({ score: profile.score, xp: profile.xp });
+  writeMine({ [seasonScoreField(seasonIndex())]: profile.score, score: profile.score, xp: profile.xp });
   void refreshLeaderboard(true);
 }
 
 /**
- * A finished arcade brawl (2v2 / FFA): bank a flat participation XP either way,
- * and tick that mode's own board — +11 for a win, +1 just for taking part.
+ * A finished arcade brawl (2v2 / FFA): bank a flat participation XP either
+ * way, and move that mode's LADDER — a win pays (FFA a touch more, it's a
+ * one-in-four), a loss hands a little back, floored at zero. Bot brawls pay
+ * only the token bot rate on a win — practice charts, it doesn't climb.
  */
-export function reportArcade(mode: ArcadeMode, win: boolean): void {
+export function reportArcade(mode: ArcadeMode, win: boolean, vsBots = false): void {
   profile.xp += xpForArcade();
   addCoins(CURRENCY.perGame);
-  const gain = win ? ARCADE_WIN : ARCADE_PLAY;
+  const gain = vsBots
+    ? win
+      ? LADDER.botWin
+      : 0
+    : win
+      ? mode === 'ffa'
+        ? LADDER.ffaWin
+        : LADDER.brawlWin
+      : -LADDER.brawlLoss;
   const fields: Record<string, unknown> = { xp: profile.xp };
   if (mode === '2v2') {
-    profile.duo += gain;
+    profile.duo = Math.max(0, profile.duo + gain);
     fields.duo = profile.duo;
   } else if (mode === 'ffa') {
-    profile.ffa += gain;
+    profile.ffa = Math.max(0, profile.ffa + gain);
     fields.ffa = profile.ffa;
   }
   writeMine(fields);

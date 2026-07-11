@@ -247,7 +247,7 @@ export class GameStateSystem extends createSystem({
     if (win) app.stats.wins += 1;
     else app.stats.losses += 1;
     saveStats();
-    reportArcade(app.arcade, win); // +25 XP for taking part, win → mode board
+    reportArcade(app.arcade, win, app.mode === 'bot'); // XP either way; LP moves only in live brawls
     sfx.matchEnd(win);
   }
 
