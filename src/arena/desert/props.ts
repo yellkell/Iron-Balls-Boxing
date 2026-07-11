@@ -197,8 +197,13 @@ export function buildProps(parent: GroupT): void {
     g.rotateY(ry);
     group.add(g);
   };
-  place(signpost(), 4.5, -5, -0.5);
-  place(skull(), -3.2, -3.5, 0.8);
+  // Placement must clear EVERY mode's floor, not just the duel: the 5-seat
+  // RAID arc runs platforms out to (±5.7, −4.15) around the pit at (0, −6),
+  // and the old spots — sign (4.5, −5), skull (−3.2, −3.5) — sat square
+  // inside that bowl, threading the GASKET sign between raid platforms.
+  // Both now stand just OUTSIDE the ring, still framing the sightline.
+  place(signpost(), 8.2, -2.0, -0.85);
+  place(skull(), -6.8, -1.6, 0.8);
   place(fence(), -7, 6, 0.3);
   collapseStatic(group);
   parent.add(group);
