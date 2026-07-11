@@ -60,6 +60,7 @@ import {
   setTutorVoicePosition,
   stopTutorVoice,
   tutorChime,
+  tutorLineReady,
   tutorVoiceActive,
 } from '../audio/tutorVoice.js';
 import { updateVoiceListener } from '../pub/voice/playback.js';
@@ -555,6 +556,16 @@ export class TutorialSystem extends createSystem({
   private runAttention(): void {
     app.tutorialHoldFire = true;
     switch (this.sub) {
+      case 0: {
+        // Warm-up: she waits, a dim spark at her spawn point, until the
+        // first line can actually SPEAK (or 3 s — captions carry it then).
+        if (tutorLineReady(LINES.overHere.id) || this.subT > 3) {
+          tutorChime();
+          this.say('overHere');
+          this.toSub(1);
+        }
+        break;
+      }
       case 1: {
         // Drift across the periphery, ~10 o'clock toward 1 o'clock — along a
         // path FIXED in the room (attnFwd), so turning toward her actually
@@ -1067,9 +1078,9 @@ export class TutorialSystem extends createSystem({
     this.orbPos.y = _head.y - 0.1;
     this.orbTarget.copy(this.orbPos);
     if (this.orb) this.orb.position.copy(this.orbPos);
-    tutorChime();
-    this.say('overHere');
-    this.toSub(1);
+    // Sub 0 holds the opening chime until her first clip is decoded (fresh
+    // installs may still be fetching) — capped so it can never stall.
+    this.toSub(0);
     this.gazeT = 0;
 
     app.tutorialBotFrozen = true; // a rusted statue until she names him
