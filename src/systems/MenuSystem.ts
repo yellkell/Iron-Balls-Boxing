@@ -35,6 +35,7 @@ import {
   colorBarHue,
   musicVolFromU,
   sfxVolFromU,
+  clickBalls,
   colorBarLight,
   createActionPanel,
   createMenu,
@@ -1093,21 +1094,23 @@ export class MenuSystem extends createSystem({}) {
    * What the panel offers right now, or null when it has no business being
    * up (mid-bout — your hands are for punching, not menus).
    */
-  private panelContent(): { title: string; buttons: ActionButton[]; status: string } | null {
+  private panelContent(): { title: string; buttons: ActionButton[]; status: string; loadout: boolean } | null {
     if (app.state === 'training') {
       return {
         title: 'AIM TRAINING',
         buttons: [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }],
         status: '',
+        loadout: true, // practice range — swap attachments whenever
       };
     }
     // A live titan bout can be conceded — souls fights run long, and the
-    // campaign has no round clock to save you.
+    // campaign has no round clock to save you. PvE, so the loadout rides too.
     if (app.state === 'playing' && app.mode === 'campaign' && match.phase !== 'matchOver') {
       return {
         title: 'TITAN BOUT',
         buttons: [{ id: 'forfeit', label: 'CONCEDE', accent: UI.danger }],
         status: '',
+        loadout: true,
       };
     }
     if (app.state === 'playing' && match.phase === 'matchOver') {
@@ -1124,6 +1127,29 @@ export class MenuSystem extends createSystem({}) {
         title: 'FIGHT OVER',
         buttons,
         status: match.rematchTheirs ? `${rival.name} wants a rematch` : '',
+        loadout: false,
+      };
+    }
+    // The round break (pre-fight hold, 3-2-1, the roundOver breather): every
+    // mode gets the BALL LOADOUT here — resigning stays a bots-only luxury
+    // (live opponents deserve a finished match; net bouts end at matchOver).
+    if (app.state === 'playing' && (match.phase === 'roundOver' || match.phase === 'countdown')) {
+      return {
+        title: 'ROUND BREAK',
+        buttons: app.mode === 'bot' ? [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }] : [],
+        status: '',
+        loadout: true,
+      };
+    }
+    // Mid-round against bots (quick match still hunting, VS BOTS brawls):
+    // resigning is allowed — nobody human is owed the rest of the fight. The
+    // tutorial keeps its guided flow: no panel there.
+    if (app.state === 'playing' && app.mode === 'bot' && match.phase === 'playing' && !app.tutorial) {
+      return {
+        title: 'BOT BOUT',
+        buttons: [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }],
+        status: '',
+        loadout: false,
       };
     }
     return null;
@@ -1160,20 +1186,32 @@ export class MenuSystem extends createSystem({}) {
     let hover: string | null = null;
     for (const hand of ['left', 'right'] as const) {
       const hit = this.updatePointer(hand, [this.panel.mesh]);
-      const id = hit?.uv ? this.panel.hitTest(hit.uv.x, hit.uv.y) : null;
-      if (!id) continue;
-      hover = id;
-      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) {
-        this.runPanelAction(id);
-        return;
+      if (!hit?.uv) continue;
+      const id = this.panel.hitTest(hit.uv.x, hit.uv.y);
+      const down = this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger) ?? false;
+      if (id) {
+        hover = id;
+        if (down) {
+          this.runPanelAction(id);
+          return;
+        }
+        continue;
+      }
+      // The loadout section: taps equip/clear attachments between rounds.
+      if (down && content.loadout) {
+        const bh = this.panel.ballsHit(hit.uv.x, hit.uv.y);
+        if (bh && clickBalls(bh.u, bh.v)) {
+          sfx.uiClick();
+          this.panelKey = ''; // repaint with the new equip state
+        }
       }
     }
 
     // Redraw only when the content or hover actually changed.
-    const key = `${content.title}|${content.buttons.map((b) => b.id + b.label).join(',')}|${content.status}|${hover}`;
+    const key = `${content.title}|${content.buttons.map((b) => b.id + b.label).join(',')}|${content.status}|${content.loadout}|${hover}`;
     if (key !== this.panelKey) {
       this.panelKey = key;
-      this.panel.redraw(content.title, content.buttons, 'press A to dismiss', hover, content.status);
+      this.panel.redraw(content.title, content.buttons, 'press A to dismiss', hover, content.status, content.loadout);
     }
   }
 

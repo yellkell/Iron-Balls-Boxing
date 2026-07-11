@@ -1100,25 +1100,35 @@ export interface ActionButton {
 
 export interface ActionPanel {
   mesh: Mesh;
-  /** Redraw with the given content; the layout is remembered for hitTest. */
+  /** Redraw with the given content; the layout is remembered for hitTest.
+   *  `loadout` appends the BALL LOADOUT section (equip attachments between
+   *  rounds — the tutorial's console taught the panel, this is its home). */
   redraw: (
     title: string,
     buttons: ActionButton[],
     hint: string,
     hoverId: string | null,
     status?: string,
+    loadout?: boolean,
   ) => void;
   /** Map a hit UV to the id of the button under it, or null. */
   hitTest: (u: number, v: number) => string | null;
+  /** Map a hit UV into the loadout section's own (u,v), or null if outside
+   *  it / not shown — feed the result to clickBalls(). */
+  ballsHit: (u: number, v: number) => { u: number; v: number } | null;
 }
 
-const FW = 512;
-const FH = 384;
+// Canvas matches the BALL LOADOUT's width so the loadout section maps 1:1;
+// tall enough for header + two buttons + the loadout. Content shorter than
+// the canvas just leaves transparent pixels below the plate.
+const FW = 560;
+const FH = 760;
 
 /**
- * The small waist-height panel summoned with the A button: FORFEIT mid-
- * training, REMATCH / RETURN at the end of a bout. Starts hidden; MenuSystem
- * owns placement, toggling and what the buttons do.
+ * The waist-height panel summoned with the A button: FORFEIT/CONCEDE where
+ * resigning is allowed, REMATCH / RETURN at the end of a bout, and the BALL
+ * LOADOUT during round breaks (and any time in training / campaign). Starts
+ * hidden; MenuSystem owns placement, toggling and what the buttons do.
  */
 export function createActionPanel(scene: Scene): ActionPanel {
   const canvas = document.createElement('canvas');
@@ -1130,7 +1140,7 @@ export function createActionPanel(scene: Scene): ActionPanel {
   const texture = new CanvasTexture(canvas);
   texture.minFilter = LinearFilter;
   const mesh = new Mesh(
-    new PlaneGeometry(0.46, 0.345),
+    new PlaneGeometry(0.5, (0.5 * FH) / FW),
     new MeshBasicMaterial({ map: texture, transparent: true }),
   );
   mesh.name = 'action-panel';
@@ -1138,12 +1148,20 @@ export function createActionPanel(scene: Scene): ActionPanel {
   scene.add(mesh);
 
   let zones: Array<{ id: string; y0: number; y1: number }> = [];
+  let ballsY: number | null = null; // top of the loadout section (canvas px)
 
   return {
     mesh,
-    redraw: (title, buttons, hint, hoverId, status = '') => {
+    redraw: (title, buttons, hint, hoverId, status = '', loadout = false) => {
+      // Height-to-content: plate wraps exactly what's drawn, the rest of the
+      // canvas stays transparent.
+      const buttonsH = buttons.length * 102;
+      const statusH = status ? 30 : 0;
+      ballsY = loadout ? 84 + buttonsH + statusH + 6 : null;
+      const contentH = loadout ? (ballsY ?? 0) + BALL_H + 48 : 84 + buttonsH + statusH + 52;
+
       ctx.clearRect(0, 0, FW, FH);
-      plate(ctx, 8, 8, FW - 16, FH - 16, {
+      plate(ctx, 8, 8, FW - 16, contentH - 16, {
         cut: 22,
         fill: UI.ink,
         stroke: hoverId ? UI.amberSoft : UI.steel,
@@ -1174,8 +1192,21 @@ export function createActionPanel(scene: Scene): ActionPanel {
         ctx.fillStyle = UI.coolBright;
         ctx.fillText(status, FW / 2, y + 12);
       }
+
+      if (loadout && ballsY !== null) {
+        // The lobby's exact BALL LOADOUT face, re-hosted as a section (it
+        // draws its own plate + title, so it reads as an inset card).
+        ctx.save();
+        ctx.translate(0, ballsY);
+        drawBalls(ctx, null);
+        ctx.restore();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+      }
+
+      ctx.font = '600 24px system-ui, sans-serif';
       ctx.fillStyle = UI.textDim;
-      ctx.fillText(hint, FW / 2, FH - 34);
+      ctx.fillText(hint, FW / 2, contentH - 34);
       texture.needsUpdate = true;
     },
     hitTest: (_u, v) => {
@@ -1184,6 +1215,12 @@ export function createActionPanel(scene: Scene): ActionPanel {
         if (y >= z.y0 && y <= z.y1) return z.id;
       }
       return null;
+    },
+    ballsHit: (u, v) => {
+      if (ballsY === null) return null;
+      const y = (1 - v) * FH - ballsY;
+      if (y < 0 || y > BALL_H) return null;
+      return { u, v: 1 - y / BALL_H };
     },
   };
 }

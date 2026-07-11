@@ -72,3 +72,4 @@ public/glxf/
 public/ui/
 # Persisted pub data (snake high score)
 server/pub-data.json
+Voice Lines/

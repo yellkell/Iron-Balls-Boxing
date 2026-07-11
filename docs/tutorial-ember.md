@@ -41,8 +41,8 @@ adopted the player on sight.
 
 ### Recording / delivery spec
 
-- One file per line, named exactly by the **ID** column below
-  (e.g. `e011-hello.wav`). We transcode to mp3 into `src/assets/tutor/`.
+- One file per line, named by the line's **code** (e.g. `e011.wav`); extra
+  takes add `_2`, `_3`… We transcode to mp3 into `src/assets/tutor/`.
 - 48 kHz mono WAV, dry (no reverb — spatialisation happens in-engine via the
   HRTF panner so her voice comes *from the orb*).
 - 2–3 takes per line; for the praise pool (E-100s) give as much variety of
@@ -275,7 +275,7 @@ smiling.
 
 | ID | Line | Direction | Trigger |
 |---|---|---|---|
-| `e040-recall` | "Pull the trigger again to call it home. Littering is a **crime** in Gasket." | Deadpan on the second sentence. | Beat start. |
+| `e040-recall` | "Pull the trigger again to call it home. Littering is a **crime**." | Deadpan on the second sentence. | Beat start. |
 | `e041-recall-done` | "Caught. Throw, recall, catch. That's the heartbeat of everything. **Well done.**" | Quiet approval; the summary matters, keep it clear. | Clean catch. |
 
 ### Beat 4 — Block

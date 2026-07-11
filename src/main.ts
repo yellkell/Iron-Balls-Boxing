@@ -15,6 +15,9 @@ import { installCrashTrap } from './debug/crashTrap.js';
 import { initLeaderboard } from './net/leaderboard.js';
 import { initGazette } from './net/gazette.js';
 import { enterMenuMusic } from './audio/menuMusic.js';
+import { ensureAudio } from './audio/sfx.js';
+import { preloadTutorVoice } from './audio/tutorVoice.js';
+import { app } from './menu/appState.js';
 import { buildArena } from './arena/arena.js';
 import { setupEnvironment } from './arena/environment.js';
 import { setupCombatants } from './combat/setup.js';
@@ -125,6 +128,13 @@ World.create(container, {
     enterVrButton.addEventListener('click', () => {
       enterVrButton.setAttribute('disabled', '');
       enterMenuMusic(); // lobby music (unless muted last time) — within the gesture
+      // A boxer who hasn't run the tutorial is headed straight for it — warm
+      // Ember's voice clips now (decode works while the context is young), so
+      // her very first "Over here." speaks instead of falling back to caption.
+      if (!app.tutorialDone) {
+        ensureAudio();
+        preloadTutorVoice();
+      }
       launchXR(world, { sessionMode: SessionMode.ImmersiveAR });
 
       const watchForSession = () => {
