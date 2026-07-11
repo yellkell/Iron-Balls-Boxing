@@ -2848,6 +2848,24 @@ export class CampaignSystem extends createSystem({
       playCash();
     }
 
+    // Two more earned pads. TIDEBREAKER: fell GOOPLIATH with a raid squad
+    // (every raider banks it). BLAZING: finish any run or raid with the
+    // blazing breaker thrown — single bouts and the solo goop fight always
+    // run normal (activeDifficulty), so they can never trip this.
+    const tidebroke = solo && this.raid() && lastStage && !platformOwned('tidebreaker');
+    if (tidebroke) {
+      ownPlatform('tidebreaker');
+      setPlatformSkin('tidebreaker');
+      playCash();
+    }
+    const blazed = lastStage && this.activeDifficulty() === 'blazing' && !platformOwned('blazing');
+    if (blazed) {
+      ownPlatform('blazing');
+      setPlatformSkin('blazing');
+      playCash();
+    }
+    const padTag = tidebroke && blazed ? ' · 2 PADS UNLOCKED' : tidebroke || blazed ? ' · PAD UNLOCKED' : '';
+
     // Mid-run fells chain straight to the next boss after a short collapse.
     this.advanceAfterVictory = run && !lastStage;
     this.victoryDelay = this.advanceAfterVictory ? CAMPAIGN.runVictoryDelay : CAMPAIGN.victoryDelay;
@@ -2882,7 +2900,9 @@ export class CampaignSystem extends createSystem({
           ? `GOOPLIATH FELLED · ${fmtRunTime(this.runClock)}`
           : app.raidHardcore
             ? `HARDCORE · ${fmtRunTime(this.runClock)}`
-            : fmtRunTime(this.runClock)) + unlockTag,
+            : fmtRunTime(this.runClock)) +
+          unlockTag +
+          padTag,
         '#d9a832',
       );
     } else if (run && lastStage) {
@@ -2897,7 +2917,7 @@ export class CampaignSystem extends createSystem({
       }
       this.hud.title(
         hardcore ? 'HARDCORE' : 'GAUNTLET',
-        `${fmtRunTime(this.runClock)}${record ? ' · NEW RECORD' : ''}${unlockTag}`,
+        `${fmtRunTime(this.runClock)}${record ? ' · NEW RECORD' : ''}${unlockTag}${padTag}`,
         this.accentCss(),
       );
     } else {

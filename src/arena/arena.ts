@@ -262,6 +262,29 @@ export function makePlatform(color: number): Group {
   grid.visible = false;
   group.add(grid);
 
+  // BLAZING: a big flame licking across the deck — the earned pad for
+  // clearing anything on the blazing breaker. Same raised neon-core
+  // treatment as the VOLT bolt, so it burns the skin's red (and team-tints
+  // on opponent pads).
+  const flameShape = new Shape();
+  const FS = 1.15; // flame footprint scale
+  flameShape.moveTo(0, -0.5 * FS);
+  flameShape.quadraticCurveTo(0.46 * FS, -0.42 * FS, 0.4 * FS, -0.05 * FS); // right belly
+  flameShape.quadraticCurveTo(0.36 * FS, 0.12 * FS, 0.16 * FS, 0.1 * FS); // notch in…
+  flameShape.quadraticCurveTo(0.34 * FS, 0.26 * FS, 0.2 * FS, 0.46 * FS); // …side tongue
+  flameShape.quadraticCurveTo(0.1 * FS, 0.56 * FS, 0, 0.62 * FS); // the tip
+  flameShape.quadraticCurveTo(-0.2 * FS, 0.42 * FS, -0.12 * FS, 0.16 * FS); // left tongue
+  flameShape.quadraticCurveTo(-0.3 * FS, 0.2 * FS, -0.36 * FS, -0.02 * FS); // left notch
+  flameShape.quadraticCurveTo(-0.46 * FS, -0.38 * FS, 0, -0.5 * FS); // left belly home
+  const flameMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  flameMat.userData.role = 'neon-core';
+  const flame = new Mesh(new ShapeGeometry(flameShape), flameMat);
+  flame.rotation.x = -Math.PI / 2; // flat on the deck, tip toward the foe
+  flame.position.y = DECK_TOP + 0.001;
+  flame.userData.skinTag = 'blazing';
+  flame.visible = false;
+  group.add(flame);
+
   // EMBER: the classic look — banding + bolts, no extra furniture.
   return group;
 }

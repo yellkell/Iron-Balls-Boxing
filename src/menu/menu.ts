@@ -3057,9 +3057,16 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     ctx.fillStyle = 'rgba(232,236,242,0.5)';
     ctx.fillText('EQUIP', icx, fy);
   } else if ((it.skin as PlatformSkin).earnedBy) {
-    // Earned, never sold — the tile says how to win it (the CHAMPION pad).
+    // Earned, never sold — the tile says how to win it, shrunk to fit
+    // ('FELL RAID GOOPLIATH' runs the full tile).
+    const msg = (it.skin as PlatformSkin).earnedBy as string;
+    let efs = 12;
+    while (efs > 8 && ctx.measureText(msg).width > r.w - 12) {
+      efs -= 1;
+      ctx.font = `800 ${efs}px system-ui, sans-serif`;
+    }
     ctx.fillStyle = UI.steelDim;
-    ctx.fillText((it.skin as PlatformSkin).earnedBy as string, icx, fy);
+    ctx.fillText(msg, icx, fy);
   } else if (previewed) {
     // Tried on (the mirror / your pad is modelling it) — the price row grows
     // into the actual BUY button.
