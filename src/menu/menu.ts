@@ -1157,13 +1157,17 @@ function drawFeatChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
 }
 
 /** The PROFILE face: a player's big emblem, tier, LP/XP, their season
- *  trophies (left of the emblem), clear badges (right) and their note. */
+ *  trophies (left of the emblem), clear badges (right) and their note — the
+ *  rank emblem drawn chip-sized between them, no grander than any other
+ *  achievement. */
 function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const row = leaderboard.viewRow ?? myProfileRow();
   const own = row.me;
   const tier = tierForXp(row.xp);
+  // The rank emblem sits at ACHIEVEMENT scale — one honour among the chips
+  // flanking it, not the towering centrepiece it used to be.
   const badge = rankBadge(tier.index);
-  if (badge) ctx.drawImage(badge, BW / 2 - 58, 134, 116, 116);
+  if (badge) ctx.drawImage(badge, BW / 2 - 24, 166, 48, 48);
 
   // Achievements flank the emblem: season honours stacked left (best first,
   // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the
