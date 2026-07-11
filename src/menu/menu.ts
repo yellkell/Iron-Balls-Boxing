@@ -1085,24 +1085,44 @@ type ProfileBadgeSpot = {
   | { kind: 'clear'; glyph: 'star' | 'shield' | 'drop'; tier: number; hardcore: boolean }
 );
 
+/** Where the achievement section's rows live on the profile card. */
+const PROF_ROW_X = 150; // chips start here; the section label sits left of it
+const PROF_HONOURS_Y = 300;
+const PROF_CHIP_H = 26;
+
+/** Deterministic chip width for an honour label — shared by draw AND hit-test
+ *  (no ctx here), so the two can't disagree. */
+function awardChipW(label: string): number {
+  return 26 + Math.ceil(label.length * 8.6);
+}
+
 function profileBadgeSpots(row: LbRow): ProfileBadgeSpot[] {
   const spots: ProfileBadgeSpot[] = [];
-  // Season honours, stacked left of the emblem — best first, ×N for repeats.
-  let ay = 138;
+  // Season honours flow LEFT→RIGHT under the label, best first, wrapping if a
+  // trophy cabinet ever fills the row.
+  let ax = PROF_ROW_X;
+  let ay = PROF_HONOURS_Y;
   for (const key of SEASON_AWARDS) {
     const count = row.awards?.[key] ?? 0;
-    if (!count || ay > 228) continue;
+    if (!count) continue;
+    const label = count > 1 ? `${AWARD_STYLE[key].label} ×${count}` : AWARD_STYLE[key].label;
+    const w = awardChipW(label);
+    if (ax + w > BW - 44) {
+      ax = PROF_ROW_X;
+      ay += PROF_CHIP_H + 6;
+    }
     const times = count > 1 ? ` · ×${count}` : '';
-    spots.push({ kind: 'award', id: `badge-${key}`, x: 52, y: ay, w: 108, h: 26, award: key, count, tip: AWARD_TIP[key] + times });
-    ay += 30;
+    spots.push({ kind: 'award', id: `badge-${key}`, x: ax, y: ay, w, h: PROF_CHIP_H, award: key, count, tip: AWARD_TIP[key] + times });
+    ax += w + 8;
   }
-  // Clear badges, right of the emblem — only the highest tier each shows.
+  // The clears row sits beneath the last honours row.
   const clears: Array<['star' | 'shield' | 'drop', string, number, number]> = [
     ['star', 'GAUNTLET CLEARED', row.gauntletBest ?? 0, row.gauntletBestHc ?? 0],
     ['shield', 'TITAN RAID CLEARED', row.raidBest ?? 0, row.raidBestHc ?? 0],
     ['drop', 'GOOPLIATH FELLED', row.goopBest ?? 0, 0],
   ];
-  let by = 138;
+  let bx = PROF_ROW_X;
+  const by = ay + PROF_CHIP_H + 10;
   for (const [glyph, what, tier, hcTier] of clears) {
     if (!tier) continue;
     const hardcore = hcTier >= tier;
@@ -1110,7 +1130,7 @@ function profileBadgeSpots(row: LbRow): ProfileBadgeSpot[] {
     spots.push({
       kind: 'clear',
       id: `badge-${glyph}`,
-      x: BW - 96,
+      x: bx,
       y: by,
       w: 44,
       h: 36,
@@ -1119,7 +1139,7 @@ function profileBadgeSpots(row: LbRow): ProfileBadgeSpot[] {
       hardcore,
       tip: `${what} · ${tierName}${hardcore ? ' · HARDCORE' : ''}`,
     });
-    by += 42;
+    bx += 54;
   }
   return spots;
 }
@@ -1167,22 +1187,69 @@ function drawFeatChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
   if (flame) drawFlame(ctx, x + w / 2 - ctx.measureText(text).width / 2 - 4, y + 22, 17);
 }
 
-/** The PROFILE face: a player's big emblem, tier, LP/XP, their season
- *  trophies (left of the emblem), clear badges (right) and their note — the
- *  rank emblem drawn chip-sized between them, no grander than any other
- *  achievement. */
+/** The PROFILE face, read top to bottom like a service record: WHO (name,
+ *  rank emblem + tier, LP/XP), HOW FAR (the XP bar), WHAT THEY'VE DONE
+ *  (labelled HONOURS and CLEARS rows), then their note and the buttons. */
 function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const row = leaderboard.viewRow ?? myProfileRow();
   const own = row.me;
   const tier = tierForXp(row.xp);
 
-  // Achievements flank the emblem: season honours stacked left (best first,
-  // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the
-  // gauntlet, a shield for raids, a droplet for the tide. Tier tints the
-  // glyph (steel → amber → ember); clearing the badge's tier HARDCORE burns
-  // it red, and blazing wears the flame at its ear. Pointing at any of them
+  // --- WHO ---
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = stencilFont(36);
+  ctx.fillStyle = UI.emberBright;
+  ctx.fillText(row.name, BW / 2, 176);
+  // The rank emblem rides beside the tier name — an accent, not a centrepiece.
+  ctx.font = stencilFont(22);
+  ctx.fillStyle = UI.amber;
+  ctx.fillText(tier.name, BW / 2, 212);
+  const badge = rankBadge(tier.index);
+  if (badge) {
+    const s = 32 * rankBadgeZoom(tier.index);
+    const bx = BW / 2 - ctx.measureText(tier.name).width / 2 - 24;
+    ctx.drawImage(badge, bx - s / 2, 212 - s / 2, s, s);
+  }
+  ctx.font = '700 20px system-ui, sans-serif';
+  ctx.fillStyle = UI.amberSoft;
+  ctx.fillText(`${row.score} LP    ·    ${row.xp} XP`, BW / 2, 242);
+
+  // --- HOW FAR --- progress toward the next rank emblem.
+  segmentBar(ctx, 80, 260, BW - 160, 14, tier.progress, UI.ember);
+  ctx.font = '700 13px system-ui, sans-serif';
+  ctx.fillStyle = UI.amberSoft;
+  ctx.fillText(
+    tier.next === null ? 'MAX RANK' : `${tier.next - row.xp} XP TO ${tierForXp(tier.next).name}`,
+    BW / 2,
+    288,
+  );
+
+  // --- WHAT THEY'VE DONE --- two labelled rows: season HONOURS chips, then
+  // CLEARS glyphs (star gauntlet · shield raid · drop Goopliath; hardcore
+  // burns the glyph red, blazing wears the flame). Pointing at any of them
   // pops a tooltip saying what it's for (drawn last, over everything).
   const spots = profileBadgeSpots(row);
+  const sectionLabel = (text: string, cy: number): void => {
+    ctx.textAlign = 'left';
+    ctx.font = '800 13px system-ui, sans-serif';
+    ctx.fillStyle = UI.textDim;
+    ctx.fillText(text, 48, cy);
+  };
+  const awardSpots = spots.filter((s) => s.kind === 'award');
+  const clearSpots = spots.filter((s) => s.kind === 'clear');
+  const honoursBottom = awardSpots.reduce((m, s) => Math.max(m, s.y), PROF_HONOURS_Y);
+  const clearsY = clearSpots[0]?.y ?? honoursBottom + PROF_CHIP_H + 10;
+  sectionLabel('HONOURS', PROF_HONOURS_Y + PROF_CHIP_H / 2);
+  sectionLabel('CLEARS', clearsY + 18);
+  const noneYet = (cy: number): void => {
+    ctx.textAlign = 'left';
+    ctx.font = '700 13px system-ui, sans-serif';
+    ctx.fillStyle = UI.steelDim;
+    ctx.fillText('none yet', PROF_ROW_X, cy);
+  };
+  if (!awardSpots.length) noneYet(PROF_HONOURS_Y + PROF_CHIP_H / 2);
+  if (!clearSpots.length) noneYet(clearsY + 18);
   for (const s of spots) {
     if (s.kind === 'award') {
       drawFeatChip(ctx, s.x, s.y, s.w, AWARD_STYLE[s.award].label, AWARD_STYLE[s.award].color, s.count);
@@ -1194,37 +1261,8 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
     }
   }
 
-  ctx.textAlign = 'center';
-  ctx.font = stencilFont(38);
-  ctx.fillStyle = UI.emberBright;
-  ctx.fillText(row.name, BW / 2, 286);
-  // The rank emblem rides BESIDE the tier name — an accent, not a centrepiece.
-  // (It used to fill the middle of the card, where it collided with the
-  // achievement tooltips; that band now stays clear.)
-  ctx.font = stencilFont(24);
-  ctx.fillStyle = UI.amber;
-  ctx.fillText(tier.name, BW / 2, 320);
-  const badge = rankBadge(tier.index);
-  if (badge) {
-    const s = 34 * rankBadgeZoom(tier.index);
-    const bx = BW / 2 - ctx.measureText(tier.name).width / 2 - 26;
-    ctx.drawImage(badge, bx - s / 2, 320 - s / 2, s, s);
-  }
-  ctx.font = '700 22px system-ui, sans-serif';
-  ctx.fillStyle = UI.amberSoft;
-  ctx.fillText(`${row.score} LP       ${row.xp} XP`, BW / 2, 352);
-
-  // Progress toward the next rank emblem.
-  segmentBar(ctx, 80, 366, BW - 160, 16, tier.progress, UI.ember);
-  ctx.font = '700 14px system-ui, sans-serif';
-  ctx.fillStyle = UI.amberSoft;
-  ctx.fillText(
-    tier.next === null ? 'MAX RANK' : `${tier.next - row.xp} XP TO ${tierForXp(tier.next).name}`,
-    BW / 2,
-    396,
-  );
-
   // Note plate — clipped so a long note can never spill past the box.
+  ctx.textAlign = 'center';
   plate(ctx, 56, 408, BW - 112, 72, { cut: 10, fill: 'rgba(18,19,24,0.5)', stroke: UI.steelDim, rivets: false });
   ctx.save();
   ctx.beginPath();
