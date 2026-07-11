@@ -1108,17 +1108,18 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   }
   // Clear badges, right of the emblem — SYMBOLS, not words: a star for the
   // gauntlet, a shield for raids, a droplet for the tide. Tier tints the
-  // glyph (steel → amber → ember) and blazing wears the flame at its ear.
-  // Only the HIGHEST tier each ever shows.
-  const clears: Array<['star' | 'shield' | 'drop', number]> = [
-    ['star', row.gauntletBest ?? 0],
-    ['shield', row.raidBest ?? 0],
-    ['drop', row.goopBest ?? 0],
+  // glyph (steel → amber → ember); clearing the badge's tier HARDCORE burns
+  // it red, and blazing wears the flame at its ear. Only the HIGHEST tier
+  // each ever shows.
+  const clears: Array<['star' | 'shield' | 'drop', number, number]> = [
+    ['star', row.gauntletBest ?? 0, row.gauntletBestHc ?? 0],
+    ['shield', row.raidBest ?? 0, row.raidBestHc ?? 0],
+    ['drop', row.goopBest ?? 0, 0],
   ];
   let by = 138;
-  for (const [glyph, tierN] of clears) {
+  for (const [glyph, tierN, hcTier] of clears) {
     if (!tierN) continue;
-    const color = tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
+    const color = hcTier >= tierN ? UI.danger : tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
     const bx = BW - 52 - 44;
     plate(ctx, bx, by, 44, 36, { cut: 8, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
     drawClearGlyph(ctx, glyph, bx + 22, by + 19, 12, color);

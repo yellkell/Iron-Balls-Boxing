@@ -36,9 +36,15 @@ export interface LbRow {
   awards: Partial<Record<SeasonAward, number>>;
   /** Highest campaign-gauntlet clear: 0 none · 1 normal · 2 hard · 3 blazing. */
   gauntletBest: number;
+  /** Highest gauntlet clear done HARDCORE (same tiers) — when it matches the
+   *  badge's tier, the profile glyph burns red. */
+  gauntletBestHc: number;
   /** Highest raid clear, same tiers. */
   raidBest: number;
-  /** Highest GOOPLIATH-raid clear, same tiers. */
+  /** Highest hardcore raid clear. */
+  raidBestHc: number;
+  /** Highest GOOPLIATH-raid clear, same tiers. (The tide has no hardcore —
+   *  one long fight — so the drop never reddens.) */
   goopBest: number;
   /** The player's self-written note, shown on their profile. */
   note: string;
@@ -144,7 +150,9 @@ const profile = {
   /** Last season index whose final standings we've claimed honours for. */
   awardedThrough: 0,
   gauntletBest: 0,
+  gauntletBestHc: 0,
   raidBest: 0,
+  raidBestHc: 0,
   goopBest: 0,
 };
 
@@ -159,7 +167,9 @@ export function myProfileRow(): LbRow {
     score: profile.score,
     awards: profile.awards,
     gauntletBest: profile.gauntletBest,
+    gauntletBestHc: profile.gauntletBestHc,
     raidBest: profile.raidBest,
+    raidBestHc: profile.raidBestHc,
     goopBest: profile.goopBest,
     note: profile.note,
   };
@@ -392,7 +402,9 @@ export function initLeaderboard(): void {
         profile.awards = (d.awards as Partial<Record<SeasonAward, number>>) ?? {};
         profile.awardedThrough = (d.awardedThrough as number) ?? season - 1;
         profile.gauntletBest = (d.gauntletBest as number) ?? 0;
+        profile.gauntletBestHc = (d.gauntletBestHc as number) ?? 0;
         profile.raidBest = (d.raidBest as number) ?? 0;
+        profile.raidBestHc = (d.raidBestHc as number) ?? 0;
         profile.goopBest = (d.goopBest as number) ?? 0;
         // A locally renamed player syncs the doc's stale callsign.
         if ((d.name as string) !== profile.name) writeMine({});
@@ -412,7 +424,9 @@ export function initLeaderboard(): void {
           awards: {},
           awardedThrough: season - 1,
           gauntletBest: 0,
+          gauntletBestHc: 0,
           raidBest: 0,
+          raidBestHc: 0,
           goopBest: 0,
           lastPlayedAt: Date.now(),
           updatedAt: h.fs.serverTimestamp(),
@@ -449,7 +463,9 @@ export async function refreshLeaderboard(force = false): Promise<void> {
           score: (d.data().score as number) ?? 0,
           awards: (d.data().awards as Partial<Record<SeasonAward, number>>) ?? {},
           gauntletBest: (d.data().gauntletBest as number) ?? 0,
+          gauntletBestHc: (d.data().gauntletBestHc as number) ?? 0,
           raidBest: (d.data().raidBest as number) ?? 0,
+          raidBestHc: (d.data().raidBestHc as number) ?? 0,
           goopBest: (d.data().goopBest as number) ?? 0,
           note: (d.data().note as string) ?? '',
         }))
@@ -552,13 +568,25 @@ const CLEAR_TIER: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, bl
  * A full RUN was WON (gauntlet, titan raid, or Goopliath raid): raise that
  * family's profile badge to this difficulty's tier if it's the best yet.
  * Only the highest tier ever shows on the profile — blazing wears the flame.
+ * A HARDCORE clear also raises its own high-water mark; when it matches the
+ * badge's tier the glyph burns red. (Goopliath has no hardcore.)
  */
-export function reportRunClear(kind: 'gauntlet' | 'raid' | 'goopliath', difficulty: Difficulty): void {
+export function reportRunClear(kind: 'gauntlet' | 'raid' | 'goopliath', difficulty: Difficulty, hardcore = false): void {
   const tier = CLEAR_TIER[difficulty];
   const field = kind === 'gauntlet' ? 'gauntletBest' : kind === 'raid' ? 'raidBest' : 'goopBest';
-  if (tier <= profile[field]) return;
-  profile[field] = tier;
-  writeMine({ [field]: tier });
+  const patch: Record<string, number> = {};
+  if (tier > profile[field]) {
+    profile[field] = tier;
+    patch[field] = tier;
+  }
+  if (hardcore && kind !== 'goopliath') {
+    const hcField = kind === 'gauntlet' ? 'gauntletBestHc' : 'raidBestHc';
+    if (tier > profile[hcField]) {
+      profile[hcField] = tier;
+      patch[hcField] = tier;
+    }
+  }
+  if (Object.keys(patch).length) writeMine(patch);
 }
 
 /**
