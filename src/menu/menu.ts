@@ -824,7 +824,7 @@ const ARCADE_SUBS: Array<[LeaderboardTab, string, MenuAction]> = [
   ['training', 'AIM', 'lb-training'],
   ['gauntlet', 'GAUNTLET', 'lb-gauntlet'],
   ['raid', 'RAID', 'lb-raid'],
-  ['goopliath', 'GOOPLIATH', 'lb-goopliath'],
+  ['goopliath', 'GOOP RAID', 'lb-goopliath'],
 ];
 const ARCADE_SUB_TABS = ARCADE_SUBS.map(([id]) => id);
 const SUB_Y = 140;

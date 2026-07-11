@@ -1303,10 +1303,16 @@ export class MenuSystem extends createSystem({}) {
       0.95,
       _head.z + _fwd.z * 0.55 + rz * 0.38,
     );
-    this.panel.mesh.lookAt(_head);
-    // From waist height a full lookAt lies the panel back like a lectern —
-    // keep a bit of that tilt but bring it most of the way upright.
-    this.panel.mesh.rotation.x *= 0.45;
+    // Face the player upright: yaw squarely toward the head, then a GENTLE
+    // pitch toward it. (Scaling lookAt's rotation.x used to skew the plane —
+    // XYZ Euler components don't separate cleanly once yaw is involved, and
+    // the loadout panel came out wonky. YXZ order keeps roll at exactly 0.)
+    const dx = _head.x - this.panel.mesh.position.x;
+    const dz = _head.z - this.panel.mesh.position.z;
+    const dy = _head.y - this.panel.mesh.position.y;
+    const pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    this.panel.mesh.rotation.order = 'YXZ';
+    this.panel.mesh.rotation.set(-pitch * 0.35, Math.atan2(dx, dz), 0);
   }
 
   // --- controller pointers -------------------------------------------------

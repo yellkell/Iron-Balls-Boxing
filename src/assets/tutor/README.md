@@ -9,8 +9,9 @@ random per play — the praise pool ships two takes each.
 These mp3s are transcoded from the VA's WAV masters (the `Voice Lines/`
 folder on the delivery branch) by the session's transcode script: downmixed
 to mono (Ember is a point source behind an HRTF panner), silence-trimmed at
-~-40 dBFS with a 0.1 s pad (dead air would drag every line's timing), and
-encoded at 96 kbps.
+~-48 dBFS with a 0.15 s pad (dead air would drag every line's timing, but a
+harsher -40 dBFS cut clipped the soft onset of quiet takes like e010 "Over
+here."), and encoded at 96 kbps.
 
 `src/audio/tutorVoice.ts` globs `*.mp3` here and decodes on demand (warmed at
 enter-VR for anyone who hasn't finished the tutorial). Any line without a
