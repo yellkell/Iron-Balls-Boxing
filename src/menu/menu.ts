@@ -1154,11 +1154,13 @@ export function createActionPanel(scene: Scene): ActionPanel {
     mesh,
     redraw: (title, buttons, hint, hoverId, status = '', loadout = false) => {
       // Height-to-content: plate wraps exactly what's drawn, the rest of the
-      // canvas stays transparent.
+      // canvas stays transparent. The loadout sits ABOVE the buttons — gear
+      // first, resign/return below where it can't be fat-fingered.
       const buttonsH = buttons.length * 102;
       const statusH = status ? 30 : 0;
-      ballsY = loadout ? 84 + buttonsH + statusH + 6 : null;
-      const contentH = loadout ? (ballsY ?? 0) + BALL_H + 48 : 84 + buttonsH + statusH + 52;
+      ballsY = loadout ? 84 : null;
+      const buttonsY = loadout ? 84 + BALL_H + 14 : 84;
+      const contentH = buttonsY + buttonsH + statusH + 52;
 
       ctx.clearRect(0, 0, FW, FH);
       plate(ctx, 8, 8, FW - 16, contentH - 16, {
@@ -1178,8 +1180,19 @@ export function createActionPanel(scene: Scene): ActionPanel {
       ctx.lineTo(FW - 36, 64);
       ctx.stroke();
 
+      if (loadout && ballsY !== null) {
+        // The lobby's exact BALL LOADOUT face, re-hosted as a section (it
+        // draws its own plate + title, so it reads as an inset card).
+        ctx.save();
+        ctx.translate(0, ballsY);
+        drawBalls(ctx, null);
+        ctx.restore();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+      }
+
       zones = [];
-      let y = 84;
+      let y = buttonsY;
       for (const b of buttons) {
         buttonPlate(ctx, 64, y, FW - 128, 84, b.label, b.accent, hoverId === b.id);
         zones.push({ id: b.id, y0: y - 6, y1: y + 90 });
@@ -1192,19 +1205,6 @@ export function createActionPanel(scene: Scene): ActionPanel {
         ctx.fillStyle = UI.coolBright;
         ctx.fillText(status, FW / 2, y + 12);
       }
-
-      if (loadout && ballsY !== null) {
-        // The lobby's exact BALL LOADOUT face, re-hosted as a section (it
-        // draws its own plate + title, so it reads as an inset card).
-        ctx.save();
-        ctx.translate(0, ballsY);
-        drawBalls(ctx, null);
-        ctx.restore();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-      }
-
-      ctx.font = '600 24px system-ui, sans-serif';
       ctx.fillStyle = UI.textDim;
       ctx.fillText(hint, FW / 2, contentH - 34);
       texture.needsUpdate = true;

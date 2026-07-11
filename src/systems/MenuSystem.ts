@@ -1307,6 +1307,9 @@ export class MenuSystem extends createSystem({}) {
       _head.z + _fwd.z * 0.55 + rz * 0.38,
     );
     this.panel.mesh.lookAt(_head);
+    // From waist height a full lookAt lies the panel back like a lectern —
+    // keep a bit of that tilt but bring it most of the way upright.
+    this.panel.mesh.rotation.x *= 0.45;
   }
 
   // --- controller pointers -------------------------------------------------
