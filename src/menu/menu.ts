@@ -46,6 +46,7 @@ import {
   leaderboardRows,
   myProfileRow,
   runRows,
+  type LbRow,
   type LeaderboardTab,
   type RunRow,
   type SeasonAward,
@@ -163,6 +164,8 @@ export type MenuAction =
   | 'edit-note'
   | 'profile-back'
   | 'rename'
+  /** Hover-only: a profile trophy chip / clear badge — shows its tooltip. */
+  | `badge-${string}`
   | 'open-pub'
   | 'pub-back'
   | `pub-go-${string}`
@@ -1046,6 +1049,70 @@ const AWARD_STYLE: Record<SeasonAward, { label: string; color: string }> = {
   top25: { label: 'TOP 25', color: UI.steel },
 };
 
+/** What each honour actually is — the hover tooltip on the profile chips. */
+const AWARD_TIP: Record<SeasonAward, string> = {
+  first: 'WON A RANKED SEASON',
+  second: 'FINISHED A RANKED SEASON 2ND',
+  third: 'FINISHED A RANKED SEASON 3RD',
+  top10: 'TOP 10 RANKED SEASON FINISH',
+  top25: 'TOP 25 RANKED SEASON FINISH',
+};
+
+/**
+ * One profile achievement's screen rect + tooltip — the SAME list drives the
+ * drawing, the pointer hit-test and the hover tooltip, so they can't drift.
+ */
+type ProfileBadgeSpot = {
+  id: MenuAction;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tip: string;
+} & (
+  | { kind: 'award'; award: SeasonAward; count: number }
+  | { kind: 'clear'; glyph: 'star' | 'shield' | 'drop'; tier: number; hardcore: boolean }
+);
+
+function profileBadgeSpots(row: LbRow): ProfileBadgeSpot[] {
+  const spots: ProfileBadgeSpot[] = [];
+  // Season honours, stacked left of the emblem — best first, ×N for repeats.
+  let ay = 138;
+  for (const key of SEASON_AWARDS) {
+    const count = row.awards?.[key] ?? 0;
+    if (!count || ay > 228) continue;
+    const times = count > 1 ? ` · ×${count}` : '';
+    spots.push({ kind: 'award', id: `badge-${key}`, x: 52, y: ay, w: 108, h: 26, award: key, count, tip: AWARD_TIP[key] + times });
+    ay += 30;
+  }
+  // Clear badges, right of the emblem — only the highest tier each shows.
+  const clears: Array<['star' | 'shield' | 'drop', string, number, number]> = [
+    ['star', 'GAUNTLET CLEARED', row.gauntletBest ?? 0, row.gauntletBestHc ?? 0],
+    ['shield', 'TITAN RAID CLEARED', row.raidBest ?? 0, row.raidBestHc ?? 0],
+    ['drop', 'GOOPLIATH FELLED', row.goopBest ?? 0, 0],
+  ];
+  let by = 138;
+  for (const [glyph, what, tier, hcTier] of clears) {
+    if (!tier) continue;
+    const hardcore = hcTier >= tier;
+    const tierName = tier >= 3 ? 'BLAZING' : tier === 2 ? 'HARD' : 'NORMAL';
+    spots.push({
+      kind: 'clear',
+      id: `badge-${glyph}`,
+      x: BW - 96,
+      y: by,
+      w: 44,
+      h: 36,
+      glyph,
+      tier,
+      hardcore,
+      tip: `${what} · ${tierName}${hardcore ? ' · HARDCORE' : ''}`,
+    });
+    by += 42;
+  }
+  return spots;
+}
+
 /** The clear-badge glyphs: star (gauntlet), shield (raid), drop (Goopliath). */
 function drawClearGlyph(ctx: CanvasRenderingContext2D, kind: 'star' | 'shield' | 'drop', cx: number, cy: number, r: number, color: string): void {
   ctx.fillStyle = color;
@@ -1098,33 +1165,22 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   const badge = rankBadge(tier.index);
   if (badge) ctx.drawImage(badge, BW / 2 - 58, 134, 116, 116);
 
-  // Season honours, stacked left of the emblem — best first, ×N for repeats.
-  let ay = 138;
-  for (const key of SEASON_AWARDS) {
-    const count = row.awards?.[key] ?? 0;
-    if (!count || ay > 228) continue;
-    drawFeatChip(ctx, 52, ay, 108, AWARD_STYLE[key].label, AWARD_STYLE[key].color, count);
-    ay += 30;
-  }
-  // Clear badges, right of the emblem — SYMBOLS, not words: a star for the
+  // Achievements flank the emblem: season honours stacked left (best first,
+  // ×N for repeats), clear badges right — SYMBOLS, not words: a star for the
   // gauntlet, a shield for raids, a droplet for the tide. Tier tints the
   // glyph (steel → amber → ember); clearing the badge's tier HARDCORE burns
-  // it red, and blazing wears the flame at its ear. Only the HIGHEST tier
-  // each ever shows.
-  const clears: Array<['star' | 'shield' | 'drop', number, number]> = [
-    ['star', row.gauntletBest ?? 0, row.gauntletBestHc ?? 0],
-    ['shield', row.raidBest ?? 0, row.raidBestHc ?? 0],
-    ['drop', row.goopBest ?? 0, 0],
-  ];
-  let by = 138;
-  for (const [glyph, tierN, hcTier] of clears) {
-    if (!tierN) continue;
-    const color = hcTier >= tierN ? UI.danger : tierN >= 3 ? UI.ember : tierN === 2 ? UI.amber : UI.steel;
-    const bx = BW - 52 - 44;
-    plate(ctx, bx, by, 44, 36, { cut: 8, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
-    drawClearGlyph(ctx, glyph, bx + 22, by + 19, 12, color);
-    if (tierN >= 3) drawFlame(ctx, bx + 40, by + 6, 14);
-    by += 42;
+  // it red, and blazing wears the flame at its ear. Pointing at any of them
+  // pops a tooltip saying what it's for (drawn last, over everything).
+  const spots = profileBadgeSpots(row);
+  for (const s of spots) {
+    if (s.kind === 'award') {
+      drawFeatChip(ctx, s.x, s.y, s.w, AWARD_STYLE[s.award].label, AWARD_STYLE[s.award].color, s.count);
+    } else {
+      const color = s.hardcore ? UI.danger : s.tier >= 3 ? UI.ember : s.tier === 2 ? UI.amber : UI.steel;
+      plate(ctx, s.x, s.y, s.w, s.h, { cut: 8, fill: 'rgba(14,15,20,0.7)', stroke: color, rivets: false });
+      drawClearGlyph(ctx, s.glyph, s.x + 22, s.y + 19, 12, color);
+      if (s.tier >= 3) drawFlame(ctx, s.x + 40, s.y + 6, 14);
+    }
   }
 
   ctx.textAlign = 'center';
@@ -1176,6 +1232,21 @@ function drawProfile(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | nu
   } else {
     buttonPlate(ctx, BW / 2 - 90, 494, 180, 42, 'BACK', UI.steel, hoverAction === 'profile-back');
   }
+
+  // The hovered achievement's tooltip — beside its chip, on top of everything.
+  const hovered = hoverAction?.startsWith('badge-') ? spots.find((s) => s.id === hoverAction) : undefined;
+  if (hovered) {
+    ctx.font = '700 15px system-ui, sans-serif';
+    const tw = ctx.measureText(hovered.tip).width + 26;
+    const tx = hovered.x < BW / 2 ? hovered.x + hovered.w + 10 : hovered.x - 10 - tw;
+    const ty = hovered.y + hovered.h / 2 - 14;
+    plate(ctx, tx, ty, tw, 28, { cut: 6, fill: 'rgba(10,11,15,0.94)', stroke: UI.amber, rivets: false });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = UI.amberSoft;
+    ctx.fillText(hovered.tip, tx + tw / 2, ty + 15);
+    ctx.textBaseline = 'alphabetic';
+  }
 }
 
 /** A profile note in at most two centred lines, ellipsised if it overflows. */
@@ -1216,6 +1287,11 @@ function hitBoard(u: number, v: number): MenuAction | null {
     return subs[i][2];
   }
   if (leaderboard.tab === 'profile') {
+    // The achievement chips are hover targets — pointing at one names it.
+    const row = leaderboard.viewRow ?? myProfileRow();
+    for (const s of profileBadgeSpots(row)) {
+      if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) return s.id;
+    }
     if (y >= 482 && y <= 536) {
       const own = !leaderboard.viewRow || leaderboard.viewRow.me;
       return own ? (x < BW / 2 ? 'rename' : 'edit-note') : 'profile-back';
