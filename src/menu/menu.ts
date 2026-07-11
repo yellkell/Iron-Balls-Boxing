@@ -193,6 +193,9 @@ export type MenuAction =
   /** Tap an avatar tile (equip) or a platform tile (buy if unowned, else equip). */
   | `shop-av-${number}`
   | `shop-pf-${number}`
+  /** The BUY button on a previewed (tried-on) STORE tile. */
+  | `shop-buy-av-${number}`
+  | `shop-buy-pf-${number}`
   /** Open / close the Gasket Gazette. */
   | 'open-gazette'
   | 'gazette-close'
@@ -3002,19 +3005,30 @@ function panelItems(locker: boolean): { items: DisplayItem[]; soon: PanRect | nu
   return { items, soon: null };
 }
 
+/** The BUY button strip inside a previewed STORE tile. */
+function buyRect(r: PanRect): PanRect {
+  return { x: r.x + 10, y: r.y + r.h - 32, w: r.w - 20, h: 26 };
+}
+
+/** Is this tile the skin the STORE is currently trying on? */
+function tilePreviewed(it: DisplayItem): boolean {
+  return customization.preview?.kind === it.kind && customization.preview.id === it.skin.id;
+}
+
 /** One cosmetic tile: a picture, its name, and a status footer. */
-function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: MenuAction | null): void {
+function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: MenuAction | null, locker: boolean): void {
   const r = it.rect;
   const avatar = it.kind === 'avatar';
   const accent = avatar ? (it.skin as AvatarSkin).accent : (it.skin as PlatformSkin).neon;
   const css = hexCss(accent);
   const equipped = avatar ? customization.avatar === it.skin.id : customization.platform === it.skin.id;
   const owned = avatar ? avatarOwned(it.skin.id) : platformOwned(it.skin.id);
+  const previewed = !locker && tilePreviewed(it);
   const hot = hoverAction === it.action;
   plate(ctx, r.x, r.y, r.w, r.h, {
     cut: 10,
-    fill: equipped ? 'rgba(20,22,30,0.94)' : hot ? 'rgba(20,22,30,0.9)' : 'rgba(10,11,15,0.72)',
-    stroke: equipped || hot ? css : UI.steel,
+    fill: equipped || previewed ? 'rgba(20,22,30,0.94)' : hot ? 'rgba(20,22,30,0.9)' : 'rgba(10,11,15,0.72)',
+    stroke: equipped || previewed || hot ? css : UI.steel,
     rivets: false,
   });
   const icx = r.x + r.w / 2;
@@ -3030,8 +3044,9 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     fs -= 1;
     ctx.font = `700 ${fs}px system-ui, sans-serif`;
   }
-  ctx.fillStyle = equipped || hot ? css : UI.text;
-  ctx.fillText(it.skin.name, icx, r.y + r.h * 0.72);
+  ctx.fillStyle = equipped || previewed || hot ? css : UI.text;
+  // The BUY button needs the footer strip, so a previewed name rides higher.
+  ctx.fillText(it.skin.name, icx, r.y + r.h * (previewed ? 0.62 : 0.72));
 
   const fy = r.y + r.h - 14;
   ctx.font = '800 12px system-ui, sans-serif';
@@ -3045,6 +3060,15 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     // Earned, never sold — the tile says how to win it (the CHAMPION pad).
     ctx.fillStyle = UI.steelDim;
     ctx.fillText((it.skin as PlatformSkin).earnedBy as string, icx, fy);
+  } else if (previewed) {
+    // Tried on (the mirror / your pad is modelling it) — the price row grows
+    // into the actual BUY button.
+    const price = (it.skin as { price?: number }).price ?? 0;
+    const b = buyRect(r);
+    const buyAction = `shop-buy-${avatar ? 'av' : 'pf'}-${it.index}`;
+    buttonPlate(ctx, b.x, b.y, b.w, b.h, `BUY  ${price}`, canAfford(price) ? UI.amber : UI.steel, hoverAction === buyAction, !canAfford(price));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
   } else {
     const price = (it.skin as { price?: number }).price ?? 0;
     const str = String(price);
@@ -3279,12 +3303,17 @@ function hitArenaTab(x: number, y: number): MenuAction | null {
 
 function drawGrid(ctx: CanvasRenderingContext2D, locker: boolean, hoverAction: MenuAction | null): void {
   const { items, soon } = panelItems(locker);
-  for (const it of items) drawTile(ctx, it, hoverAction);
+  for (const it of items) drawTile(ctx, it, hoverAction, locker);
   if (soon) drawSoonTile(ctx, soon);
 }
 
 function gridHit(x: number, y: number, locker: boolean): MenuAction | null {
   for (const it of panelItems(locker).items) {
+    // A previewed STORE tile's BUY strip claims its own action (earned-only
+    // tiles never grow one — nothing to buy).
+    if (!locker && tilePreviewed(it) && !(it.skin as PlatformSkin).earnedBy && inPanRect(x, y, buyRect(it.rect))) {
+      return `shop-buy-${it.kind === 'avatar' ? 'av' : 'pf'}-${it.index}` as MenuAction;
+    }
     if (inPanRect(x, y, it.rect)) return it.action;
   }
   return null;
