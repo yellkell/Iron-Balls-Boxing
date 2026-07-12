@@ -37,6 +37,7 @@ import {
   sfxVolFromU,
   clickBalls,
   colorBarLight,
+  campaignModal,
   createActionPanel,
   createMenu,
   flashProfileKeyboardHint,
@@ -562,6 +563,7 @@ export class MenuSystem extends createSystem({}) {
         break;
       case 'campaign-close':
         app.campaignOpen = false;
+        campaignModal.pending = null; // never reopen onto a stale pop-up
         break;
       case 'open-raid':
         // Rejoining the modal mid-lobby (e.g. after a look around) lands you
@@ -612,14 +614,26 @@ export class MenuSystem extends createSystem({}) {
         break;
       case 'campaign-speedrun':
       case 'campaign-hardcore':
-        // The timed runs: all five titans back to back from stage I. The
-        // line-up's hitTest already gates sealed runs, so just launch.
+        // The timed runs arm the pick-your-damage pop-up instead of firing
+        // straight away — START launches, CANCEL (or any stray click) closes.
+        campaignModal.pending = action === 'campaign-hardcore' ? 'hardcore' : 'gauntlet';
+        break;
+      case 'campaign-launch-cancel':
+        campaignModal.pending = null;
+        break;
+      case 'campaign-launch-start': {
+        // All five titans back to back from stage I, at the difficulty the
+        // pop-up's chips picked (diff-<tier> saved it to app.difficulty).
+        const kind = campaignModal.pending;
+        campaignModal.pending = null;
+        if (!kind) break;
         app.mode = 'campaign';
-        app.campaignMode = action === 'campaign-hardcore' ? 'hardcore' : 'gauntlet';
+        app.campaignMode = kind;
         app.campaignStage = 0;
         app.arcade = '1v1';
         app.state = 'playing';
         break;
+      }
       case 'campaign-goopliath':
         // The sealed entry beneath the line-up: GOOPLIATH's own single, very
         // long fight. hitTest gates it until the gauntlet is cleared.

@@ -15,6 +15,7 @@
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Quaternion, Raycaster, Vector3 } from 'three';
 import { uiClick } from '../../audio/sfx.js';
+import { isVoiceMuted } from '../voice/capture.js';
 import { Panel } from '../panel.js';
 import { pub } from '../state.js';
 import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../social.js';
@@ -116,9 +117,10 @@ export class SocialSystem extends createSystem({}) {
 
   private paint(): void {
     const punters = [...pub.punters.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const micMuted = isVoiceMuted();
     const key =
       punters.map((p) => `${p.name}|${socialMuted(p.name) ? 1 : 0}${socialBlocked(p.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}`;
+      `#${this.hover ?? ''}#${micMuted ? 'm' : 'o'}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -134,6 +136,40 @@ export class SocialSystem extends createSystem({}) {
       ctx.font = "600 17px 'Arial Narrow', system-ui, sans-serif";
       ctx.fillStyle = 'rgba(172,182,198,0.75)';
       ctx.fillText('mute silences · block also hides · yours to undo', 24, 74);
+
+      // YOUR mic, top-right: the little glyph mirrors the left-Y mute so you
+      // can always tell whether the room can hear you.
+      const mx = W - 24 - 96;
+      const on = !micMuted;
+      ctx.strokeStyle = on ? '#ffb000' : '#e8352a';
+      ctx.fillStyle = on ? '#ffb000' : '#e8352a';
+      ctx.lineWidth = 3;
+      // capsule + stand
+      ctx.beginPath();
+      ctx.roundRect(mx, 24, 14, 24, 7);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(mx + 7, 44, 13, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(mx + 7, 57);
+      ctx.lineTo(mx + 7, 64);
+      ctx.moveTo(mx - 2, 64);
+      ctx.lineTo(mx + 16, 64);
+      ctx.stroke();
+      if (!on) {
+        // the slash
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(mx - 8, 18);
+        ctx.lineTo(mx + 22, 68);
+        ctx.stroke();
+      }
+      ctx.font = "800 16px 'Arial Narrow', system-ui, sans-serif";
+      ctx.fillText(on ? 'MIC LIVE' : 'MIC MUTED', mx + 28, 36);
+      ctx.fillStyle = 'rgba(172,182,198,0.7)';
+      ctx.font = "600 15px 'Arial Narrow', system-ui, sans-serif";
+      ctx.fillText('left Y flips', mx + 28, 56);
 
       if (!punters.length) {
         ctx.font = "600 22px 'Arial Narrow', system-ui, sans-serif";
