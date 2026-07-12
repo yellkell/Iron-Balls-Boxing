@@ -2361,9 +2361,9 @@ const CARDS_X = (CAMP_W - (CARD_W * 5 + CARD_GAP * 4)) / 2;
 const DIFF_ROW = { x: 210, y: 360, w: 118, gap: 10, h: 34 } as const;
 /** The pick-your-damage pop-up GAUNTLET/HARDCORE open before launching. */
 const LAUNCH_MODAL = { x: CAMP_W / 2 - 320, y: 168, w: 640, h: 260 } as const;
-/** Which run the launch pop-up is arming (null = no pop-up). MenuSystem sets
- *  it on the run buttons and clears it on start/cancel/close. */
-export const campaignModal = { pending: null as 'gauntlet' | 'hardcore' | null };
+/** Which fight the launch pop-up is arming (null = no pop-up). MenuSystem
+ *  sets it on the run/goop buttons and clears it on start/cancel/close. */
+export const campaignModal = { pending: null as 'gauntlet' | 'hardcore' | 'goopliath' | null };
 const RUN_BTN = { x: 48, y: 410, w: 320, h: 54 } as const;
 const HARD_BTN = { x: 48, y: 476, w: 320, h: 54 } as const;
 /** The sealed sixth emblem BENEATH the line-up — GOOPLIATH's own fight. */
@@ -2604,33 +2604,37 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
   ctx.textAlign = 'center';
   buttonPlate(ctx, CAMP_CLOSE.x, CAMP_CLOSE.y, CAMP_CLOSE.w, CAMP_CLOSE.h, 'CLOSE', UI.amber, hoverAction === 'campaign-close');
 
-  // The LAUNCH pop-up: pressing GAUNTLET or HARDCORE doesn't fire straight
-  // away any more — pick the damage first, then START. (Raids keep their own
-  // host picker in the lobby; single bouts and the goop always run normal.)
+  // The LAUNCH pop-up: pressing GAUNTLET, HARDCORE or FIGHT GOOPLIATH doesn't
+  // fire straight away any more — pick the damage first, then START. (Raids
+  // keep their own host picker in the lobby; single titan bouts run normal.)
   if (campaignModal.pending) {
     ctx.fillStyle = 'rgba(4,5,8,0.62)';
     ctx.fillRect(0, 0, CAMP_W, CAMP_H);
     const m = LAUNCH_MODAL;
-    const hardcore = campaignModal.pending === 'hardcore';
-    plate(ctx, m.x, m.y, m.w, m.h, { cut: 18, fill: 'rgba(14,15,20,0.97)', stroke: hardcore ? UI.danger : UI.emberBright });
+    const kind = campaignModal.pending;
+    const accent = kind === 'hardcore' ? UI.danger : kind === 'goopliath' ? GOOP_GREEN : UI.emberBright;
+    const title = kind === 'hardcore' ? 'HARDCORE RUN' : kind === 'goopliath' ? 'FIGHT GOOPLIATH' : 'RUN THE GAUNTLET';
+    const blurb =
+      kind === 'hardcore'
+        ? 'no healing between titans — pick your damage'
+        : kind === 'goopliath'
+          ? 'the tide beneath the pit — blazing carries a raid-sized pool'
+          : 'all five titans, on the clock — pick your damage';
+    plate(ctx, m.x, m.y, m.w, m.h, { cut: 18, fill: 'rgba(14,15,20,0.97)', stroke: accent });
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = stencilFont(34);
-    ctx.fillStyle = hardcore ? UI.danger : UI.emberBright;
-    ctx.fillText(hardcore ? 'HARDCORE RUN' : 'RUN THE GAUNTLET', CAMP_W / 2, m.y + 46);
+    ctx.fillStyle = accent;
+    ctx.fillText(title, CAMP_W / 2, m.y + 46);
     ctx.font = '600 19px system-ui, sans-serif';
     ctx.fillStyle = UI.textDim;
-    ctx.fillText(
-      hardcore ? 'no healing between titans — pick your damage' : 'all five titans, on the clock — pick your damage',
-      CAMP_W / 2,
-      m.y + 82,
-    );
+    ctx.fillText(blurb, CAMP_W / 2, m.y + 82);
     const chipsW = DIFFICULTY_ORDER.length * (DIFF_ROW.w + DIFF_ROW.gap) - DIFF_ROW.gap;
     drawDiffChips(ctx, CAMP_W / 2 - chipsW / 2, m.y + 108, DIFF_ROW.w, DIFF_ROW.gap, 40, app.difficulty, hoverAction, 'diff-', true);
     buttonPlate(ctx, m.x + 44, m.y + m.h - 74, 170, 52, 'CANCEL', UI.steel, hoverAction === 'campaign-launch-cancel');
     buttonPlate(
       ctx, m.x + m.w - 44 - 210, m.y + m.h - 74, 210, 52,
-      'START', hardcore ? UI.danger : UI.emberBright, hoverAction === 'campaign-launch-start',
+      'START', accent, hoverAction === 'campaign-launch-start',
     );
   }
 }
