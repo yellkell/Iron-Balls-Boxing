@@ -353,12 +353,13 @@ export class CampaignSystem extends createSystem({
     return app.campaignMode === 'goopliath' || (app.campaignMode === 'raid' && app.raidGoopliath);
   }
 
-  /** The active RUN difficulty. Single stages and the solo GOOPLIATH fight
-   *  always run NORMAL; the run modes (gauntlet/hardcore/raid) honour the
-   *  player's / host's pick. */
+  /** The active difficulty. Single titan stages always run NORMAL; the run
+   *  modes (gauntlet/hardcore/raid) and the dedicated GOOPLIATH fight honour
+   *  the player's / host's pick (the goop fight gets its own pick-your-damage
+   *  pop-up, so hard/blazing drop badges are earnable against the tide). */
   private activeDifficulty(): Difficulty {
     const m = app.campaignMode;
-    if (m === 'gauntlet' || m === 'hardcore' || m === 'raid') return app.difficulty;
+    if (m === 'gauntlet' || m === 'hardcore' || m === 'raid' || m === 'goopliath') return app.difficulty;
     return 'normal';
   }
 
@@ -618,6 +619,20 @@ export class CampaignSystem extends createSystem({
     if (this.goopSolo()) {
       // The dedicated gel fight — solo entry or raid breaker.
       this.def = goopliathBoss(this.raid(), this.raidSize());
+      // GOOPLIATH's pools are hand-set per tier (75 / 135 / 250 per pair of
+      // fists — not multiplier math), pre-divided by the tier's health
+      // multiplier so the hp line below lands exactly on them. The campaign
+      // fight takes one pool; a raid takes pool × squad, so the host's pick
+      // scales the tide on the SAME curve and each raider's share of the
+      // work matches the solo fight at that tier.
+      {
+        const d = this.activeDifficulty();
+        const pool = d === 'blazing' ? GOOPLIATH.hitsCampaignBlazing : d === 'hard' ? GOOPLIATH.hitsCampaignHard : null;
+        if (pool !== null) {
+          const fists = this.raid() ? this.raidSize() : 1;
+          this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
+        }
+      }
       this.runLen = 1;
       goopStage = true;
     } else if (this.runMode()) {
@@ -2848,9 +2863,16 @@ export class CampaignSystem extends createSystem({
       playCash();
     }
 
+    // The dedicated CAMPAIGN goop fight banks the drop badge at its picked
+    // difficulty (raids bank theirs in the raid branch below) — so hard and
+    // blazing achievements are earnable against the tide solo too.
+    if (app.campaignMode === 'goopliath' && lastStage) {
+      reportRunClear('goopliath', this.activeDifficulty());
+    }
+
     // Two more earned pads. TIDEBREAKER: fell GOOPLIATH with a raid squad
-    // (every raider banks it). BLAZING: finish any run or raid with the
-    // blazing breaker thrown — single bouts and the solo goop fight always
+    // (every raider banks it). BLAZING: finish any run, raid, or the blazing
+    // goop fight with the blazing breaker thrown — single titan bouts always
     // run normal (activeDifficulty), so they can never trip this.
     const tidebroke = solo && this.raid() && lastStage && !platformOwned('tidebreaker');
     if (tidebroke) {

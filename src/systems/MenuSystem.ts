@@ -622,8 +622,8 @@ export class MenuSystem extends createSystem({}) {
         campaignModal.pending = null;
         break;
       case 'campaign-launch-start': {
-        // All five titans back to back from stage I, at the difficulty the
-        // pop-up's chips picked (diff-<tier> saved it to app.difficulty).
+        // Launch the armed fight (a run from stage I, or the goop) at the
+        // difficulty the pop-up's chips picked (diff-<tier> saved it).
         const kind = campaignModal.pending;
         campaignModal.pending = null;
         if (!kind) break;
@@ -636,12 +636,8 @@ export class MenuSystem extends createSystem({}) {
       }
       case 'campaign-goopliath':
         // The sealed entry beneath the line-up: GOOPLIATH's own single, very
-        // long fight. hitTest gates it until the gauntlet is cleared.
-        app.mode = 'campaign';
-        app.campaignMode = 'goopliath';
-        app.campaignStage = 0;
-        app.arcade = '1v1';
-        app.state = 'playing';
+        // long fight — arms the same pick-your-damage pop-up as the runs.
+        campaignModal.pending = 'goopliath';
         break;
       case 'toggle-shootback':
         app.shootBack = !app.shootBack;

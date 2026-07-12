@@ -180,6 +180,26 @@ function setCoinGlow(mesh: Mesh, on: boolean): void {
   }
 }
 
+/**
+ * The coin flip: which face lands up, decided 50/50 — but DETERMINISTICALLY,
+ * from the coin's id + its final resting spot (the exact data every client
+ * receives in COIN_REST). A called toss must read the same in every headset,
+ * so nobody rolls dice locally; everyone hashes the same landing.
+ */
+function coinFaceUp(id: string, x: number, z: number): 'H' | 'T' {
+  const s = `${id}|${Math.round(x * 100)}|${Math.round(z * 100)}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (h & 1) === 0 ? 'H' : 'T';
+}
+
+/** Lie a coin flat with `face` up (H = top cap, T = the flipped bottom cap),
+ *  spun to a cosmetic random yaw — the letter's heading doesn't matter, the
+ *  face does. */
+function lieFlat(coin: FloorCoin, face: 'H' | 'T'): void {
+  coin.mesh.rotation.set(face === 'T' ? Math.PI : 0, Math.random() * Math.PI * 2, 0);
+}
+
 function makeTag(): WristTag {
   const panel = new Panel(TAG_W, TAG_H, 1024);
   return { panel, shown: -1 };
@@ -556,12 +576,14 @@ export class CoinSystem extends createSystem({}) {
         p.y = restY;
         coin.vel.set(0, 0, 0);
         coin.resting = true;
-        coin.mesh.rotation.set(0, Math.random() * Math.PI * 2, 0); // lie flat on the surface
         // Bet eligibility (pit bounds + which corner's half) is decided on the
         // coin's ACTUAL landing spot — check it before any overlap nudge could
         // shift it across the pit boundary or the corner midline.
         if (this.tryArenaBet(coin, p)) continue; // landed in the pit → spent as a bet
         this.resolveCoinRest(coin, p); // nudge clear of any coin/glass already there
+        // Heads or tails off the FINAL spot (post-nudge — the one broadcast),
+        // so every headset reads the same face.
+        lieFlat(coin, coinFaceUp(coin.id, p.x, p.z));
         setRestCircle(`coin:${coin.id}`, p.x, p.y, p.z, COIN_R);
         pubSendEvent({ e: 'COIN_REST', id: coin.id, pos: [p.x, p.y, p.z] });
       } else if (stream) {
@@ -636,7 +658,9 @@ export class CoinSystem extends createSystem({}) {
         }
         if (ev.e === 'COIN_REST') {
           coin.resting = true;
-          coin.mesh.rotation.set(0, coin.mesh.rotation.y, 0); // settle flat
+          // Same deterministic flip as the owner computed — H/T agrees in
+          // every headset because it hashes the same id + broadcast spot.
+          lieFlat(coin, coinFaceUp(coin.id, ev.pos[0], ev.pos[2]));
           // The owner already resolved overlap before sending this — just
           // mirror their final resting spot into the shared registry so OUR
           // glasses (PropSystem) know to avoid it too.
