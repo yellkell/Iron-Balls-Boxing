@@ -1525,9 +1525,9 @@ function buildStallionPelvis(accent: number): Group {
 
 /** WOLF (KAVIC) → lofted for accuracy, and MEAN: the lean hunter's skull —
  *  a modest dome, a light stop at the brow, then a LONG tapering muzzle (the
- *  opposite of the bear's short deep one), ears PINNED BACK, slit eyes
- *  glaring under a heavy V-brow, a wrinkled bridge and a fanged snarl, swept
- *  cheek ruffs and a layered nape ruff. */
+ *  opposite of the bear's short deep one), BIG ears pinned back, slit eyes
+ *  glaring under a heavy V-brow, swept cheek ruffs and a layered nape ruff.
+ *  The face stays clean — the menace is the glare and the ear set. */
 function buildWolfHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('wolf');
@@ -1561,18 +1561,18 @@ function buildWolfHead(accent: number): Group {
   // ±0.36r the surface has already fallen away and the outer halves floated).
   // Geometry pre-spun 45° so a flat face fronts before the thin z-squash.
   for (const side of [-1, 1]) {
-    const earGeo = new ConeGeometry(r * 0.22, r * 0.56, 4);
+    const earGeo = new ConeGeometry(r * 0.28, r * 0.74, 4);
     earGeo.rotateY(Math.PI / 4);
     const ear = new Mesh(earGeo, chassisMat(accent, 0.05));
     ear.scale.set(1, 1, 0.55);
-    ear.position.set(side * r * 0.27, r * 0.7, r * 0.3);
+    ear.position.set(side * r * 0.28, r * 0.78, r * 0.3);
     ear.rotation.set(0.3, 0, side * -0.14); // raked back with the skull line
     g.add(ear);
-    const innerGeo = new ConeGeometry(r * 0.12, r * 0.34, 4);
+    const innerGeo = new ConeGeometry(r * 0.16, r * 0.46, 4);
     innerGeo.rotateY(Math.PI / 4);
     const inner = new Mesh(innerGeo, darkMat());
     inner.scale.set(1, 1, 0.4);
-    inner.position.set(side * r * 0.27, r * 0.64, r * 0.24);
+    inner.position.set(side * r * 0.28, r * 0.7, r * 0.24);
     inner.rotation.set(0.3, 0, side * -0.14);
     g.add(inner);
   }
@@ -1605,24 +1605,13 @@ function buildWolfHead(accent: number): Group {
   nose.position.set(0, 0.0, -r * 1.38);
   g.add(nose);
 
-  // The SNARL: the mouth line runs back level, then a lip-curl notch kicks UP
-  // on each side over a bared fang.
+  // A single clean mouth line and the chin — the curls and fangs never read
+  // at this resolution, just clutter around the mouth. The menace lives in
+  // the glare and the pinned ears.
   const mouth = new Mesh(new BoxGeometry(r * 0.03, r * 0.03, r * 0.6), darkMat());
   mouth.position.set(0, -r * 0.28, -r * 1.02);
   mouth.rotation.x = -0.08;
   g.add(mouth);
-  for (const side of [-1, 1]) {
-    const curl = new Mesh(new BoxGeometry(r * 0.03, r * 0.14, r * 0.03), darkMat());
-    curl.position.set(side * r * 0.11, -r * 0.2, -r * 1.06);
-    curl.rotation.set(0, 0, side * 0.5);
-    g.add(curl);
-    const fangGeo = new ConeGeometry(r * 0.032, r * 0.11, 4);
-    fangGeo.rotateY(Math.PI / 4);
-    const fang = new Mesh(fangGeo, chassisMat(accent, 0.12));
-    fang.rotation.x = Math.PI; // point down
-    fang.position.set(side * r * 0.09, -r * 0.32, -r * 1.12);
-    g.add(fang);
-  }
   const chin = new Mesh(new SphereGeometry(r * 0.09, 10, 8), chassisMat(accent, 0.04));
   chin.scale.set(1, 0.65, 0.9);
   chin.position.set(0, -r * 0.28, -r * 1.24);
