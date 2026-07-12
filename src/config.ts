@@ -514,6 +514,11 @@ export const RAID = {
 export const GOOPLIATH = {
   /** Fireball hits to fell him. THE longest fight in the game by design. */
   hitsCampaign: 75,
+  /** The dedicated fight's HARD and BLAZING pools (hand-set, not multiplier
+   *  math): hard is half-again the tide, blazing more than a whole raid's
+   *  pool for one pair of fists. */
+  hitsCampaignHard: 135,
+  hitsCampaignBlazing: 250,
   /** Raid hit count PER RAIDER — a 4-squad lands on the original 300. */
   hitsPerRaider: 75,
   /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
