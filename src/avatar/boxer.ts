@@ -1820,8 +1820,8 @@ function buildFrogChest(accent: number): Group {
 
   // BULBOUS dome shoulders, the knight's pauldron construction gone pond:
   // a half-dome shell tilted over the arm with a dark under-fill so it never
-  // reads hollow and a rim lip at the cut edge — kept smooth (no studs, no
-  // lames), with one big pond spot riding each crown.
+  // reads hollow and a rim lip at the cut edge — kept COMPLETELY smooth (no
+  // studs, no lames, no crown spots — the domes read best bare).
   for (const side of [-1, 1]) {
     const sh = new Group();
     sh.position.set(side * 0.27, 0.11, 0);
@@ -1841,10 +1841,6 @@ function buildFrogChest(accent: number): Group {
     lip.scale.z = 1.05;
     lip.position.y = -0.036;
     sh.add(lip);
-    const spot = new Mesh(new SphereGeometry(0.045, 10, 8), darkMat());
-    spot.scale.set(1, 0.3, 1);
-    spot.position.set(side * 0.02, 0.117, 0.02);
-    sh.add(spot);
   }
 
   const trunk = new Mesh(new CylinderGeometry(0.155, 0.085, 0.42, 8), darkMat());
