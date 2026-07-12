@@ -619,13 +619,19 @@ export class CampaignSystem extends createSystem({
     if (this.goopSolo()) {
       // The dedicated gel fight — solo entry or raid breaker.
       this.def = goopliathBoss(this.raid(), this.raidSize());
-      // The dedicated fight's pools are hand-set per tier (75 / 135 / 250) —
-      // pre-divided by the tier's health multiplier so the hp line below
-      // lands exactly on them. (Raid goop keeps hitsPerRaider × squad.)
-      if (!this.raid()) {
+      // GOOPLIATH's pools are hand-set per tier (75 / 135 / 250 per pair of
+      // fists — not multiplier math), pre-divided by the tier's health
+      // multiplier so the hp line below lands exactly on them. The campaign
+      // fight takes one pool; a raid takes pool × squad, so the host's pick
+      // scales the tide on the SAME curve and each raider's share of the
+      // work matches the solo fight at that tier.
+      {
         const d = this.activeDifficulty();
         const pool = d === 'blazing' ? GOOPLIATH.hitsCampaignBlazing : d === 'hard' ? GOOPLIATH.hitsCampaignHard : null;
-        if (pool !== null) this.def = { ...this.def, health: pool / DIFFICULTY[d].health };
+        if (pool !== null) {
+          const fists = this.raid() ? this.raidSize() : 1;
+          this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
+        }
       }
       this.runLen = 1;
       goopStage = true;
