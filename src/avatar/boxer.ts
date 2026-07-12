@@ -348,8 +348,9 @@ function buildBearHead(accent: number): Group {
     g.add(eye);
   }
 
-  // The big nose pad capping the muzzle, with the philtrum seam splitting
-  // down to the mouth line and a soft chin below it.
+  // The big nose pad capping the muzzle, the philtrum seam splitting down
+  // from it, and a soft chin below. (No mouth plate — the wide dark box
+  // meant as the jaw underline just read as a black square under the nose.)
   const nose = new Mesh(new SphereGeometry(r * 0.15, 12, 10), darkMat());
   nose.scale.set(1.25, 0.75, 0.7);
   nose.position.set(0, -r * 0.04, -r * 1.16);
@@ -358,10 +359,6 @@ function buildBearHead(accent: number): Group {
   philtrum.position.set(0, -r * 0.22, -r * 1.14);
   philtrum.rotation.x = 0.25;
   g.add(philtrum);
-  const mouth = new Mesh(new BoxGeometry(r * 0.28, r * 0.03, r * 0.3), darkMat());
-  mouth.position.set(0, -r * 0.45, -r * 0.96);
-  mouth.rotation.x = 0.15;
-  g.add(mouth);
   const chin = new Mesh(new SphereGeometry(r * 0.13, 12, 10), chassisMat(accent, 0.05));
   chin.scale.set(1, 0.7, 0.85);
   chin.position.set(0, -r * 0.42, -r * 1.0);
@@ -1608,17 +1605,13 @@ function buildWolfHead(accent: number): Group {
   nose.position.set(0, 0.0, -r * 1.38);
   g.add(nose);
 
-  // A single clean mouth line and the chin — the curls and fangs never read
-  // at this resolution, just clutter around the mouth. The menace lives in
-  // the glare and the pinned ears.
+  // A single clean mouth line, nothing else — the curls, fangs and chin ball
+  // never read at this resolution, just clutter under the nose. The menace
+  // lives in the glare and the pinned ears.
   const mouth = new Mesh(new BoxGeometry(r * 0.03, r * 0.03, r * 0.6), darkMat());
   mouth.position.set(0, -r * 0.28, -r * 1.02);
   mouth.rotation.x = -0.08;
   g.add(mouth);
-  const chin = new Mesh(new SphereGeometry(r * 0.09, 10, 8), chassisMat(accent, 0.04));
-  chin.scale.set(1, 0.65, 0.9);
-  chin.position.set(0, -r * 0.28, -r * 1.24);
-  g.add(chin);
 
   // Cheek ruffs swept back and down — leaner, longer sweeps than the bear's.
   for (const side of [-1, 1]) {
