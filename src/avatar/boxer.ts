@@ -1523,14 +1523,359 @@ function buildStallionPelvis(accent: number): Group {
   return g;
 }
 
+/** WOLF (HOWLER) → lofted for accuracy: the lean hunter's skull — a modest
+ *  dome, a light stop at the brow, then a LONG tapering muzzle (the opposite
+ *  of the bear's short deep one), tall pricked triangular ears, narrow
+ *  slanted eyes under a scowling brow ridge, swept cheek ruffs and a layered
+ *  nape ruff. */
+function buildWolfHead(accent: number): Group {
+  const r = BODY_IK.headRadius;
+  const g = taggedHead('wolf');
+  g.scale.setScalar(1.38); // leaner carry than the bear's 1.5 — a runner, not a wall
+  g.position.y = 0.03;
+
+  // The skull loft, occiput → nose tip. Half the head is muzzle: the taper
+  // starts at the cheeks and runs shallow and straight — no bear dome, no
+  // horse convexity — with only a light dish at the stop.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.42, 0.55], bot: [-0.35, 0.6], w: 0.38, n: 2.0 }, // occiput
+        { top: [0.68, 0.28], bot: [-0.48, 0.42], w: 0.46, n: 2.05 }, // crown
+        { top: [0.64, -0.02], bot: [-0.52, 0.2], w: 0.5, n: 2.1 }, // cheeks (widest)
+        { top: [0.5, -0.3], bot: [-0.5, -0.08], w: 0.44, n: 2.1 }, // brow
+        { top: [0.3, -0.52], bot: [-0.46, -0.32], w: 0.3, n: 1.95 }, // the light stop
+        { top: [0.18, -0.78], bot: [-0.4, -0.6], w: 0.24, n: 1.9 }, // muzzle root
+        { top: [0.1, -1.05], bot: [-0.34, -0.92], w: 0.19, n: 1.85 }, // mid muzzle
+        { top: [0.05, -1.28], bot: [-0.26, -1.18], w: 0.14, n: 1.8 }, // toward the nose
+        { top: [0.02, -1.38], bot: [-0.2, -1.32], w: 0.09, n: 1.75 }, // tip
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
+  g.add(skull);
+
+  // Tall pricked ears on the top corners — the wolf's outline from any
+  // distance. Geometry pre-spun 45° so a flat face fronts before the thin
+  // z-squash (the knight-wedge lesson), dark inner plate tucked forward.
+  for (const side of [-1, 1]) {
+    const earGeo = new ConeGeometry(r * 0.21, r * 0.52, 4);
+    earGeo.rotateY(Math.PI / 4);
+    const ear = new Mesh(earGeo, chassisMat(accent, 0.05));
+    ear.scale.set(1, 1, 0.55);
+    // Bases SUNK into the crown (the loft top runs ~0.66r here) — floating
+    // ear roots read instantly as a costume, not a skull.
+    ear.position.set(side * r * 0.36, r * 0.78, r * 0.24);
+    ear.rotation.set(-0.12, 0, side * -0.16);
+    g.add(ear);
+    const innerGeo = new ConeGeometry(r * 0.12, r * 0.32, 4);
+    innerGeo.rotateY(Math.PI / 4);
+    const inner = new Mesh(innerGeo, darkMat());
+    inner.scale.set(1, 1, 0.4);
+    inner.position.set(side * r * 0.36, r * 0.74, r * 0.18);
+    inner.rotation.set(-0.12, 0, side * -0.16);
+    g.add(inner);
+  }
+
+  // Narrow slanted eyes under an angled brow ridge — the scowl is the ridge,
+  // not the eye. Slant runs UP and OUT.
+  for (const side of [-1, 1]) {
+    const ridge = new Mesh(new BoxGeometry(r * 0.26, r * 0.06, r * 0.1), chassisMat(accent, 0.05));
+    ridge.position.set(side * r * 0.24, r * 0.42, -r * 0.48);
+    ridge.rotation.set(0.2, 0, side * -0.28);
+    g.add(ridge);
+    const socket = new Mesh(new SphereGeometry(r * 0.1, 12, 10), darkMat());
+    socket.scale.set(1.15, 0.55, 0.7);
+    socket.position.set(side * r * 0.25, r * 0.3, -r * 0.52);
+    socket.rotation.z = side * -0.3;
+    g.add(socket);
+    const eye = new Mesh(new SphereGeometry(r * 0.08, 12, 10), glowMat(accent, 2.6));
+    eye.scale.set(1.1, 0.5, 0.7);
+    eye.position.set(side * r * 0.25, r * 0.3, -r * 0.56);
+    eye.rotation.z = side * -0.3;
+    g.add(eye);
+  }
+
+  // Nose pad, mouth line running back along the muzzle underside, small chin.
+  const nose = new Mesh(new SphereGeometry(r * 0.11, 12, 10), darkMat());
+  nose.scale.set(1.1, 0.7, 0.75);
+  nose.position.set(0, 0.0, -r * 1.38);
+  g.add(nose);
+  const mouth = new Mesh(new BoxGeometry(r * 0.03, r * 0.03, r * 0.6), darkMat());
+  mouth.position.set(0, -r * 0.28, -r * 1.02);
+  mouth.rotation.x = -0.08;
+  g.add(mouth);
+  const chin = new Mesh(new SphereGeometry(r * 0.09, 10, 8), chassisMat(accent, 0.04));
+  chin.scale.set(1, 0.65, 0.9);
+  chin.position.set(0, -r * 0.28, -r * 1.24);
+  g.add(chin);
+
+  // Cheek ruffs swept back and down — leaner, longer sweeps than the bear's.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 2; i++) {
+      const ruff = new Mesh(new BoxGeometry(r * 0.045, r * (0.3 - i * 0.06), r * (0.44 - i * 0.08)), darkMat());
+      ruff.position.set(side * r * (0.46 - i * 0.04), -r * (0.16 + i * 0.18), r * (0.08 - i * 0.16));
+      ruff.rotation.set(0.18, side * 0.7, side * (0.3 + i * 0.2));
+      g.add(ruff);
+    }
+  }
+  // The nape ruff: a fan of plates around the back of the skull.
+  for (let i = 0; i < 5; i++) {
+    const a = ((-40 + i * 20) * Math.PI) / 180;
+    const plate = new Mesh(new BoxGeometry(r * 0.14, r * 0.34, r * 0.05), darkMat());
+    plate.position.set(Math.sin(a) * r * 0.42, -r * 0.05, r * (0.52 + Math.cos(a) * 0.12));
+    plate.rotation.set(0.35, a, 0);
+    g.add(plate);
+  }
+  return g;
+}
+
+/** WOLF chest: a lean hunter's cuirass — narrow shoulders, hard waist taper,
+ *  a draped PELT MANTLE over the shoulders instead of steel pauldrons, an old
+ *  claw rake glowing on the right pec and a crescent of moon-embers on the
+ *  left — the pack mark. */
+function buildWolfChest(accent: number): Group {
+  const g = taggedHead('wolf');
+  const core = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.24, -0.05], bot: [0.26, 0.12], w: 0.12, n: 2.0 }, // neck ring
+        { top: [0.15, -0.16], bot: [0.17, 0.17], w: 0.26, n: 2.05 }, // shoulder line
+        { top: [0.03, -0.19], bot: [0.04, 0.17], w: 0.23, n: 2.05 }, // chest
+        { top: [-0.13, -0.15], bot: [-0.13, 0.13], w: 0.165, n: 2.0 }, // ribs
+        { top: [-0.28, -0.09], bot: [-0.28, 0.09], w: 0.105, n: 2.0 }, // waist (hard taper)
+        { top: [-0.31, -0.085], bot: [-0.31, 0.085], w: 0.1, n: 2.0 }, // hem
+      ],
+      1,
+    ),
+    chassisMat(accent, 0.05),
+  );
+  g.add(core);
+
+  // The pelt mantle: shoulder caps + two rows of fur plates draped down the
+  // back — the wolf wears its kill, not forged pauldrons.
+  for (const side of [-1, 1]) {
+    const cap = new Mesh(new SphereGeometry(0.095, 14, 10), darkMat());
+    cap.scale.set(1.15, 0.55, 1.0);
+    cap.position.set(side * 0.26, 0.16, 0);
+    cap.rotation.z = side * -0.2;
+    g.add(cap);
+  }
+  for (let row = 0; row < 2; row++) {
+    for (let i = 0; i < 4 - row; i++) {
+      const x = (i - (3 - row) / 2) * 0.09;
+      const plate = new Mesh(new BoxGeometry(0.07, 0.11 - row * 0.02, 0.03), darkMat());
+      plate.position.set(x, 0.14 - row * 0.09, 0.16 + row * 0.015);
+      plate.rotation.set(-0.3, 0, x * 1.2);
+      g.add(plate);
+    }
+  }
+
+  // The old rake: three claw slashes glowing across the right pec.
+  for (let i = 0; i < 3; i++) {
+    const claw = new Mesh(new BoxGeometry(0.014, 0.1, 0.012), glowMat(accent, 0.85));
+    claw.position.set(0.05 + i * 0.04, 0.03 - i * 0.014, -0.175 + i * 0.006);
+    claw.rotation.set(0.12, 0, 0.35);
+    g.add(claw);
+  }
+  // The pack mark: five moon-embers in a crescent on the left pec.
+  for (let i = 0; i < 5; i++) {
+    const a = (-0.5 + i * 0.35) as number;
+    const ember = new Mesh(new SphereGeometry(0.008, 8, 6), glowMat(accent, 1.5));
+    ember.position.set(-0.1 + Math.sin(a) * 0.045, 0.03 + Math.cos(a) * 0.055, -0.178);
+    g.add(ember);
+  }
+
+  // Collar + waist neon, wrapping like the bear's.
+  g.add(glowBand(accent, 0.215, 0.15, 0.11, 0.035, 0.016, 0.85));
+  g.add(glowBand(accent, -0.285, 0.107, 0.09, 0.0, 0.014, 0.85));
+  return g;
+}
+
+/** WOLF hips: a hunter's belt with a fur KILT — staggered dark pelt plates —
+ *  and a glowing clasp. */
+function buildWolfPelvis(accent: number): Group {
+  const g = taggedHead('wolf');
+  const belt = new Mesh(new BoxGeometry(0.19, 0.05, 0.15), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const clasp = new Mesh(new SphereGeometry(0.024, 10, 8), glowMat(accent, 1.1));
+  clasp.scale.set(1, 0.8, 0.5);
+  clasp.position.set(0, 0.05, -0.08);
+  g.add(clasp);
+  for (let i = 0; i < 5; i++) {
+    const a = ((-60 + i * 30) * Math.PI) / 180;
+    const plate = new Mesh(new BoxGeometry(0.055, 0.16 - Math.abs(i - 2) * 0.015, 0.028), darkMat());
+    plate.position.set(Math.sin(a) * 0.11, -0.05, -Math.cos(a) * 0.09);
+    plate.rotation.set(0.1, a, Math.sin(a) * 0.25);
+    g.add(plate);
+  }
+  return g;
+}
+
+/** FROG (CROAK) → lofted for accuracy: the pond heavyweight — a broad FLAT
+ *  head wider than it is long, big dome eye-turrets perched ON TOP (the frog
+ *  signature), a wide smile line wrapping the snout, a throat sac tucked
+ *  under the jaw, and two pin nostrils up top. Smooth and gel-glossy — no
+ *  fur, no plates. */
+function buildFrogHead(accent: number): Group {
+  const r = BODY_IK.headRadius;
+  const g = taggedHead('frog');
+  g.scale.set(1.5, 1.12, 1.32); // wide and low — the flat pond profile
+  g.position.y = 0.0;
+
+  // The skull loft: low flat crown, widest at the cheeks, then a broad round
+  // snout sloping to the lip — no stop, no muzzle, just one smooth wedge.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.28, 0.5], bot: [-0.3, 0.52], w: 0.5, n: 2.2 }, // back of skull
+        { top: [0.42, 0.2], bot: [-0.42, 0.3], w: 0.62, n: 2.3 }, // crown (flat, wide)
+        { top: [0.4, -0.12], bot: [-0.48, 0.02], w: 0.66, n: 2.3 }, // cheeks (widest)
+        { top: [0.3, -0.42], bot: [-0.46, -0.3], w: 0.58, n: 2.2 }, // eye line
+        { top: [0.14, -0.7], bot: [-0.4, -0.6], w: 0.46, n: 2.1 }, // snout
+        { top: [0.02, -0.92], bot: [-0.3, -0.86], w: 0.3, n: 2.0 }, // lip
+        { top: [-0.04, -1.0], bot: [-0.22, -0.98], w: 0.16, n: 1.9 }, // tip (rounded)
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
+  g.add(skull);
+
+  // The eye turrets: big domes on TOP of the skull with forward glow lenses
+  // and the frog's horizontal slit pupils riding proud of the glass.
+  for (const side of [-1, 1]) {
+    const dome = new Mesh(new SphereGeometry(r * 0.27, 16, 12), chassisMat(accent, 0.05));
+    dome.position.set(side * r * 0.38, r * 0.5, -r * 0.32);
+    g.add(dome);
+    const lens = new Mesh(new SphereGeometry(r * 0.17, 14, 12), glowMat(accent, 2.0));
+    lens.position.set(side * r * 0.38, r * 0.54, -r * 0.44);
+    g.add(lens);
+    const pupil = new Mesh(new BoxGeometry(r * 0.17, r * 0.05, r * 0.03), darkMat());
+    pupil.position.set(side * r * 0.38, r * 0.54, -r * 0.6);
+    g.add(pupil);
+  }
+
+  // The smile: a wide mouth line wrapping the snout in three dark segments —
+  // straight across the front, swept back and up into each cheek.
+  const smileMid = new Mesh(new BoxGeometry(r * 0.62, r * 0.035, r * 0.03), darkMat());
+  smileMid.position.set(0, -r * 0.22, -r * 0.9);
+  g.add(smileMid);
+  for (const side of [-1, 1]) {
+    // Hugging the snout's curve — any longer/straighter and the ends poked
+    // past the cheeks like whiskers.
+    const corner = new Mesh(new BoxGeometry(r * 0.38, r * 0.035, r * 0.03), darkMat());
+    corner.position.set(side * r * 0.4, -r * 0.16, -r * 0.68);
+    corner.rotation.set(0, side * 0.85, side * 0.12);
+    g.add(corner);
+  }
+
+  // The throat sac, tucked under the jaw — a warmer sheen than the shell so
+  // it reads soft; and two pin nostrils high on the snout.
+  const sac = new Mesh(new SphereGeometry(r * 0.3, 16, 12), chassisMat(accent, 0.1));
+  sac.scale.set(1.25, 0.7, 0.95);
+  sac.position.set(0, -r * 0.44, -r * 0.5);
+  g.add(sac);
+  for (const side of [-1, 1]) {
+    const nostril = new Mesh(new SphereGeometry(r * 0.035, 8, 6), darkMat());
+    nostril.position.set(side * r * 0.1, r * 0.12, -r * 0.9);
+    g.add(nostril);
+  }
+  return g;
+}
+
+/** FROG chest: the plump pond barrel — minimal taper, a paler BANDED BELLY
+ *  plate down the front, smooth round shoulder caps (no forged edges
+ *  anywhere) and dark pond spots across the back. */
+function buildFrogChest(accent: number): Group {
+  const g = taggedHead('frog');
+  const core = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.24, -0.06], bot: [0.26, 0.13], w: 0.14, n: 2.1 }, // neck ring
+        { top: [0.15, -0.18], bot: [0.17, 0.19], w: 0.28, n: 2.15 }, // shoulders
+        { top: [0.0, -0.22], bot: [0.02, 0.2], w: 0.27, n: 2.15 }, // the belly (deepest)
+        { top: [-0.15, -0.2], bot: [-0.15, 0.17], w: 0.24, n: 2.1 }, // lower belly
+        { top: [-0.28, -0.12], bot: [-0.28, 0.11], w: 0.14, n: 2.0 }, // hip pinch
+        { top: [-0.31, -0.11], bot: [-0.31, 0.1], w: 0.13, n: 2.0 }, // hem
+      ],
+      1,
+    ),
+    chassisMat(accent, 0.05),
+  );
+  g.add(core);
+
+  // The banded belly: three wide shallow plates down the front, carrying a
+  // warmer sheen so they read as the pale underbelly.
+  for (let i = 0; i < 3; i++) {
+    const band = new Mesh(new BoxGeometry(0.26 - i * 0.04, 0.06, 0.035), chassisMat(accent, 0.12));
+    band.position.set(0, 0.0 - i * 0.085, -0.205 + i * 0.012);
+    band.rotation.x = 0.1 + i * 0.06;
+    g.add(band);
+  }
+
+  // Smooth round shoulder caps — amphibian, not armour.
+  for (const side of [-1, 1]) {
+    const cap = new Mesh(new SphereGeometry(0.1, 16, 12), chassisMat(accent, 0.05));
+    cap.scale.set(1.1, 0.6, 1.0);
+    cap.position.set(side * 0.27, 0.16, 0);
+    cap.rotation.z = side * -0.18;
+    g.add(cap);
+  }
+
+  // Pond spots scattered across the shoulders and back.
+  const SPOTS: [number, number, number, number][] = [
+    [-0.16, 0.12, 0.16, 0.028],
+    [0.12, 0.15, 0.17, 0.034],
+    [0.02, 0.02, 0.2, 0.024],
+    [-0.08, -0.08, 0.18, 0.03],
+    [0.17, -0.02, 0.16, 0.022],
+  ];
+  for (const [x, y, z, s] of SPOTS) {
+    const spot = new Mesh(new SphereGeometry(s, 10, 8), darkMat());
+    spot.scale.set(1, 1, 0.35);
+    spot.position.set(x, y, z);
+    g.add(spot);
+  }
+
+  // Collar + hip neon, the same wrap the others wear.
+  g.add(glowBand(accent, 0.215, 0.165, 0.125, 0.035, 0.016, 0.85));
+  g.add(glowBand(accent, -0.285, 0.142, 0.115, 0.0, 0.014, 0.85));
+  return g;
+}
+
+/** FROG hips: smooth rounded haunches — a soft belt, two squashed thigh
+ *  domes and a lily-glow clasp. */
+function buildFrogPelvis(accent: number): Group {
+  const g = taggedHead('frog');
+  const belt = new Mesh(new BoxGeometry(0.2, 0.05, 0.16), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const clasp = new Mesh(new SphereGeometry(0.026, 10, 8), glowMat(accent, 1.0));
+  clasp.scale.set(1.2, 0.8, 0.5);
+  clasp.position.set(0, 0.05, -0.085);
+  g.add(clasp);
+  for (const side of [-1, 1]) {
+    const haunch = new Mesh(new SphereGeometry(0.09, 14, 10), chassisMat(accent, 0.04));
+    haunch.scale.set(0.7, 1.05, 0.9);
+    haunch.position.set(side * 0.1, -0.05, 0);
+    g.add(haunch);
+  }
+  return g;
+}
+
 /** Per-skin builders, keyed by skin id — pick one (a fixed wearer) or all
- *  four (the customisation mirror, which toggles between them live). */
+ *  of them (the customisation mirror, which toggles between them live). */
 const HEAD_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearHead,
   crimson: buildPantherHead,
   valkyrie: buildEagleHead,
   knight: buildKnightHead,
   stallion: buildStallionHead,
+  wolf: buildWolfHead,
+  frog: buildFrogHead,
 };
 const CHEST_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearChest,
@@ -1538,6 +1883,8 @@ const CHEST_BUILDERS: Record<string, (accent: number) => Group> = {
   valkyrie: buildEagleChest,
   knight: buildKnightChest,
   stallion: buildStallionChest,
+  wolf: buildWolfChest,
+  frog: buildFrogChest,
 };
 const PELVIS_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearPelvis,
@@ -1545,8 +1892,10 @@ const PELVIS_BUILDERS: Record<string, (accent: number) => Group> = {
   valkyrie: buildEaglePelvis,
   knight: buildKnightPelvis,
   stallion: buildStallionPelvis,
+  wolf: buildWolfPelvis,
+  frog: buildFrogPelvis,
 };
-const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'stallion'];
+const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'stallion', 'wolf', 'frog'];
 
 /**
  * Build the full opponent rig. Pieces start hidden; add them to the scene.
