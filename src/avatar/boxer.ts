@@ -1523,11 +1523,11 @@ function buildStallionPelvis(accent: number): Group {
   return g;
 }
 
-/** WOLF (HOWLER) → lofted for accuracy: the lean hunter's skull — a modest
- *  dome, a light stop at the brow, then a LONG tapering muzzle (the opposite
- *  of the bear's short deep one), tall pricked triangular ears, narrow
- *  slanted eyes under a scowling brow ridge, swept cheek ruffs and a layered
- *  nape ruff. */
+/** WOLF (KAVIC) → lofted for accuracy, and MEAN: the lean hunter's skull —
+ *  a modest dome, a light stop at the brow, then a LONG tapering muzzle (the
+ *  opposite of the bear's short deep one), ears PINNED BACK, slit eyes
+ *  glaring under a heavy V-brow, a wrinkled bridge and a fanged snarl, swept
+ *  cheek ruffs and a layered nape ruff. */
 function buildWolfHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('wolf');
@@ -1556,56 +1556,77 @@ function buildWolfHead(accent: number): Group {
   );
   g.add(skull);
 
-  // Tall pricked ears on the top corners — the wolf's outline from any
-  // distance. Geometry pre-spun 45° so a flat face fronts before the thin
-  // z-squash (the knight-wedge lesson), dark inner plate tucked forward.
+  // Ears PINNED BACK — the aggressive set, not the alert prick — with their
+  // bases buried in the crown's midline where the loft is still tall (out at
+  // ±0.36r the surface has already fallen away and the outer halves floated).
+  // Geometry pre-spun 45° so a flat face fronts before the thin z-squash.
   for (const side of [-1, 1]) {
-    const earGeo = new ConeGeometry(r * 0.21, r * 0.52, 4);
+    const earGeo = new ConeGeometry(r * 0.22, r * 0.56, 4);
     earGeo.rotateY(Math.PI / 4);
     const ear = new Mesh(earGeo, chassisMat(accent, 0.05));
     ear.scale.set(1, 1, 0.55);
-    // Bases SUNK into the crown (the loft top runs ~0.66r here) — floating
-    // ear roots read instantly as a costume, not a skull.
-    ear.position.set(side * r * 0.36, r * 0.78, r * 0.24);
-    ear.rotation.set(-0.12, 0, side * -0.16);
+    ear.position.set(side * r * 0.27, r * 0.7, r * 0.3);
+    ear.rotation.set(0.3, 0, side * -0.14); // raked back with the skull line
     g.add(ear);
-    const innerGeo = new ConeGeometry(r * 0.12, r * 0.32, 4);
+    const innerGeo = new ConeGeometry(r * 0.12, r * 0.34, 4);
     innerGeo.rotateY(Math.PI / 4);
     const inner = new Mesh(innerGeo, darkMat());
     inner.scale.set(1, 1, 0.4);
-    inner.position.set(side * r * 0.36, r * 0.74, r * 0.18);
-    inner.rotation.set(-0.12, 0, side * -0.16);
+    inner.position.set(side * r * 0.27, r * 0.64, r * 0.24);
+    inner.rotation.set(0.3, 0, side * -0.14);
     g.add(inner);
   }
 
-  // Narrow slanted eyes under an angled brow ridge — the scowl is the ridge,
-  // not the eye. Slant runs UP and OUT.
+  // The GLARE: heavy brow ridges angled hard down toward the nose (the angry
+  // V), with narrow slit eyes slanted steeply beneath them.
   for (const side of [-1, 1]) {
-    const ridge = new Mesh(new BoxGeometry(r * 0.26, r * 0.06, r * 0.1), chassisMat(accent, 0.05));
-    ridge.position.set(side * r * 0.24, r * 0.42, -r * 0.48);
-    ridge.rotation.set(0.2, 0, side * -0.28);
+    const ridge = new Mesh(new BoxGeometry(r * 0.3, r * 0.075, r * 0.11), chassisMat(accent, 0.05));
+    ridge.position.set(side * r * 0.22, r * 0.4, -r * 0.48);
+    ridge.rotation.set(0.2, 0, side * -0.42);
     g.add(ridge);
     const socket = new Mesh(new SphereGeometry(r * 0.1, 12, 10), darkMat());
-    socket.scale.set(1.15, 0.55, 0.7);
-    socket.position.set(side * r * 0.25, r * 0.3, -r * 0.52);
-    socket.rotation.z = side * -0.3;
+    socket.scale.set(1.2, 0.5, 0.7);
+    socket.position.set(side * r * 0.25, r * 0.28, -r * 0.53);
+    socket.rotation.z = side * -0.42;
     g.add(socket);
-    const eye = new Mesh(new SphereGeometry(r * 0.08, 12, 10), glowMat(accent, 2.6));
-    eye.scale.set(1.1, 0.5, 0.7);
-    eye.position.set(side * r * 0.25, r * 0.3, -r * 0.56);
-    eye.rotation.z = side * -0.3;
+    const eye = new Mesh(new SphereGeometry(r * 0.08, 12, 10), glowMat(accent, 3.0));
+    eye.scale.set(1.15, 0.42, 0.7);
+    eye.position.set(side * r * 0.25, r * 0.28, -r * 0.57);
+    eye.rotation.z = side * -0.42;
     g.add(eye);
   }
 
-  // Nose pad, mouth line running back along the muzzle underside, small chin.
+  // Nose pad with WRINKLE bars across the bridge behind it — the curled-up
+  // snarl a wolf throws before it goes.
   const nose = new Mesh(new SphereGeometry(r * 0.11, 12, 10), darkMat());
   nose.scale.set(1.1, 0.7, 0.75);
   nose.position.set(0, 0.0, -r * 1.38);
   g.add(nose);
+  for (let i = 0; i < 2; i++) {
+    const wrinkle = new Mesh(new BoxGeometry(r * (0.22 - i * 0.05), r * 0.03, r * 0.05), darkMat());
+    wrinkle.position.set(0, r * (0.12 - i * 0.02), -r * (1.16 - i * 0.13));
+    wrinkle.rotation.x = 0.5;
+    g.add(wrinkle);
+  }
+
+  // The SNARL: the mouth line runs back level, then a lip-curl notch kicks UP
+  // on each side over a bared fang.
   const mouth = new Mesh(new BoxGeometry(r * 0.03, r * 0.03, r * 0.6), darkMat());
   mouth.position.set(0, -r * 0.28, -r * 1.02);
   mouth.rotation.x = -0.08;
   g.add(mouth);
+  for (const side of [-1, 1]) {
+    const curl = new Mesh(new BoxGeometry(r * 0.03, r * 0.14, r * 0.03), darkMat());
+    curl.position.set(side * r * 0.11, -r * 0.2, -r * 1.06);
+    curl.rotation.set(0, 0, side * 0.5);
+    g.add(curl);
+    const fangGeo = new ConeGeometry(r * 0.032, r * 0.11, 4);
+    fangGeo.rotateY(Math.PI / 4);
+    const fang = new Mesh(fangGeo, chassisMat(accent, 0.12));
+    fang.rotation.x = Math.PI; // point down
+    fang.position.set(side * r * 0.09, -r * 0.32, -r * 1.12);
+    g.add(fang);
+  }
   const chin = new Mesh(new SphereGeometry(r * 0.09, 10, 8), chassisMat(accent, 0.04));
   chin.scale.set(1, 0.65, 0.9);
   chin.position.set(0, -r * 0.28, -r * 1.24);
@@ -1734,7 +1755,7 @@ function buildWolfPelvis(accent: number): Group {
   return g;
 }
 
-/** FROG (CROAK) → lofted for accuracy: the pond heavyweight — a broad FLAT
+/** FROG (LEGS) → lofted for accuracy: the pond heavyweight — a broad FLAT
  *  head wider than it is long, big dome eye-turrets perched ON TOP (the frog
  *  signature), a wide smile line wrapping the snout, a throat sac tucked
  *  under the jaw, and two pin nostrils up top. Smooth and gel-glossy — no

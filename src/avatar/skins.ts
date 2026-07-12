@@ -85,14 +85,13 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   // The stallion: long sculpted muzzle, pricked ears, a swept mane crest and
   // tack-strap cuirass. Derby-green steel with a minted glow.
   { id: 'stallion', name: 'STALLION', chassis: 0x1c2a21, trim: 0x0e1611, accent: 0x53ffa0, price: 500 },
-  // The wolf: lean tapered muzzle, tall pricked ears, a pelt mantle over the
-  // shoulders and a crescent of moon-embers on the chest. Night-grey steel
-  // with a cold moonlit glow.
-  { id: 'wolf', name: 'HOWLER', chassis: 0x252b34, trim: 0x12161d, accent: 0xa8e0ff, price: 250 },
+  // The wolf: lean tapered muzzle, pinned-back ears, a snarling scowl and a
+  // crescent of moon-embers on the chest. Night-grey steel, cold moonlit glow.
+  { id: 'wolf', name: 'KAVIC', chassis: 0x252b34, trim: 0x12161d, accent: 0xa8e0ff, price: 250 },
   // The frog: broad flat head with dome eye-turrets on top, a wide smile
   // line, a throat sac, and a banded belly plate. Pond-green gel-smooth
   // armour with a lily-bright glow.
-  { id: 'frog', name: 'CROAK', chassis: 0x1b3a26, trim: 0x0c1d12, accent: 0x86ff70, price: 750 },
+  { id: 'frog', name: 'LEGS', chassis: 0x1b3a26, trim: 0x0c1d12, accent: 0x86ff70, price: 750 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
