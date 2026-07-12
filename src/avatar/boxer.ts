@@ -1818,22 +1818,33 @@ function buildFrogChest(accent: number): Group {
   collar.position.y = 0.11;
   g.add(collar);
 
-  // Broad, FLAT shoulder pads — barely swept, wider than the panther's — with
-  // a glow lip and a pond spot riding each.
+  // BULBOUS dome shoulders, the knight's pauldron construction gone pond:
+  // a half-dome shell tilted over the arm with a dark under-fill so it never
+  // reads hollow and a rim lip at the cut edge — kept smooth (no studs, no
+  // lames), with one big pond spot riding each crown.
   for (const side of [-1, 1]) {
-    const pad = new Mesh(new BoxGeometry(0.21, 0.07, 0.28), chassisMat(accent, 0.05));
-    pad.position.set(side * 0.27, 0.12, 0);
-    pad.rotation.z = side * -0.14;
-    g.add(pad);
-    const lip = new Mesh(new BoxGeometry(0.215, 0.015, 0.285), glowMat(accent, 0.5));
-    lip.position.set(side * 0.27, 0.16, 0);
-    lip.rotation.z = side * -0.14;
-    g.add(lip);
-    const spot = new Mesh(new SphereGeometry(0.03, 10, 8), darkMat());
+    const sh = new Group();
+    sh.position.set(side * 0.27, 0.11, 0);
+    sh.rotation.z = side * -0.22;
+    g.add(sh);
+    const dome = new Mesh(
+      new SphereGeometry(0.145, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
+      chassisMat(accent, 0.05),
+    );
+    dome.scale.set(1, 0.82, 1.05);
+    sh.add(dome);
+    const fill = new Mesh(new SphereGeometry(0.12, 12, 9), darkMat());
+    fill.scale.set(1, 0.62, 1.0);
+    fill.position.y = -0.02;
+    sh.add(fill);
+    const lip = new Mesh(new CylinderGeometry(0.143, 0.148, 0.026, 18), glowMat(accent, 0.45));
+    lip.scale.z = 1.05;
+    lip.position.y = -0.036;
+    sh.add(lip);
+    const spot = new Mesh(new SphereGeometry(0.045, 10, 8), darkMat());
     spot.scale.set(1, 0.3, 1);
-    spot.position.set(side * 0.28, 0.155, 0.05);
-    spot.rotation.z = side * -0.14;
-    g.add(spot);
+    spot.position.set(side * 0.02, 0.117, 0.02);
+    sh.add(spot);
   }
 
   const trunk = new Mesh(new CylinderGeometry(0.155, 0.085, 0.42, 8), darkMat());
