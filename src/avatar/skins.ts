@@ -91,7 +91,7 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   // The frog: broad flat head with dome eye-turrets on top, a wide smile
   // line, a throat sac, and a banded belly plate. Pond-green gel-smooth
   // armour with a lily-bright glow.
-  { id: 'frog', name: 'LEGS', chassis: 0x1b3a26, trim: 0x0c1d12, accent: 0x86ff70, price: 750 },
+  { id: 'frog', name: 'LEGS', chassis: 0x1b3a26, trim: 0x0c1d12, accent: 0x86ff70, price: 250 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
