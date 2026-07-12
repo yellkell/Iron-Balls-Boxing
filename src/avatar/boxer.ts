@@ -1613,25 +1613,22 @@ function buildWolfHead(accent: number): Group {
   mouth.rotation.x = -0.08;
   g.add(mouth);
 
-  // The SCRUFF — the eagle's jagged-collar idiom, not the bear's flat fur
-  // boards: a ring of squashed fur points around the base of the head,
-  // alternating long/short for the zigzag and two-tone (steel/dark) for
-  // depth, pointing down and out. The gap at the front leaves the jaw clean.
-  const _sDir = new Vector3();
-  const _sUp = new Vector3(0, 1, 0);
-  for (let i = 0; i < 9; i++) {
-    const a = ((58 + i * 30.5) * Math.PI) / 180; // wraps the head, skips the muzzle
-    const sx = Math.sin(a);
-    const sz = Math.cos(a);
-    const len = r * (0.3 + (i % 2) * 0.11); // alternating long/short = the zigzag
-    _sDir.set(sx * 0.6, -1, sz * 0.6).normalize();
-    const tuft = new Mesh(new ConeGeometry(r * 0.13, len, 6), i % 2 ? darkMat() : chassisMat(accent, 0.05));
-    tuft.scale.z = 0.55;
-    tuft.quaternion.setFromUnitVectors(_sUp, _sDir);
-    tuft.position
-      .set(sx * r * 0.38, -r * 0.36, sz * r * 0.36 + r * 0.1)
-      .addScaledVector(_sDir, len / 2);
-    g.add(tuft);
+  // Cheek ruffs swept back and down — leaner, longer sweeps than the bear's.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 2; i++) {
+      const ruff = new Mesh(new BoxGeometry(r * 0.045, r * (0.3 - i * 0.06), r * (0.44 - i * 0.08)), darkMat());
+      ruff.position.set(side * r * (0.46 - i * 0.04), -r * (0.16 + i * 0.18), r * (0.08 - i * 0.16));
+      ruff.rotation.set(0.18, side * 0.7, side * (0.3 + i * 0.2));
+      g.add(ruff);
+    }
+  }
+  // The nape ruff: a fan of plates around the back of the skull.
+  for (let i = 0; i < 5; i++) {
+    const a = ((-40 + i * 20) * Math.PI) / 180;
+    const plate = new Mesh(new BoxGeometry(r * 0.14, r * 0.34, r * 0.05), darkMat());
+    plate.position.set(Math.sin(a) * r * 0.42, -r * 0.05, r * (0.52 + Math.cos(a) * 0.12));
+    plate.rotation.set(0.35, a, 0);
+    g.add(plate);
   }
   return g;
 }
