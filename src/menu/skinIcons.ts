@@ -238,10 +238,9 @@ function drawStallion(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: 
   ctx.quadraticCurveTo(x(0.88), y(0.6), x(0.82), y(0.95));
   // Base of the neck.
   ctx.lineTo(x(-0.02), y(0.95));
-  // Up the throatlatch, round the JOWL (the big cheek disc), then the lean
-  // jaw underline running forward to the chin.
-  ctx.quadraticCurveTo(x(-0.08), y(0.66), x(-0.18), y(0.56));
-  ctx.quadraticCurveTo(x(-0.5), y(0.55), x(-0.48), y(0.26));
+  // Up the throatlatch in ONE clean sweep onto the lean jaw underline — the
+  // old jowl-disc detour bulged like a lump in the throat at tile size.
+  ctx.quadraticCurveTo(x(-0.2), y(0.62), x(-0.42), y(0.34));
   ctx.lineTo(x(-0.8), y(0.16));
   // Chin knob, lip notch, and the rounded nose closing to the tip.
   ctx.quadraticCurveTo(x(-0.9), y(0.16), x(-0.93), y(0.08));

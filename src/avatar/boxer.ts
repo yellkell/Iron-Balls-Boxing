@@ -1568,11 +1568,14 @@ function buildWolfHead(accent: number): Group {
     ear.position.set(side * r * 0.28, r * 0.78, r * 0.3);
     ear.rotation.set(0.3, 0, side * -0.14); // raked back with the skull line
     g.add(ear);
-    const innerGeo = new ConeGeometry(r * 0.16, r * 0.46, 4);
+    // The dark inner sits PROUD of the outer cone's front face (the bigger
+    // ear swallowed it at z 0.24 and the ears read as flat spikes) — that
+    // shadowed cavity is what sells the ear's depth.
+    const innerGeo = new ConeGeometry(r * 0.17, r * 0.5, 4);
     innerGeo.rotateY(Math.PI / 4);
     const inner = new Mesh(innerGeo, darkMat());
     inner.scale.set(1, 1, 0.4);
-    inner.position.set(side * r * 0.28, r * 0.7, r * 0.24);
+    inner.position.set(side * r * 0.28, r * 0.74, r * 0.15);
     inner.rotation.set(0.3, 0, side * -0.14);
     g.add(inner);
   }
