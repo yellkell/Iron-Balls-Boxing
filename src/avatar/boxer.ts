@@ -1631,65 +1631,85 @@ function buildWolfHead(accent: number): Group {
   return g;
 }
 
-/** WOLF chest: a lean hunter's cuirass — narrow shoulders, hard waist taper,
- *  a draped PELT MANTLE over the shoulders instead of steel pauldrons, an old
- *  claw rake glowing on the right pec and a crescent of moon-embers on the
- *  left — the pack mark. */
+/** WOLF chest: the panther's bladed cuirass language turned feral — angled
+ *  shoulder pads with HACKLE spikes rising off the collar's back edge, sharp
+ *  pecs over a dark trunk, chevron abs, an old claw rake glowing on the
+ *  right pec and a crescent of moon-embers on the left — the pack mark. */
 function buildWolfChest(accent: number): Group {
   const g = taggedHead('wolf');
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.24, -0.05], bot: [0.26, 0.12], w: 0.12, n: 2.0 }, // neck ring
-        { top: [0.15, -0.16], bot: [0.17, 0.17], w: 0.26, n: 2.05 }, // shoulder line
-        { top: [0.03, -0.19], bot: [0.04, 0.17], w: 0.23, n: 2.05 }, // chest
-        { top: [-0.13, -0.15], bot: [-0.13, 0.13], w: 0.165, n: 2.0 }, // ribs
-        { top: [-0.28, -0.09], bot: [-0.28, 0.09], w: 0.105, n: 2.0 }, // waist (hard taper)
-        { top: [-0.31, -0.085], bot: [-0.31, 0.085], w: 0.1, n: 2.0 }, // hem
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.05),
-  );
-  g.add(core);
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
 
-  // The pelt mantle: shoulder caps + two rows of fur plates draped down the
-  // back — the wolf wears its kill, not forged pauldrons.
+  // Swept shoulder pads with a glow lip, and a raked-back fur spike off each
+  // outer edge — leaner than the panther's upright blade.
   for (const side of [-1, 1]) {
-    const cap = new Mesh(new SphereGeometry(0.095, 14, 10), darkMat());
-    cap.scale.set(1.15, 0.55, 1.0);
-    cap.position.set(side * 0.26, 0.16, 0);
-    cap.rotation.z = side * -0.2;
-    g.add(cap);
+    const pad = new Mesh(new BoxGeometry(0.19, 0.07, 0.26), chassisMat(accent, 0.05));
+    pad.position.set(side * 0.27, 0.12, 0);
+    pad.rotation.z = side * -0.26;
+    g.add(pad);
+    const lip = new Mesh(new BoxGeometry(0.195, 0.015, 0.265), glowMat(accent, 0.55));
+    lip.position.set(side * 0.27, 0.165, 0);
+    lip.rotation.z = side * -0.26;
+    g.add(lip);
+    const spike = new Mesh(new ConeGeometry(0.028, 0.16, 4), darkMat());
+    spike.position.set(side * 0.33, 0.15, 0.06);
+    spike.rotation.set(0.6, 0, side * -0.55);
+    g.add(spike);
   }
-  for (let row = 0; row < 2; row++) {
-    for (let i = 0; i < 4 - row; i++) {
-      const x = (i - (3 - row) / 2) * 0.09;
-      const plate = new Mesh(new BoxGeometry(0.07, 0.11 - row * 0.02, 0.03), darkMat());
-      plate.position.set(x, 0.14 - row * 0.09, 0.16 + row * 0.015);
-      plate.rotation.set(-0.3, 0, x * 1.2);
-      g.add(plate);
-    }
+  // HACKLES: a row of raised fur spikes along the back of the collar, tallest
+  // at the centre — the wolf's back is up.
+  for (let i = -2; i <= 2; i++) {
+    const hackle = new Mesh(new ConeGeometry(0.024, 0.14 - Math.abs(i) * 0.025, 4), darkMat());
+    hackle.position.set(i * 0.07, 0.17, 0.1);
+    hackle.rotation.x = 0.5;
+    g.add(hackle);
   }
 
-  // The old rake: three claw slashes glowing across the right pec.
+  const trunk = new Mesh(new CylinderGeometry(0.15, 0.075, 0.42, 8), darkMat());
+  trunk.scale.z = 0.7;
+  trunk.position.y = -0.13;
+  g.add(trunk);
+
+  // Sharp angled pecs, panther-style.
+  for (const side of [-1, 1]) {
+    const pec = new Mesh(new BoxGeometry(0.14, 0.16, 0.06), chassisMat(accent, 0.05));
+    pec.position.set(side * 0.08, 0.0, -0.13);
+    pec.rotation.set(0.1, side * 0.4, side * 0.12);
+    g.add(pec);
+  }
+  // The old rake: three claw slashes glowing across the right pec…
   for (let i = 0; i < 3; i++) {
     const claw = new Mesh(new BoxGeometry(0.014, 0.1, 0.012), glowMat(accent, 0.85));
     claw.position.set(0.05 + i * 0.04, 0.03 - i * 0.014, -0.175 + i * 0.006);
     claw.rotation.set(0.12, 0, 0.35);
     g.add(claw);
   }
-  // The pack mark: five moon-embers in a crescent on the left pec.
+  // …and the pack mark: five moon-embers in a crescent on the left.
   for (let i = 0; i < 5; i++) {
-    const a = (-0.5 + i * 0.35) as number;
+    const a = -0.5 + i * 0.35;
     const ember = new Mesh(new SphereGeometry(0.008, 8, 6), glowMat(accent, 1.5));
     ember.position.set(-0.1 + Math.sin(a) * 0.045, 0.03 + Math.cos(a) * 0.055, -0.178);
     g.add(ember);
   }
 
-  // Collar + waist neon, wrapping like the bear's.
-  g.add(glowBand(accent, 0.215, 0.15, 0.11, 0.035, 0.016, 0.85));
-  g.add(glowBand(accent, -0.285, 0.107, 0.09, 0.0, 0.014, 0.85));
+  // Chevron abs with glow seams, hard flanks — the shared sharp underbody.
+  for (let i = 0; i < 3; i++) {
+    const w = 0.18 - i * 0.035;
+    const ab = new Mesh(new BoxGeometry(w, 0.05, 0.07), chassisMat(accent, 0.04));
+    ab.position.set(0, -0.15 - i * 0.072, -0.1);
+    ab.rotation.x = -0.1;
+    g.add(ab);
+    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.009, 0.072), glowMat(accent, 0.32));
+    seam.position.set(0, -0.178 - i * 0.072, -0.1);
+    g.add(seam);
+  }
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.26, 0.2), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.14;
+    g.add(flank);
+  }
   return g;
 }
 
@@ -1786,82 +1806,94 @@ function buildFrogHead(accent: number): Group {
   return g;
 }
 
-/** FROG chest: the plump pond barrel — minimal taper, a paler BANDED BELLY
- *  plate down the front, smooth round shoulder caps (no forged edges
- *  anywhere) and dark pond spots across the back. */
+/** FROG chest: the stallion's plated cuirass gone amphibian — collar and
+ *  broad flat shoulder pads over a dark trunk, a BANDED pale belly stacked
+ *  down the front (eagle-style breast plates, wider), a lily-pad medallion
+ *  at the sternum and dark pond spots on the pads and flanks. */
 function buildFrogChest(accent: number): Group {
   const g = taggedHead('frog');
-  const core = new Mesh(
-    loftGeometry(
-      [
-        { top: [0.24, -0.06], bot: [0.26, 0.13], w: 0.14, n: 2.1 }, // neck ring
-        { top: [0.15, -0.18], bot: [0.17, 0.19], w: 0.28, n: 2.15 }, // shoulders
-        { top: [0.0, -0.22], bot: [0.02, 0.2], w: 0.27, n: 2.15 }, // the belly (deepest)
-        { top: [-0.15, -0.2], bot: [-0.15, 0.17], w: 0.24, n: 2.1 }, // lower belly
-        { top: [-0.28, -0.12], bot: [-0.28, 0.11], w: 0.14, n: 2.0 }, // hip pinch
-        { top: [-0.31, -0.11], bot: [-0.31, 0.1], w: 0.13, n: 2.0 }, // hem
-      ],
-      1,
-    ),
-    chassisMat(accent, 0.05),
-  );
-  g.add(core);
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
 
-  // The banded belly: three wide shallow plates down the front, carrying a
-  // warmer sheen so they read as the pale underbelly.
-  for (let i = 0; i < 3; i++) {
-    const band = new Mesh(new BoxGeometry(0.26 - i * 0.04, 0.06, 0.035), chassisMat(accent, 0.12));
-    band.position.set(0, 0.0 - i * 0.085, -0.205 + i * 0.012);
-    band.rotation.x = 0.1 + i * 0.06;
-    g.add(band);
-  }
-
-  // Smooth round shoulder caps — amphibian, not armour.
+  // Broad, FLAT shoulder pads — barely swept, wider than the panther's — with
+  // a glow lip and a pond spot riding each.
   for (const side of [-1, 1]) {
-    const cap = new Mesh(new SphereGeometry(0.1, 16, 12), chassisMat(accent, 0.05));
-    cap.scale.set(1.1, 0.6, 1.0);
-    cap.position.set(side * 0.27, 0.16, 0);
-    cap.rotation.z = side * -0.18;
-    g.add(cap);
-  }
-
-  // Pond spots scattered across the shoulders and back.
-  const SPOTS: [number, number, number, number][] = [
-    [-0.16, 0.12, 0.16, 0.028],
-    [0.12, 0.15, 0.17, 0.034],
-    [0.02, 0.02, 0.2, 0.024],
-    [-0.08, -0.08, 0.18, 0.03],
-    [0.17, -0.02, 0.16, 0.022],
-  ];
-  for (const [x, y, z, s] of SPOTS) {
-    const spot = new Mesh(new SphereGeometry(s, 10, 8), darkMat());
-    spot.scale.set(1, 1, 0.35);
-    spot.position.set(x, y, z);
+    const pad = new Mesh(new BoxGeometry(0.21, 0.07, 0.28), chassisMat(accent, 0.05));
+    pad.position.set(side * 0.27, 0.12, 0);
+    pad.rotation.z = side * -0.14;
+    g.add(pad);
+    const lip = new Mesh(new BoxGeometry(0.215, 0.015, 0.285), glowMat(accent, 0.5));
+    lip.position.set(side * 0.27, 0.16, 0);
+    lip.rotation.z = side * -0.14;
+    g.add(lip);
+    const spot = new Mesh(new SphereGeometry(0.03, 10, 8), darkMat());
+    spot.scale.set(1, 0.3, 1);
+    spot.position.set(side * 0.28, 0.155, 0.05);
+    spot.rotation.z = side * -0.14;
     g.add(spot);
   }
 
-  // Collar + hip neon, the same wrap the others wear.
-  g.add(glowBand(accent, 0.215, 0.165, 0.125, 0.035, 0.016, 0.85));
-  g.add(glowBand(accent, -0.285, 0.142, 0.115, 0.0, 0.014, 0.85));
+  const trunk = new Mesh(new CylinderGeometry(0.155, 0.085, 0.42, 8), darkMat());
+  trunk.scale.z = 0.74;
+  trunk.position.y = -0.13;
+  g.add(trunk);
+
+  // The banded belly: four wide plates stepping down the front, each with a
+  // pale glow seam — the frog's segmented underbelly in armour language.
+  for (let i = 0; i < 4; i++) {
+    const w = 0.24 - i * 0.035;
+    const band = new Mesh(new BoxGeometry(w, 0.07, 0.06), chassisMat(accent, 0.06));
+    band.position.set(0, 0.02 - i * 0.078, -0.125 - i * 0.002);
+    band.rotation.x = -0.14;
+    g.add(band);
+    const seam = new Mesh(new BoxGeometry(w * 0.9, 0.011, 0.062), glowMat(accent, 0.4));
+    seam.position.set(0, -0.015 - i * 0.078, -0.125 - i * 0.002);
+    g.add(seam);
+  }
+  // The lily-pad medallion at the sternum, stallion-style but flat and wide.
+  const pod = new Mesh(new CylinderGeometry(0.042, 0.042, 0.024, 12), glowMat(accent, 1.3));
+  pod.rotation.x = Math.PI / 2;
+  pod.position.set(0, 0.06, -0.155);
+  g.add(pod);
+
+  // Hard flanks with a pond spot low on each.
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.26, 0.2), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.13;
+    g.add(flank);
+    const spot = new Mesh(new SphereGeometry(0.024, 10, 8), darkMat());
+    spot.scale.set(0.35, 1, 1);
+    spot.position.set(side * 0.165, -0.12, 0.02);
+    g.add(spot);
+  }
   return g;
 }
 
-/** FROG hips: smooth rounded haunches — a soft belt, two squashed thigh
- *  domes and a lily-glow clasp. */
+/** FROG hips: the panther set gone pond — belt, lily clasp, tapered guard
+ *  and wide flat tassets with glow edges (plates, not haunches). */
 function buildFrogPelvis(accent: number): Group {
   const g = taggedHead('frog');
   const belt = new Mesh(new BoxGeometry(0.2, 0.05, 0.16), chassisMat(accent, 0.04));
   belt.position.y = 0.05;
   g.add(belt);
-  const clasp = new Mesh(new SphereGeometry(0.026, 10, 8), glowMat(accent, 1.0));
-  clasp.scale.set(1.2, 0.8, 0.5);
+  const clasp = new Mesh(new CylinderGeometry(0.026, 0.026, 0.028, 12), glowMat(accent, 1.1));
+  clasp.rotation.x = Math.PI / 2;
   clasp.position.set(0, 0.05, -0.085);
   g.add(clasp);
+  const guard = new Mesh(new CylinderGeometry(0.08, 0.03, 0.14, 6), chassisMat(accent, 0.03));
+  guard.position.set(0, -0.05, -0.02);
+  g.add(guard);
   for (const side of [-1, 1]) {
-    const haunch = new Mesh(new SphereGeometry(0.09, 14, 10), chassisMat(accent, 0.04));
-    haunch.scale.set(0.7, 1.05, 0.9);
-    haunch.position.set(side * 0.1, -0.05, 0);
-    g.add(haunch);
+    const tasset = new Mesh(new BoxGeometry(0.065, 0.16, 0.13), chassisMat(accent, 0.04));
+    tasset.position.set(side * 0.1, -0.05, 0);
+    tasset.rotation.z = side * 0.26;
+    g.add(tasset);
+    const edge = new Mesh(new BoxGeometry(0.07, 0.013, 0.135), glowMat(accent, 0.4));
+    edge.position.set(side * 0.115, -0.12, 0);
+    edge.rotation.z = side * 0.26;
+    g.add(edge);
   }
   return g;
 }
