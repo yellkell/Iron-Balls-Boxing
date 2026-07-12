@@ -1528,7 +1528,7 @@ function buildStallionPelvis(accent: number): Group {
 function buildWolfHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('wolf');
-  g.scale.setScalar(1.66); // carried BIG — past the bear's 1.5, the pack leader
+  g.scale.setScalar(1.49); // carried big — a hair under the bear's 1.5
   g.position.y = 0.03;
 
   // The skull loft, occiput → nose tip. Half the head is muzzle: the taper

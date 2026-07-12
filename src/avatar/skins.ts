@@ -95,15 +95,18 @@ export const AVATAR_SKINS: AvatarSkin[] = [
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
-  // The three launch skins — free, owned from the start.
+  // The three launch skins — free, owned from the start. SMOULDER (the
+  // default) burns your fire's ember over a CHARRED deck — coals, not
+  // polish — which also keeps it a room apart from GOLD RUSH's gold-on-gold
+  // (the two warm pads used to read as twins on the same gunmetal).
   { id: 'azure', name: 'AZURE', neon: 0x4fb7ff },
   { id: 'inferno', name: 'INFERNO', neon: 0xff3b30 },
-  { id: 'ember', name: 'EMBER', neon: PALETTE.ember },
+  { id: 'ember', name: 'SMOULDER', neon: PALETTE.ember, slab: 0x1a1412 },
   // Shop: two basic recolours…
   { id: 'toxic', name: 'TOXIC', neon: PALETTE.venom, price: 100 },
   { id: 'plasma', name: 'PLASMA', neon: PALETTE.violet, price: 100 },
-  // …the fancier premium pad — gold piping AND a gold-tinted slab.
-  { id: 'goldrush', name: 'GOLD RUSH', neon: 0xffc23a, slab: 0xb8902c, price: 100 },
+  // …the fancier premium pad — YELLOW-gold piping AND a gold-tinted slab.
+  { id: 'goldrush', name: 'GOLD RUSH', neon: 0xffd84a, slab: 0xb8902c, price: 100 },
   // …two more premium repaints. FROSTBITE is FROZEN OVER: glacier piping on a
   // pale rimed deck — the light slab is what keeps it from reading as just
   // AZURE again (both wore blue neon on dark steel and told apart badly).
