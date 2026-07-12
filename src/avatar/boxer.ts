@@ -1528,7 +1528,7 @@ function buildStallionPelvis(accent: number): Group {
 function buildWolfHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('wolf');
-  g.scale.setScalar(1.38); // leaner carry than the bear's 1.5 — a runner, not a wall
+  g.scale.setScalar(1.66); // carried BIG — past the bear's 1.5, the pack leader
   g.position.y = 0.03;
 
   // The skull loft, occiput → nose tip. Half the head is muzzle: the taper
@@ -1744,7 +1744,7 @@ function buildWolfPelvis(accent: number): Group {
 function buildFrogHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('frog');
-  g.scale.set(1.5, 1.12, 1.32); // wide and low — the flat pond profile
+  g.scale.set(2.03, 1.51, 1.78); // wide and low, and HUGE — the flat pond profile fills the guard
   g.position.y = 0.0;
 
   // The skull loft: low flat crown, widest at the cheeks, then a broad round
