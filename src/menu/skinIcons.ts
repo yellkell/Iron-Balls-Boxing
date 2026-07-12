@@ -31,11 +31,86 @@ export function drawAvatarIcon(ctx: CanvasRenderingContext2D, id: string, cx: nu
     case 'stallion':
       drawStallion(ctx, cx, cy, r);
       break;
+    case 'wolf':
+      drawWolf(ctx, cx, cy, r);
+      break;
+    case 'frog':
+      drawFrog(ctx, cx, cy, r);
+      break;
     case 'crimson':
     default:
       drawPanther(ctx, cx, cy, r);
       break;
   }
+  ctx.restore();
+}
+
+/** Wolf head-on: a single lean silhouette — tall pricked ears, jagged cheek
+ *  fur, tapering hard to a narrow chin. The panther's cousin, but pointier
+ *  everywhere. */
+function drawWolf(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  const x = (u: number): number => cx + u * r;
+  const y = (v: number): number => cy + v * r;
+  ctx.beginPath();
+  ctx.moveTo(x(-0.5), y(-1.0)); // left ear tip
+  ctx.lineTo(x(-0.08), y(-0.42)); // down its inner edge to the valley
+  ctx.lineTo(x(0.08), y(-0.42));
+  ctx.lineTo(x(0.5), y(-1.0)); // right ear tip
+  ctx.lineTo(x(0.62), y(-0.3)); // outer edge to the temple
+  // Jagged cheek fur: two points flicking out, stepping inward.
+  ctx.lineTo(x(0.78), y(0.02));
+  ctx.lineTo(x(0.52), y(0.14));
+  ctx.lineTo(x(0.62), y(0.38));
+  ctx.lineTo(x(0.34), y(0.44));
+  // The long taper to a narrow chin.
+  ctx.lineTo(x(0.1), y(0.92));
+  ctx.lineTo(x(-0.1), y(0.92));
+  ctx.lineTo(x(-0.34), y(0.44));
+  ctx.lineTo(x(-0.62), y(0.38));
+  ctx.lineTo(x(-0.52), y(0.14));
+  ctx.lineTo(x(-0.78), y(0.02));
+  ctx.lineTo(x(-0.62), y(-0.3));
+  ctx.closePath();
+  ctx.fill();
+  // Nose, knocked out dark at the chin.
+  ctx.save();
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = '#06070b';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.74, r * 0.11, r * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Frog head-on: the wide flat face with two dome eyes riding the crown and
+ *  the smile line carved across. */
+function drawFrog(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  // Eye domes first (behind the face), perched on top.
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.48, cy - r * 0.5, r * 0.32, 0, Math.PI * 2);
+  ctx.arc(cx + r * 0.48, cy - r * 0.5, r * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  // The wide low face.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.12, r * 0.95, r * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#06070b';
+  ctx.strokeStyle = '#06070b';
+  // Horizontal slit pupils.
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + s * r * 0.48, cy - r * 0.52, r * 0.15, r * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // The smile, sweeping wide and up into the cheeks.
+  ctx.lineWidth = r * 0.09;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.68, cy + r * 0.1);
+  ctx.quadraticCurveTo(cx, cy + r * 0.5, cx + r * 0.68, cy + r * 0.1);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -163,10 +238,9 @@ function drawStallion(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: 
   ctx.quadraticCurveTo(x(0.88), y(0.6), x(0.82), y(0.95));
   // Base of the neck.
   ctx.lineTo(x(-0.02), y(0.95));
-  // Up the throatlatch, round the JOWL (the big cheek disc), then the lean
-  // jaw underline running forward to the chin.
-  ctx.quadraticCurveTo(x(-0.08), y(0.66), x(-0.18), y(0.56));
-  ctx.quadraticCurveTo(x(-0.5), y(0.55), x(-0.48), y(0.26));
+  // Up the throatlatch in ONE clean sweep onto the lean jaw underline — the
+  // old jowl-disc detour bulged like a lump in the throat at tile size.
+  ctx.quadraticCurveTo(x(-0.2), y(0.62), x(-0.42), y(0.34));
   ctx.lineTo(x(-0.8), y(0.16));
   // Chin knob, lip notch, and the rounded nose closing to the tip.
   ctx.quadraticCurveTo(x(-0.9), y(0.16), x(-0.93), y(0.08));
