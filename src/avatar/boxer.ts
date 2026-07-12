@@ -1577,37 +1577,33 @@ function buildWolfHead(accent: number): Group {
     g.add(inner);
   }
 
-  // The GLARE: heavy brow ridges angled hard down toward the nose (the angry
-  // V), with narrow slit eyes slanted steeply beneath them.
+  // The GLARE: heavy brow ridges in the angry V — INNER ends dropped hard
+  // toward the nose — with narrow slit eyes slanted to match beneath them.
+  // (Sign note: the face is on −z and read mirrored; the first cut used the
+  // other sign and the brows tilted quizzical, not angry.)
   for (const side of [-1, 1]) {
     const ridge = new Mesh(new BoxGeometry(r * 0.3, r * 0.075, r * 0.11), chassisMat(accent, 0.05));
     ridge.position.set(side * r * 0.22, r * 0.4, -r * 0.48);
-    ridge.rotation.set(0.2, 0, side * -0.42);
+    ridge.rotation.set(0.2, 0, side * 0.42);
     g.add(ridge);
     const socket = new Mesh(new SphereGeometry(r * 0.1, 12, 10), darkMat());
     socket.scale.set(1.2, 0.5, 0.7);
     socket.position.set(side * r * 0.25, r * 0.28, -r * 0.53);
-    socket.rotation.z = side * -0.42;
+    socket.rotation.z = side * 0.42;
     g.add(socket);
     const eye = new Mesh(new SphereGeometry(r * 0.08, 12, 10), glowMat(accent, 3.0));
     eye.scale.set(1.15, 0.42, 0.7);
     eye.position.set(side * r * 0.25, r * 0.28, -r * 0.57);
-    eye.rotation.z = side * -0.42;
+    eye.rotation.z = side * 0.42;
     g.add(eye);
   }
 
-  // Nose pad with WRINKLE bars across the bridge behind it — the curled-up
-  // snarl a wolf throws before it goes.
+  // The nose pad. (No wrinkle bars on the bridge — they read as a stray black
+  // stripe across the snout, not a snarl scrunch.)
   const nose = new Mesh(new SphereGeometry(r * 0.11, 12, 10), darkMat());
   nose.scale.set(1.1, 0.7, 0.75);
   nose.position.set(0, 0.0, -r * 1.38);
   g.add(nose);
-  for (let i = 0; i < 2; i++) {
-    const wrinkle = new Mesh(new BoxGeometry(r * (0.22 - i * 0.05), r * 0.03, r * 0.05), darkMat());
-    wrinkle.position.set(0, r * (0.12 - i * 0.02), -r * (1.16 - i * 0.13));
-    wrinkle.rotation.x = 0.5;
-    g.add(wrinkle);
-  }
 
   // The SNARL: the mouth line runs back level, then a lip-curl notch kicks UP
   // on each side over a bared fang.
