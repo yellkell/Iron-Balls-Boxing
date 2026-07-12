@@ -23,9 +23,11 @@ import {
   isSpeaking,
   pushVoiceFrame,
   removeVoiceSpeaker,
+  setVoiceSpeakerMuted,
   setVoiceSpeakerPosition,
   updateVoiceListener,
 } from '../voice/playback.js';
+import { socialBlocked, socialMuted } from '../social.js';
 import { Panel } from '../panel.js';
 import type { PoseTuple, PubPlayerNet } from '../protocol.js';
 import { bus, pub, type RemotePunter } from '../state.js';
@@ -224,6 +226,13 @@ export class PubPlayerSystem extends createSystem({}) {
     for (const punter of pub.punters.values()) {
       const rig = punter.rig;
       punter.snapAge += delta;
+      // Social safety: a BLOCKED punter vanishes for you (avatar + name tag)
+      // and neither blocked nor MUTED punters are heard. Local only.
+      const hidden = socialBlocked(punter.name);
+      setVoiceSpeakerMuted(punter.id, hidden || socialMuted(punter.name));
+      for (const piece of rig.all) piece.visible = !hidden;
+      punter.nameTag.mesh.visible = !hidden;
+      if (hidden) continue;
       // A fighter (denser pose stream, server fast-path) eases in at the
       // arena's smoothing so the duel tracks 1:1 with quick match; everyone
       // else stays gently smoothed. Fighters also LEAD the stream along the

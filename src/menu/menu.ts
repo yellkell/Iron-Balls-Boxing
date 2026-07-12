@@ -99,6 +99,9 @@ export type MenuAction =
   | 'campaign-close'
   | 'campaign-speedrun'
   | 'campaign-hardcore'
+  /** The pick-your-damage launch pop-up the run buttons open. */
+  | 'campaign-launch-start'
+  | 'campaign-launch-cancel'
   /** The sealed entry beneath the line-up: GOOPLIATH's own fight. */
   | 'campaign-goopliath'
   | `campaign-${number}`
@@ -2356,6 +2359,11 @@ const CARD_Y = 96;
 const CARDS_X = (CAMP_W - (CARD_W * 5 + CARD_GAP * 4)) / 2;
 // The run difficulty chips sit right above the run buttons they govern.
 const DIFF_ROW = { x: 210, y: 360, w: 118, gap: 10, h: 34 } as const;
+/** The pick-your-damage pop-up GAUNTLET/HARDCORE open before launching. */
+const LAUNCH_MODAL = { x: CAMP_W / 2 - 320, y: 168, w: 640, h: 260 } as const;
+/** Which run the launch pop-up is arming (null = no pop-up). MenuSystem sets
+ *  it on the run buttons and clears it on start/cancel/close. */
+export const campaignModal = { pending: null as 'gauntlet' | 'hardcore' | null };
 const RUN_BTN = { x: 48, y: 410, w: 320, h: 54 } as const;
 const HARD_BTN = { x: 48, y: 476, w: 320, h: 54 } as const;
 /** The sealed sixth emblem BENEATH the line-up — GOOPLIATH's own fight. */
@@ -2546,19 +2554,9 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     }
   }
 
-  // Run difficulty — governs the gauntlet + hardcore runs below (EASY always
-  // open, HARD/BLAZING earned by clearing the run a tier down). BLAZING wedges
-  // GOOPLIATH into the lineup 2nd-to-last. Single bouts ignore it entirely, so
-  // the whole row stays SEALED until the gauntlet opens and it means something.
-  const runsOpen = gauntletUnlocked();
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.font = stencilFont(20);
-  ctx.fillStyle = runsOpen ? UI.textDim : UI.steelDim;
-  ctx.fillText('DIFFICULTY', 48, DIFF_ROW.y + DIFF_ROW.h / 2);
-  drawDiffChips(ctx, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, app.difficulty, hoverAction, 'diff-', runsOpen, !runsOpen);
-
   // The timed runs — unlocked by clearing the gauntlet, then by finishing it.
+  // (Difficulty is picked in the LAUNCH pop-up these buttons open — it only
+  // governs the runs, so it lives with them, not loose on the screen.)
   drawRunRow(
     ctx, RUN_BTN, 'RUN THE GAUNTLET', 'GAUNTLET SEALED', gauntletUnlocked(), UI.emberBright,
     campaignProgress.runTimesGauntlet, 'fell all five titans to unlock',
@@ -2605,6 +2603,36 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
 
   ctx.textAlign = 'center';
   buttonPlate(ctx, CAMP_CLOSE.x, CAMP_CLOSE.y, CAMP_CLOSE.w, CAMP_CLOSE.h, 'CLOSE', UI.amber, hoverAction === 'campaign-close');
+
+  // The LAUNCH pop-up: pressing GAUNTLET or HARDCORE doesn't fire straight
+  // away any more — pick the damage first, then START. (Raids keep their own
+  // host picker in the lobby; single bouts and the goop always run normal.)
+  if (campaignModal.pending) {
+    ctx.fillStyle = 'rgba(4,5,8,0.62)';
+    ctx.fillRect(0, 0, CAMP_W, CAMP_H);
+    const m = LAUNCH_MODAL;
+    const hardcore = campaignModal.pending === 'hardcore';
+    plate(ctx, m.x, m.y, m.w, m.h, { cut: 18, fill: 'rgba(14,15,20,0.97)', stroke: hardcore ? UI.danger : UI.emberBright });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = stencilFont(34);
+    ctx.fillStyle = hardcore ? UI.danger : UI.emberBright;
+    ctx.fillText(hardcore ? 'HARDCORE RUN' : 'RUN THE GAUNTLET', CAMP_W / 2, m.y + 46);
+    ctx.font = '600 19px system-ui, sans-serif';
+    ctx.fillStyle = UI.textDim;
+    ctx.fillText(
+      hardcore ? 'no healing between titans — pick your damage' : 'all five titans, on the clock — pick your damage',
+      CAMP_W / 2,
+      m.y + 82,
+    );
+    const chipsW = DIFFICULTY_ORDER.length * (DIFF_ROW.w + DIFF_ROW.gap) - DIFF_ROW.gap;
+    drawDiffChips(ctx, CAMP_W / 2 - chipsW / 2, m.y + 108, DIFF_ROW.w, DIFF_ROW.gap, 40, app.difficulty, hoverAction, 'diff-', true);
+    buttonPlate(ctx, m.x + 44, m.y + m.h - 74, 170, 52, 'CANCEL', UI.steel, hoverAction === 'campaign-launch-cancel');
+    buttonPlate(
+      ctx, m.x + m.w - 44 - 210, m.y + m.h - 74, 210, 52,
+      'START', hardcore ? UI.danger : UI.emberBright, hoverAction === 'campaign-launch-start',
+    );
+  }
 }
 
 function hitCampaign(u: number, v: number): MenuAction | null {
@@ -2612,11 +2640,18 @@ function hitCampaign(u: number, v: number): MenuAction | null {
   const y = (1 - v) * CAMP_H;
   const inBtn = (b: { x: number; y: number; w: number; h: number }): boolean =>
     x >= b.x && x <= b.x + b.w && y >= b.y - 5 && y <= b.y + b.h + 5;
+  // While the launch pop-up is open it owns every click: its chips and two
+  // buttons hit, anything else is a dismiss.
+  if (campaignModal.pending) {
+    const m = LAUNCH_MODAL;
+    const chipsW = DIFFICULTY_ORDER.length * (DIFF_ROW.w + DIFF_ROW.gap) - DIFF_ROW.gap;
+    const diff = hitDiffChips(x, y, CAMP_W / 2 - chipsW / 2, m.y + 108, DIFF_ROW.w, DIFF_ROW.gap, 40, 'diff-');
+    if (diff) return diff;
+    if (x >= m.x + 44 && x <= m.x + 214 && y >= m.y + m.h - 79 && y <= m.y + m.h - 17) return 'campaign-launch-cancel';
+    if (x >= m.x + m.w - 254 && x <= m.x + m.w - 44 && y >= m.y + m.h - 79 && y <= m.y + m.h - 17) return 'campaign-launch-start';
+    return 'campaign-launch-cancel';
+  }
   if (inBtn(CAMP_CLOSE)) return 'campaign-close';
-  // The whole difficulty row sleeps until the gauntlet opens (no run for a
-  // pick to govern) — until then no chip hit-tests, not just the locked ones.
-  const diff = gauntletUnlocked() ? hitDiffChips(x, y, DIFF_ROW.x, DIFF_ROW.y, DIFF_ROW.w, DIFF_ROW.gap, DIFF_ROW.h, 'diff-') : null;
-  if (diff) return diff;
   if (inBtn(RUN_BTN) && gauntletUnlocked()) return 'campaign-speedrun';
   if (inBtn(HARD_BTN) && campaignProgress.hardcoreUnlocked) return 'campaign-hardcore';
   if (inBtn(GOOP_BTN) && goopliathUnlocked()) return 'campaign-goopliath';
