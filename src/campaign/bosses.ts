@@ -971,12 +971,25 @@ export function buildTitan(def: BossDef): TitanRig {
     fringe.position.y = hipY - 0.36 * s;
     root.add(fringe);
   }
-  const skirt = new Mesh(new CylinderGeometry(0.16 * wide * s, 0.05 * s, 0.28 * s, 8), dark());
-  skirt.position.y = hipY - 0.48 * s;
-  root.add(skirt);
-  const skirtGlow = new Mesh(new CylinderGeometry(0.09 * s, 0.05 * s, 0.06 * s, 8), glowMat(accent, 1.2));
-  skirtGlow.position.y = hipY - 0.6 * s;
-  root.add(skirtGlow);
+  if (def.style === 'fortress') {
+    // No dangling exhaust funnel on the fortress — a tapered spout under
+    // that hull read like a spinning top. Instead a wide, shallow hover
+    // PLENUM tucked between the sponsons: a flat tank belly with its glow
+    // recessed underneath, so the bulk sits on a cushion, not a point.
+    const plenum = new Mesh(new CylinderGeometry(0.26 * s, 0.28 * s, 0.1 * s, 10), dark());
+    plenum.position.y = hipY - 0.5 * s;
+    root.add(plenum);
+    const cushion = new Mesh(new CylinderGeometry(0.21 * s, 0.19 * s, 0.045 * s, 10), glowMat(accent, 1.2));
+    cushion.position.y = hipY - 0.56 * s;
+    root.add(cushion);
+  } else {
+    const skirt = new Mesh(new CylinderGeometry(0.16 * s, 0.05 * s, 0.28 * s, 8), dark());
+    skirt.position.y = hipY - 0.48 * s;
+    root.add(skirt);
+    const skirtGlow = new Mesh(new CylinderGeometry(0.09 * s, 0.05 * s, 0.06 * s, 8), glowMat(accent, 1.2));
+    skirtGlow.position.y = hipY - 0.6 * s;
+    root.add(skirtGlow);
+  }
 
   // ── ARMS: shoulder pivots carrying girder arms + bespoke hands ───────────
   const buildHand = (side: -1 | 1): Group => {
