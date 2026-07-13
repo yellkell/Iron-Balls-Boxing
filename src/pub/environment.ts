@@ -1140,9 +1140,9 @@ function buildFightHall(root: Group): {
 
   // Wall art on the hall's bare OUTER walls — north, south and far-west. The
   // east wall carries the scoreboards + doorway, and the benches are low, so
-  // eye-height pieces read cleanly above the crowd. City night shots hung as
-  // big prints, plus the two graffiti pieces sprayed straight on — bigger
-  // than the pub-room ones to suit the venue's tall walls.
+  // eye-height pieces read cleanly above the crowd. All city night shots hung
+  // as big prints (the only graffiti in the venue is the pair by the club's
+  // fight-hall doorway) — bigger than the pub-room ones to suit the tall walls.
   const hallPoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
     const holder = new Group();
     holder.position.set(x, y, z);
@@ -1150,24 +1150,16 @@ function buildFightHall(root: Group): {
     holder.add(buildPoster(url, 1.35, 0.9, tilt));
     root.add(holder);
   };
-  const hallGraffiti = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
-    const holder = new Group();
-    holder.position.set(x, y, z);
-    holder.rotation.y = ry;
-    holder.add(buildGraffiti(url, 1.6, 1.07, tilt));
-    root.add(holder);
-  };
   const NZ = hall.minZ + 0.05; // north wall (faces +z)
   const SZ = hall.maxZ - 0.05; // south wall (faces −z)
   const WX = hall.minX + 0.05; // far-west wall (faces +x)
-  // One graffiti piece per long wall (opposite corners), city shots filling
-  // the rest — no two alike on the same wall.
-  hallGraffiti('posters/blaston-graffiti.png', cx + 2.8, 2.2, NZ, 0, 0.02); // north-right
+  // No two alike on the same wall; repeats only across opposite walls.
+  hallPoster('posters/city-bokeh.jpg', cx + 2.8, 2.2, NZ, 0, 0.05); // north-right
   hallPoster('posters/city-trails.jpg', cx - 3.2, 2.3, NZ, 0, -0.04); // north-left
-  hallGraffiti('posters/goop-graffiti.png', cx - 2.6, 2.2, SZ, Math.PI, -0.03); // south-left
+  hallPoster('posters/city-dusk.jpg', cx - 2.6, 2.2, SZ, Math.PI, 0.06); // south-left
   hallPoster('posters/city-harbour.jpg', cx + 3.4, 2.1, SZ, Math.PI, -0.03); // south-right
-  hallPoster('posters/city-bokeh.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04); // west-north
-  hallPoster('posters/city-dusk.jpg', WX, 2.15, 3.8, Math.PI / 2, -0.05); // west-south
+  hallPoster('posters/city-harbour.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04); // west-north
+  hallPoster('posters/city-bokeh.jpg', WX, 2.15, 3.8, Math.PI / 2, -0.05); // west-south
 
   return {
     consolePanels: [consolePanels[0], consolePanels[1]],
