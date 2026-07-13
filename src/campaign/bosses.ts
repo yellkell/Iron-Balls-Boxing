@@ -621,12 +621,52 @@ export function buildTitan(def: BossDef): TitanRig {
   // Shoulders per style.
   for (const side of [-1, 1]) {
     if (def.style === 'vulture') {
-      // Swept wing plates, layered and angled up-and-out like folded wings.
-      for (let layer = 0; layer < 3; layer++) {
-        const wing = new Mesh(new BoxGeometry(0.3 * s, 0.02 * s, (0.24 - layer * 0.05) * s), dark());
-        wing.position.set(side * (0.36 + layer * 0.1) * s, (0.12 + layer * 0.07) * s, 0.02 * s);
-        wing.rotation.z = side * -(0.35 + layer * 0.18);
-        chest.add(wing);
+      // The WINGS — a real span, not pauldron trim: an inner spar out of the
+      // shoulder, a wrist joint kinking the outer spar higher, and primaries
+      // fanning off both, longest at the tip. Mantled up-and-back like a
+      // raptor deciding whether you're worth the swoop.
+      const wing = new Group();
+      wing.position.set(side * 0.28 * s, 0.16 * s, 0.14 * s);
+      wing.rotation.y = side * 0.35; // swept back off the shoulders
+      wing.rotation.z = side * 0.5; // raised up-and-out
+      chest.add(wing);
+      const spar1 = new Mesh(new BoxGeometry(0.5 * s, 0.05 * s, 0.035 * s), chassis(accent, 0.04));
+      spar1.position.x = side * 0.25 * s;
+      wing.add(spar1);
+      for (let f = 0; f < 3; f++) {
+        // Inner primaries hang off the arm spar, splaying slightly outward.
+        const len = (0.3 + f * 0.06) * s;
+        const rot = side * (0.08 + f * 0.1);
+        const feather = new Mesh(new BoxGeometry(0.055 * s, len, 0.018 * s), dark());
+        feather.position.set(side * (0.12 + f * 0.13) * s, -len / 2 + 0.02 * s, 0);
+        feather.rotation.z = rot;
+        wing.add(feather);
+      }
+      const wrist = new Group();
+      wrist.position.x = side * 0.5 * s;
+      wrist.rotation.z = side * 0.55; // the kink — outer wing reaches higher
+      wing.add(wrist);
+      const joint = new Mesh(new CylinderGeometry(0.045 * s, 0.045 * s, 0.06 * s, 8), dark());
+      joint.rotation.x = Math.PI / 2;
+      wrist.add(joint);
+      const spar2 = new Mesh(new BoxGeometry(0.44 * s, 0.04 * s, 0.03 * s), chassis(accent, 0.04));
+      spar2.position.x = side * 0.22 * s;
+      wrist.add(spar2);
+      for (let f = 0; f < 4; f++) {
+        // Outer primaries: the long blades, tipped in a dim ember of accent.
+        const len = (0.42 + f * 0.09) * s;
+        const rot = side * (0.12 + f * 0.11);
+        const fx = side * (0.08 + f * 0.11) * s;
+        const feather = new Mesh(new BoxGeometry(0.05 * s, len, 0.016 * s), dark());
+        feather.position.set(fx, -len / 2 + 0.02 * s, 0);
+        feather.rotation.z = rot;
+        wrist.add(feather);
+        const tip = new Mesh(new BoxGeometry(0.05 * s, 0.045 * s, 0.017 * s), glowMat(accent, 0.35));
+        // Anchor the ember on the feather's far end: the blade pivots about
+        // its centre, so the end lands at centre + R(rot)·(0, −len/2).
+        tip.position.set(fx + Math.sin(rot) * (len / 2), -len / 2 + 0.02 * s - Math.cos(rot) * (len / 2) + 0.02 * s, 0);
+        tip.rotation.z = rot;
+        wrist.add(tip);
       }
     } else if (def.style === 'hook' && side === 1) {
       // RUSTHOOK's right shoulder is a bare stub — the armour fell off years ago.
