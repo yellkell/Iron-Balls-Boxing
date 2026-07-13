@@ -535,8 +535,10 @@ export const GOOPLIATH = {
    *  dynamics read as tons of gel in motion. (Sounds stay real-time.) */
   timeScale: 0.55,
   /** Raymarch quality override (1 = the full step budget). The gel shader is
-   *  fill-rate bound and a boss this size covers a LOT of Quest pixels. */
-  quality: 0.85,
+   *  fill-rate bound and a boss this size covers a LOT of Quest pixels.
+   *  (These overrides only started biting once setQuality's floor dropped
+   *  from 20 steps to 8 — they were silently pinned to 20 before.) */
+  quality: 0.72,
   /** Step budget while an attack is mid-swing: an extended limb stretches
    *  the march's bounding box across far more of the view — the exact moment
    *  frame time spikes — so the budget drops while he's punching and comes

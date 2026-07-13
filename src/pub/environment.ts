@@ -213,15 +213,18 @@ export function buildPub(world: World): PubRefs {
     }
   }
 
-  // Caged lamps hanging off the beams: warm pools of light.
-  for (const [x, z] of [
-    [-2.4, -1.8],
-    [2.4, -1.8],
-    [-2.4, 1.2],
-    [2.4, 1.2],
-    [0, -0.3],
-    [0, 2.7],
-    [4.2, 0.6], // over the darts corridor
+  // Caged lamps hanging off the beams: warm pools of light. Every lamp keeps
+  // its glowing bulb, but only FOUR carry a real PointLight — every light in
+  // the scene taxes every shaded fragment on Quest, whatever you're looking
+  // at, so the fixtures outnumber the lights and nobody can tell from below.
+  for (const [x, z, lit] of [
+    [-2.4, -1.8, 1],
+    [2.4, -1.8, 0],
+    [-2.4, 1.2, 0],
+    [2.4, 1.2, 1],
+    [0, -0.3, 0],
+    [0, 2.7, 1], // over the booths, holds the door end
+    [4.2, 0.6, 1], // over the darts corridor
   ] as const) {
     const lamp = new Group();
     lamp.position.set(x, H - PUB.beamDrop, z);
@@ -245,9 +248,11 @@ export function buildPub(world: World): PubRefs {
     cage.position.y = -0.2;
     cage.rotation.x = Math.PI / 2;
     lamp.add(cage);
-    const light = new PointLight(0xffb46a, 6, 7, 1.6);
-    light.position.y = -0.24;
-    lamp.add(light);
+    if (lit) {
+      const light = new PointLight(0xffb46a, 8, 8.5, 1.6); // brighter + further: 4 lights cover what 7 did
+      light.position.y = -0.24;
+      lamp.add(light);
+    }
     root.add(lamp);
   }
 
@@ -976,13 +981,14 @@ function buildFightHall(root: Group): {
     beam.position.set(cx, h - 0.11, z);
     root.add(beam);
   }
+  // Two platform keys + two ambers on the diagonal — four lights, not six:
+  // every scene light costs every shaded fragment on Quest, so the corner
+  // ambers double up on reach instead of count.
   for (const [x, z, colour, intensity] of [
     [cx, FIGHT.platformZ, 0xfff0d8, 14],
     [cx, -FIGHT.platformZ, 0xfff0d8, 14],
-    [hall.minX + 2, 5, 0xffb46a, 8],
-    [hall.minX + 2, -5, 0xffb46a, 8],
-    [hall.maxX - 2, 5, 0xffb46a, 8],
-    [hall.maxX - 2, -5, 0xffb46a, 8],
+    [hall.minX + 2, 5, 0xffb46a, 11],
+    [hall.maxX - 2, -5, 0xffb46a, 11],
   ] as const) {
     const light = new PointLight(colour, intensity, 12, 1.7);
     light.position.set(x, h - 0.6, z);
@@ -1158,14 +1164,18 @@ function buildFightHall(root: Group): {
     holder.add(buildGraffiti(url, 1.6, 1.07, tilt));
     root.add(holder);
   };
-  const NZ = hall.minZ + 0.05; // north wall (faces +z)
+  // North-wall art sits a touch FURTHER off the wall than the creed sign
+  // (minZ + 0.05) and clear of its 5.4 m span — the blaston graffiti used to
+  // overlap the creed's edge on the SAME plane, and two coplanar transparent
+  // planes z-fight (that was the left-side flicker).
+  const NZ = hall.minZ + 0.075; // north wall (faces +z), proud of the creed
   const SZ = hall.maxZ - 0.05; // south wall (faces −z)
   const WX = hall.minX + 0.05; // far-west wall (faces +x)
   // Each city photo hangs exactly once across the whole venue. The hall's one
   // graffiti piece (the venue's second and last PLAY BLASTON) faces the crowd
   // from the north wall; the far-west wall carries a single tall print.
-  hallGraffiti('posters/blaston-graffiti.png', cx + 2.8, 2.2, NZ, 0, 0.02); // north-right
-  hallPoster('posters/city-tokyo.jpg', cx - 3.2, 2.3, NZ, 0, -0.04, 1.35, 0.76); // north-left
+  hallGraffiti('posters/blaston-graffiti.png', cx + 3.6, 2.2, NZ, 0, 0.02); // north-right, clear of the creed
+  hallPoster('posters/city-tokyo.jpg', cx - 3.7, 2.3, NZ, 0, -0.04, 1.35, 0.76); // north-left, clear of the creed
   hallPoster('posters/city-mountain.jpg', cx - 2.6, 2.2, SZ, Math.PI, -0.03, 1.7, 0.71); // south-left
   hallPoster('posters/city-trails.jpg', cx + 3.4, 2.2, SZ, Math.PI, -0.03, 0.8, 1.2); // south-right
   hallPoster('posters/city-alley.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04, 0.8, 1.2); // west-north

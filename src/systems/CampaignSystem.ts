@@ -273,6 +273,8 @@ export class CampaignSystem extends createSystem({
   // Beat counters for the staged entrances/deaths (press strokes, winch
   // jerks, the king's stalls) — they gate the one-shot sfx per beat.
   private introStep = 0;
+  /** VULTURE wing pose (0 mantled … 1 full span) — starts open for the intro. */
+  private wingSpread = 1;
   private outroStep = 0;
   /** Where the titan STOOD when the killing blow landed (it sways in the
    *  fight) — the collapse anchors here so it falls from where it stands
@@ -673,6 +675,7 @@ export class CampaignSystem extends createSystem({
       this.scene.add(this.rig.root);
     }
     this.introStep = 0;
+    this.wingSpread = 1; // wings open for the ceremony; the fight folds them
     this.entrancePose(0);
     // Start the entrance line fetching now — it has the klaxon + rise to
     // arrive before the name card asks for it.
@@ -1006,15 +1009,15 @@ export class CampaignSystem extends createSystem({
         const e = k * k * (3 - 2 * k); // smoothstep
         root.position.set(3.4 * (1 - e), 2.6 * (1 - e) * (1 - e), z - 1.6 * (1 - e));
         root.rotation.z = -0.5 * Math.sin(e * Math.PI);
-        // Wings ride the swoop: full span with a slow beat through the dive,
-        // then folding down to the mantled rest as it flares onto the mark.
-        const fold = clamp((k - 0.7) / 0.3, 0, 1);
-        const spread = 1 - fold * fold * (3 - 2 * fold);
-        const beat = Math.sin(this.time * 8) * 0.06 * spread;
+        // Wings hold FULL SPAN for the whole ceremony — the dive, the landing
+        // and the name card all play under open wings (a slow beat keeps them
+        // alive). They only come down when the bell rings: animateTitan owns
+        // them from the first fight frame and folds them to the mantled rest.
+        const beat = Math.sin(this.time * 8) * 0.06;
         for (const w of this.rig!.wings) {
-          w.group.rotation.y = w.side * (0.35 - 0.3 * spread);
-          w.group.rotation.z = w.side * (0.5 - 0.35 * spread) + w.side * beat;
-          w.wrist.rotation.z = w.side * (0.55 - 0.45 * spread) - w.side * beat * 0.7;
+          w.group.rotation.y = w.side * 0.05;
+          w.group.rotation.z = w.side * (0.15 + beat);
+          w.wrist.rotation.z = w.side * (0.1 - beat * 0.7);
         }
         break;
       }
@@ -2529,6 +2532,24 @@ export class CampaignSystem extends createSystem({
     this.playerHeadOf(fighting ? this.faceSeat : this.mySeatId(), _head);
     rig.head.lookAt(_head.x, _head.y, _head.z);
     rig.head.rotateY(Math.PI);
+
+    // VULTURE's wings are REACTIVE once the fight starts: mantled at rest,
+    // snapping open with every telegraph (riding the charge), flaring on a
+    // flinch, and carrying a restless flutter when enraged. The entrance
+    // ceremony owns them before this (held at full span in entrancePose).
+    if (rig.wings.length > 0 && fighting) {
+      const charge = this.attack ? clamp(this.attack.time / this.attack.chargeTime, 0, 1) : 0;
+      const target = Math.max(charge * 0.85, this.flinch > 0 ? 0.6 : 0, this.enraged ? 0.3 : 0);
+      // Snap open fast, settle back slow — a bird's flare, not a servo.
+      this.wingSpread += (target - this.wingSpread) * Math.min(1, delta * (target > this.wingSpread ? 10 : 3));
+      const flutter = Math.sin(this.time * 2.3) * 0.02 + (this.enraged ? Math.sin(this.time * 11) * 0.05 : 0);
+      const spread = clamp(this.wingSpread + flutter, 0, 1);
+      for (const w of rig.wings) {
+        w.group.rotation.y = w.side * (0.35 - 0.3 * spread);
+        w.group.rotation.z = w.side * (0.5 - 0.35 * spread);
+        w.wrist.rotation.z = w.side * (0.55 - 0.45 * spread);
+      }
+    }
 
     // Whatever is vulnerable BLINKS — a hard on/off wink, not a breath, so
     // it reads as a signal: the head's visor tell, the chest core, the low

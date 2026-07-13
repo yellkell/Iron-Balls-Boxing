@@ -325,7 +325,10 @@ export function createGelMaterial(): GelUniforms {
       (u.uInvModel.value as Matrix4).copy(invModel);
     },
     setQuality(q) {
-      material.uniforms.uSteps.value = Math.max(20, Math.round(GEL_LOOK.maxSteps * Math.min(1, q)));
+      // Floor of 8, not 20 — the old floor silently pinned every configured
+      // quality override (0.85 AND 0.5 both clamped to 20 steps), so the
+      // boss always marched at full cost whatever the config said.
+      material.uniforms.uSteps.value = Math.max(8, Math.round(GEL_LOOK.maxSteps * Math.min(1, q)));
     },
   };
 }
