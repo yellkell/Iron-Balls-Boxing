@@ -921,23 +921,12 @@ export function buildTitan(def: BossDef): TitanRig {
       guard.position.set(side * 0.44 * s, hipY - 0.32 * s, 0.02 * s);
       root.add(guard);
     }
-    // The glacis: a raked front plate wearing hazard chevrons — the last
-    // thing a wall sees before the fortress arrives.
+    // The glacis: a clean raked front plate behind the curtain, no glow, no
+    // trim — dark bow armour whose only statement is its rake.
     const glacis = new Mesh(new BoxGeometry(0.5 * s, 0.22 * s, 0.03 * s), dark());
     glacis.position.set(0, hipY - 0.4 * s, -0.2 * s);
     glacis.rotation.x = -0.35;
     root.add(glacis);
-    for (const cx2 of [-0.1, 0.02, 0.14] as const) {
-      const stripe = new Mesh(new BoxGeometry(0.05 * s, 0.16 * s, 0.012 * s), glowMat(accent, 0.35));
-      stripe.position.set(cx2 * s, hipY - 0.4 * s, -0.215 * s);
-      stripe.rotation.x = -0.35;
-      stripe.rotation.z = 0.6;
-      root.add(stripe);
-    }
-    // Tow hook under the glacis — fortresses recover fortresses.
-    const tow = new Mesh(new BoxGeometry(0.07 * s, 0.06 * s, 0.06 * s), steelMat(0x241f2e));
-    tow.position.set(0.16 * s, hipY - 0.52 * s, -0.18 * s);
-    root.add(tow);
   }
   if (def.style === 'vulture') {
     // Tail plumage: three quills raked down-and-back off the hips.
