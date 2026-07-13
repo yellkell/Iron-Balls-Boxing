@@ -733,11 +733,11 @@ export function buildTitan(def: BossDef): TitanRig {
     chest.add(needle);
   }
   if (def.style === 'king') {
-    // Gold filigree framing the core in a diamond — the heart of the king
-    // sits in a crown of its own.
-    for (const rot of [0.785, -0.785, 2.356, -2.356]) {
-      const strip = new Mesh(new BoxGeometry(0.16 * s, 0.016 * s, 0.012 * s), steelMat(GOLD, GOLD, 0.3));
-      strip.position.set(Math.cos(rot + Math.PI / 4) * 0.115 * s, -0.12 * s + Math.sin(rot + Math.PI / 4) * 0.115 * s, -0.25 * s);
+    // A gold X braced behind the core — four arms on the true diagonals,
+    // each running radially so the whole mark reads as one clean cross.
+    for (const rot of [Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4]) {
+      const strip = new Mesh(new BoxGeometry(0.14 * s, 0.018 * s, 0.012 * s), steelMat(GOLD, GOLD, 0.3));
+      strip.position.set(Math.cos(rot) * 0.15 * s, -0.12 * s + Math.sin(rot) * 0.15 * s, -0.245 * s);
       strip.rotation.z = rot;
       chest.add(strip);
     }
