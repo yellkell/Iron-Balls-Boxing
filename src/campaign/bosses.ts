@@ -359,6 +359,9 @@ export interface TitanRig {
   low: Mesh;
   /** Its glow — blinks while the low blow is the live weak point. */
   lowMat: MeshStandardMaterial;
+  /** VULTURE's wings (empty on every other chassis): shoulder group + wrist
+   *  kink per side, so the entrance can spread them and settle to mantled. */
+  wings: { group: Group; wrist: Group; side: number }[];
   /** Shoulder emblems [left, right] — GOLIATH's crown circuit stops. */
   shoulders: [Mesh, Mesh];
   /** Their glows — blink while that shoulder is the live weak point. */
@@ -613,12 +616,16 @@ export function buildTitan(def: BossDef): TitanRig {
   // ── TORSO — shared frame, bespoke dressing ────────────────────────────────
   const chest = new Group();
   chest.position.y = shoulderY;
-  const yokeW = (def.style === 'fortress' ? 0.74 : def.style === 'vulture' ? 0.56 : 0.62) * s;
+  // JUGGERNAUT carries extra beam: the fortress hull is built FAT — every
+  // width below stretches by `wide`, so it reads as bulk, not scale.
+  const wide = def.style === 'fortress' ? 1.22 : 1;
+  const yokeW = (def.style === 'fortress' ? 0.86 : def.style === 'vulture' ? 0.56 : 0.62) * s;
   const yoke = new Mesh(new BoxGeometry(yokeW, 0.13 * s, 0.26 * s), chassis(accent, 0.05));
   yoke.position.y = 0.06 * s;
   chest.add(yoke);
 
   // Shoulders per style.
+  const wings: TitanRig['wings'] = [];
   for (const side of [-1, 1]) {
     if (def.style === 'vulture') {
       // The WINGS — a real span, not pauldron trim: an inner spar out of the
@@ -646,6 +653,7 @@ export function buildTitan(def: BossDef): TitanRig {
       wrist.position.x = side * 0.5 * s;
       wrist.rotation.z = side * 0.55; // the kink — outer wing reaches higher
       wing.add(wrist);
+      wings.push({ group: wing, wrist, side });
       const joint = new Mesh(new CylinderGeometry(0.045 * s, 0.045 * s, 0.06 * s, 8), dark());
       joint.rotation.x = Math.PI / 2;
       wrist.add(joint);
@@ -674,14 +682,14 @@ export function buildTitan(def: BossDef): TitanRig {
       stub.position.set(side * 0.34 * s, 0.08 * s, 0);
       chest.add(stub);
     } else {
-      const padW = (def.style === 'fortress' ? 0.3 : 0.24) * s;
+      const padW = (def.style === 'fortress' ? 0.36 : 0.24) * s;
       const pad = new Mesh(new BoxGeometry(padW, 0.18 * s, 0.32 * s), dark());
-      pad.position.set(side * 0.37 * s, 0.08 * s, 0);
+      pad.position.set(side * 0.37 * wide * s, 0.08 * s, 0);
       pad.rotation.z = side * -0.22;
       chest.add(pad);
       const trimMat = def.style === 'king' ? steelMat(GOLD, GOLD, 0.35) : glowMat(accent, 0.5);
       const trim = new Mesh(new BoxGeometry(padW + 0.005 * s, 0.024 * s, 0.325 * s), trimMat);
-      trim.position.set(side * 0.37 * s, 0.175 * s, 0);
+      trim.position.set(side * 0.37 * wide * s, 0.175 * s, 0);
       trim.rotation.z = side * -0.22;
       chest.add(trim);
     }
@@ -694,14 +702,18 @@ export function buildTitan(def: BossDef): TitanRig {
   );
   trunk.scale.z = 0.72;
   if (def.style === 'vulture') trunk.scale.x = 0.85;
+  if (def.style === 'fortress') {
+    trunk.scale.x = 1.35; // the hull barrels out
+    trunk.scale.z = 0.85;
+  }
   trunk.position.y = -0.2 * s;
   chest.add(trunk);
 
   if (def.style === 'fortress') {
     // Double-layered bolted front plates — the fortress doctrine made steel.
     for (const [w, h, z, y] of [
-      [0.5, 0.3, -0.19, -0.02],
-      [0.38, 0.24, -0.23, -0.3],
+      [0.62, 0.3, -0.19, -0.02],
+      [0.48, 0.24, -0.23, -0.3],
     ] as const) {
       const slab = new Mesh(new BoxGeometry(w * s, h * s, 0.04 * s), dark());
       slab.position.set(0, y * s, z * s);
@@ -846,11 +858,11 @@ export function buildTitan(def: BossDef): TitanRig {
       root.add(mouth);
     } else {
       const housing = new Mesh(new BoxGeometry(0.13 * s, 0.12 * s, 0.2 * s), dark());
-      housing.position.set(side * 0.37 * s, shoulderY + 0.2 * s, 0.02 * s);
+      housing.position.set(side * 0.37 * wide * s, shoulderY + 0.2 * s, 0.02 * s);
       root.add(housing);
       const muzzle = new Mesh(new CylinderGeometry(0.035 * s, 0.045 * s, 0.1 * s, 8), mat);
       muzzle.rotation.x = Math.PI / 2.6; // tipped up-and-forward, mortar style
-      muzzle.position.set(side * 0.37 * s, shoulderY + 0.27 * s, -0.04 * s);
+      muzzle.position.set(side * 0.37 * wide * s, shoulderY + 0.27 * s, -0.04 * s);
       root.add(muzzle);
     }
   });
@@ -865,14 +877,14 @@ export function buildTitan(def: BossDef): TitanRig {
     const side = i === 0 ? -1 : 1;
     const lamp = new Mesh(new CylinderGeometry(lampR, lampR, 0.055 * s, 8), shoulderMats[i]);
     lamp.rotation.x = Math.PI / 2;
-    lamp.position.set(side * 0.38 * s, shoulderY + 0.13 * s, -0.13 * s);
+    lamp.position.set(side * 0.38 * wide * s, shoulderY + 0.13 * s, -0.13 * s);
     root.add(lamp);
     return lamp;
   };
   const shoulders: [Mesh, Mesh] = [makeShoulderLamp(0), makeShoulderLamp(1)];
 
   // ── Pelvis + hover skirt: no legs — floating hands and iron, on brand ────
-  const pelvis = new Mesh(new BoxGeometry(0.28 * s, 0.18 * s, 0.22 * s), chassis(accent, 0.03));
+  const pelvis = new Mesh(new BoxGeometry(0.28 * wide * s, 0.18 * s, 0.22 * s), chassis(accent, 0.03));
   pelvis.position.y = hipY - 0.28 * s;
   root.add(pelvis);
   // The LOW-BLOW emblem: an octagonal lamp set proud of the belt plate.
@@ -886,8 +898,8 @@ export function buildTitan(def: BossDef): TitanRig {
     // The armour curtain: a ring of riveted skirt plates.
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
-      const plate = new Mesh(new BoxGeometry(0.14 * s, 0.2 * s, 0.025 * s), dark());
-      plate.position.set(Math.cos(a) * 0.19 * s, hipY - 0.42 * s, Math.sin(a) * 0.19 * s);
+      const plate = new Mesh(new BoxGeometry(0.17 * s, 0.2 * s, 0.025 * s), dark());
+      plate.position.set(Math.cos(a) * 0.24 * s, hipY - 0.42 * s, Math.sin(a) * 0.24 * s);
       plate.rotation.y = -a + Math.PI / 2;
       plate.rotation.x = 0.12;
       root.add(plate);
@@ -896,22 +908,22 @@ export function buildTitan(def: BossDef): TitanRig {
     // the fortress never stopped being a tank: road wheels in an armoured
     // sponson either side, tracks moulded as ridged blocks.
     for (const side of [-1, 1]) {
-      const sponson = new Mesh(new BoxGeometry(0.16 * s, 0.2 * s, 0.46 * s), dark());
-      sponson.position.set(side * 0.33 * s, hipY - 0.44 * s, 0.02 * s);
+      const sponson = new Mesh(new BoxGeometry(0.18 * s, 0.2 * s, 0.46 * s), dark());
+      sponson.position.set(side * 0.38 * s, hipY - 0.44 * s, 0.02 * s);
       root.add(sponson);
       for (let wIdx = 0; wIdx < 3; wIdx++) {
         const wheel = new Mesh(new CylinderGeometry(0.065 * s, 0.065 * s, 0.05 * s, 10), steelMat(0x241f2e));
         wheel.rotation.z = Math.PI / 2;
-        wheel.position.set(side * 0.4 * s, hipY - 0.5 * s, (-0.14 + wIdx * 0.15) * s);
+        wheel.position.set(side * 0.46 * s, hipY - 0.5 * s, (-0.14 + wIdx * 0.15) * s);
         root.add(wheel);
       }
       const guard = new Mesh(new BoxGeometry(0.05 * s, 0.05 * s, 0.5 * s), chassis(accent, 0.03));
-      guard.position.set(side * 0.38 * s, hipY - 0.32 * s, 0.02 * s);
+      guard.position.set(side * 0.44 * s, hipY - 0.32 * s, 0.02 * s);
       root.add(guard);
     }
     // The glacis: a raked front plate wearing hazard chevrons — the last
     // thing a wall sees before the fortress arrives.
-    const glacis = new Mesh(new BoxGeometry(0.4 * s, 0.22 * s, 0.03 * s), dark());
+    const glacis = new Mesh(new BoxGeometry(0.5 * s, 0.22 * s, 0.03 * s), dark());
     glacis.position.set(0, hipY - 0.4 * s, -0.2 * s);
     glacis.rotation.x = -0.35;
     root.add(glacis);
@@ -959,7 +971,7 @@ export function buildTitan(def: BossDef): TitanRig {
     fringe.position.y = hipY - 0.36 * s;
     root.add(fringe);
   }
-  const skirt = new Mesh(new CylinderGeometry(0.16 * s, 0.05 * s, 0.28 * s, 8), dark());
+  const skirt = new Mesh(new CylinderGeometry(0.16 * wide * s, 0.05 * s, 0.28 * s, 8), dark());
   skirt.position.y = hipY - 0.48 * s;
   root.add(skirt);
   const skirtGlow = new Mesh(new CylinderGeometry(0.09 * s, 0.05 * s, 0.06 * s, 8), glowMat(accent, 1.2));
@@ -1089,6 +1101,7 @@ export function buildTitan(def: BossDef): TitanRig {
     coreMat,
     low,
     lowMat,
+    wings,
     shoulders,
     shoulderMats,
     podMats,

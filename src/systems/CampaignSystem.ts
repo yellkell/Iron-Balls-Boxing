@@ -1006,6 +1006,16 @@ export class CampaignSystem extends createSystem({
         const e = k * k * (3 - 2 * k); // smoothstep
         root.position.set(3.4 * (1 - e), 2.6 * (1 - e) * (1 - e), z - 1.6 * (1 - e));
         root.rotation.z = -0.5 * Math.sin(e * Math.PI);
+        // Wings ride the swoop: full span with a slow beat through the dive,
+        // then folding down to the mantled rest as it flares onto the mark.
+        const fold = clamp((k - 0.7) / 0.3, 0, 1);
+        const spread = 1 - fold * fold * (3 - 2 * fold);
+        const beat = Math.sin(this.time * 8) * 0.06 * spread;
+        for (const w of this.rig!.wings) {
+          w.group.rotation.y = w.side * (0.35 - 0.3 * spread);
+          w.group.rotation.z = w.side * (0.5 - 0.35 * spread) + w.side * beat;
+          w.wrist.rotation.z = w.side * (0.55 - 0.45 * spread) - w.side * beat * 0.7;
+        }
         break;
       }
       case 'fortress': {
