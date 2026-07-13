@@ -671,12 +671,12 @@ export function buildPub(world: World): PubRefs {
   const WEST = -W + 0.04; // …and the west wall, facing +x
   const RY_E = -Math.PI / 2;
   const RY_W = Math.PI / 2;
-  // East wall (long + clear) — real-city night shots down its length, hung
-  // like framed photo prints, a couple wonky.
-  placePoster('posters/city-harbour.jpg', EAST, 1.5, -2.3, RY_E, 0.06, 0.9, 0.6);
-  placePoster('posters/city-bokeh.jpg', EAST, 1.58, -0.6, RY_E, 0, 0.9, 0.6);
-  placePoster('posters/city-dusk.jpg', EAST, 1.5, 1.1, RY_E, -0.07, 0.9, 0.6);
-  placePoster('posters/city-trails.jpg', EAST, 1.55, 2.6, RY_E, 0.03, 0.9, 0.6);
+  // East wall (long + clear) — real night-city photos hung like prints,
+  // broken up by sprayed graffiti so the wall reads half gallery, half alley.
+  placePoster('posters/city-deli.jpg', EAST, 1.5, -2.3, RY_E, 0.06, 0.94, 0.75);
+  placeGraffiti('posters/blaston-graffiti.png', EAST, 1.55, -0.6, RY_E, 0.02, 1.15, 0.77);
+  placePoster('posters/city-vegas.jpg', EAST, 1.5, 1.1, RY_E, -0.07, 0.62, 0.93);
+  placeGraffiti('posters/goop-graffiti.png', EAST, 1.55, 2.6, RY_E, -0.03, 1.15, 0.77);
   // West wall, either side of the doorway — GRAFFITI sprayed straight onto
   // the plaster: GOOPLIATH's dripping tag one side, the PLAY BLASTON piece
   // the other. Transparent decals, so the wall shows through the overspray.
@@ -1143,23 +1143,31 @@ function buildFightHall(root: Group): {
   // eye-height pieces read cleanly above the crowd. All city night shots hung
   // as big prints (the only graffiti in the venue is the pair by the club's
   // fight-hall doorway) — bigger than the pub-room ones to suit the tall walls.
-  const hallPoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
+  const hallPoster = (url: string, x: number, y: number, z: number, ry: number, tilt: number, w: number, h: number): void => {
     const holder = new Group();
     holder.position.set(x, y, z);
     holder.rotation.y = ry;
-    holder.add(buildPoster(url, 1.35, 0.9, tilt));
+    holder.add(buildPoster(url, w, h, tilt));
+    root.add(holder);
+  };
+  const hallGraffiti = (url: string, x: number, y: number, z: number, ry: number, tilt: number): void => {
+    const holder = new Group();
+    holder.position.set(x, y, z);
+    holder.rotation.y = ry;
+    holder.add(buildGraffiti(url, 1.6, 1.07, tilt));
     root.add(holder);
   };
   const NZ = hall.minZ + 0.05; // north wall (faces +z)
   const SZ = hall.maxZ - 0.05; // south wall (faces −z)
   const WX = hall.minX + 0.05; // far-west wall (faces +x)
-  // No two alike on the same wall; repeats only across opposite walls.
-  hallPoster('posters/city-bokeh.jpg', cx + 2.8, 2.2, NZ, 0, 0.05); // north-right
-  hallPoster('posters/city-trails.jpg', cx - 3.2, 2.3, NZ, 0, -0.04); // north-left
-  hallPoster('posters/city-dusk.jpg', cx - 2.6, 2.2, SZ, Math.PI, 0.06); // south-left
-  hallPoster('posters/city-harbour.jpg', cx + 3.4, 2.1, SZ, Math.PI, -0.03); // south-right
-  hallPoster('posters/city-harbour.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04); // west-north
-  hallPoster('posters/city-bokeh.jpg', WX, 2.15, 3.8, Math.PI / 2, -0.05); // west-south
+  // Each city photo hangs exactly once across the whole venue; graffiti fills
+  // the remaining slots, one piece + one photo per wall.
+  hallGraffiti('posters/blaston-graffiti.png', cx + 2.8, 2.2, NZ, 0, 0.02); // north-right
+  hallPoster('posters/city-tokyo.jpg', cx - 3.2, 2.3, NZ, 0, -0.04, 1.35, 0.76); // north-left
+  hallGraffiti('posters/goop-graffiti.png', cx - 2.6, 2.2, SZ, Math.PI, -0.03); // south-left
+  hallPoster('posters/city-trails.jpg', cx + 3.4, 2.2, SZ, Math.PI, -0.03, 0.8, 1.2); // south-right
+  hallPoster('posters/city-alley.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04, 0.8, 1.2); // west-north
+  hallGraffiti('posters/blaston-graffiti.png', WX, 2.15, 3.8, Math.PI / 2, -0.02); // west-south
 
   return {
     consolePanels: [consolePanels[0], consolePanels[1]],
