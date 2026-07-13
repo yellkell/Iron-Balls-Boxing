@@ -37,6 +37,7 @@ import {
   PointLight,
 } from 'three';
 import { BOSSES, GOOPLIATH_DEF, buildTitan, goopliathBoss, raidBoss, runLineup, type AttackKind, type BossDef, type RunStage, type TitanRig } from '../campaign/bosses.js';
+import { playBossVoice, preloadBossVoice } from '../audio/bossVoice.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { GooFx } from '../goopliath/splats.js';
 import { ATTACKS as GOOP_ATTACKS, CREATURE as GOOP_BODY, type AttackName as GoopAttackName } from '../goopliath/goopConfig.js';
@@ -673,6 +674,9 @@ export class CampaignSystem extends createSystem({
     }
     this.introStep = 0;
     this.entrancePose(0);
+    // Start the entrance line fetching now — it has the klaxon + rise to
+    // arrive before the name card asks for it.
+    preloadBossVoice(this.def.name);
 
     // Health pools: the titan carries its OWN pool (bossEnt — every weak-point
     // hitbox's owner). In a SOLO campaign the slot-1 humanoid also stands down
@@ -926,12 +930,13 @@ export class CampaignSystem extends createSystem({
       }
     }
 
-    // Name reveal + roar once it stands.
+    // Name reveal once it stands — the boss speaks its line if one shipped,
+    // and roars the old roar if not (or if the file hasn't arrived yet).
     const titleStart = klaxonTime + riseTime;
     if (this.t >= titleStart && this.t - delta < titleStart) {
       this.entrancePose(1);
       this.hud.title(this.def.name, this.def.epithet, this.accentCss());
-      sfx.bossRoar(this.def.scale * 0.8);
+      if (!playBossVoice(this.def.name)) sfx.bossRoar(this.def.scale * 0.8);
     }
 
     // FIGHT flash, then the bell — the same neon FIGHT plate the ring
