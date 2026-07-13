@@ -359,6 +359,9 @@ export interface TitanRig {
   low: Mesh;
   /** Its glow — blinks while the low blow is the live weak point. */
   lowMat: MeshStandardMaterial;
+  /** VULTURE's wings (empty on every other chassis): shoulder group + wrist
+   *  kink per side, so the entrance can spread them and settle to mantled. */
+  wings: { group: Group; wrist: Group; side: number }[];
   /** Shoulder emblems [left, right] — GOLIATH's crown circuit stops. */
   shoulders: [Mesh, Mesh];
   /** Their glows — blink while that shoulder is the live weak point. */
@@ -444,6 +447,16 @@ export function buildTitan(def: BossDef): TitanRig {
       const drum = new Mesh(new CylinderGeometry(headR * 0.95, headR * 1.05, headR * 1.7, 10), chassis(accent, 0.05));
       drum.rotation.z = 0.12;
       head.add(drum);
+      // A bent whip antenna — snapped in some forgotten bout, never fixed.
+      const aerialLo = new Mesh(new CylinderGeometry(0.008 * s, 0.012 * s, headR * 0.9, 5), dark());
+      aerialLo.position.set(headR * 0.55, headR * 1.05, headR * 0.2);
+      aerialLo.rotation.z = -0.25;
+      head.add(aerialLo);
+      const aerialHi = new Mesh(new CylinderGeometry(0.006 * s, 0.008 * s, headR * 0.7, 5), dark());
+      aerialHi.position.set(headR * 0.72, headR * 1.55, headR * 0.32);
+      aerialHi.rotation.z = 1.15; // the kink — bent nearly flat
+      aerialHi.rotation.x = 0.2;
+      head.add(aerialHi);
       const dent = new Mesh(new BoxGeometry(headR * 1.4, 0.05 * s, headR * 0.9), dark());
       dent.position.set(headR * 0.2, headR * 0.75, 0);
       dent.rotation.z = -0.2;
@@ -470,6 +483,10 @@ export function buildTitan(def: BossDef): TitanRig {
       const horn = new Mesh(new BoxGeometry(headR * 0.9, headR * 0.9, headR * 0.8), dark());
       horn.position.set(headR * 1.5, headR * 0.1, 0);
       head.add(horn);
+      // A furnace seam glowing along the anvil's base — the head runs HOT.
+      const seam = new Mesh(new BoxGeometry(headR * 2.45, 0.02 * s, headR * 1.85), glowMat(accent, 0.8));
+      seam.position.y = -headR * 0.68;
+      head.add(seam);
       const brow = new Mesh(new BoxGeometry(headR * 2.5, 0.08 * s, headR * 0.5), dark());
       brow.position.set(0, headR * 0.5, -headR * 0.78);
       head.add(brow);
@@ -491,6 +508,16 @@ export function buildTitan(def: BossDef): TitanRig {
       const hood = new Mesh(new CylinderGeometry(headR * 0.55, headR * 0.9, headR * 1.9, 8), chassis(accent, 0.06));
       hood.rotation.x = 0.28; // craned forward, watching you
       head.add(hood);
+      // The half-beak: a short down-turned hook off the CHIN, well below the
+      // eye so the blink stays clear — the executioner's profile in one cut.
+      const beakRoot = new Mesh(new BoxGeometry(headR * 0.34, headR * 0.3, headR * 0.5), dark());
+      beakRoot.position.set(0, -headR * 0.72, -headR * 0.85);
+      beakRoot.rotation.x = 0.5;
+      head.add(beakRoot);
+      const beakTip = new Mesh(new CylinderGeometry(0.004 * s, headR * 0.16, headR * 0.55, 5), dark());
+      beakTip.position.set(0, -headR * 1.0, -headR * 0.98);
+      beakTip.rotation.x = Math.PI - 0.55; // point curls down-and-back
+      head.add(beakTip);
       // The eye sits PROUD of the hood's rim — tucked inside the casque it
       // was invisible, and a blink nobody can see is no tell at all.
       const eye = new Mesh(new CylinderGeometry(headR * 0.42, headR * 0.42, 0.05 * s, 12), visorMat);
@@ -511,6 +538,13 @@ export function buildTitan(def: BossDef): TitanRig {
       const cap = new Mesh(new CylinderGeometry(headR * 0.6, headR * 1.1, headR * 0.55, 10), dark());
       cap.position.y = headR * 0.75;
       head.add(cap);
+      // Periscope stub off the cap — the commander never opens the hatch.
+      const scopeMast = new Mesh(new CylinderGeometry(headR * 0.12, headR * 0.12, headR * 0.6, 6), dark());
+      scopeMast.position.set(headR * 0.45, headR * 1.2, headR * 0.1);
+      head.add(scopeMast);
+      const scopeHead = new Mesh(new BoxGeometry(headR * 0.3, headR * 0.22, headR * 0.42), dark());
+      scopeHead.position.set(headR * 0.45, headR * 1.55, -headR * 0.02);
+      head.add(scopeHead);
       const slot = new Mesh(new BoxGeometry(headR * 1.7, 0.03 * s, 0.03 * s), visorMat);
       slot.position.set(0, headR * 0.1, -headR * 1.05);
       head.add(slot);
@@ -544,6 +578,12 @@ export function buildTitan(def: BossDef): TitanRig {
       const jaw = new Mesh(new BoxGeometry(headR * 1.1, 0.05 * s, 0.06 * s), dark());
       jaw.position.set(0, -headR * 0.62, -headR * 0.72);
       head.add(jaw);
+      // The war plume: a blade of royal fire rising through the crown's
+      // circle — the king's colours flying over the helm.
+      const plume = new Mesh(new BoxGeometry(0.02 * s, headR * 1.1, headR * 0.55), glowMat(accent, 1.1));
+      plume.position.set(0, headR * 1.6, headR * 0.1);
+      plume.rotation.x = -0.12; // swept back
+      head.add(plume);
       break;
     }
   }
@@ -576,20 +616,65 @@ export function buildTitan(def: BossDef): TitanRig {
   // ── TORSO — shared frame, bespoke dressing ────────────────────────────────
   const chest = new Group();
   chest.position.y = shoulderY;
-  const yokeW = (def.style === 'fortress' ? 0.74 : def.style === 'vulture' ? 0.56 : 0.62) * s;
+  // JUGGERNAUT carries extra beam: the fortress hull is built FAT — every
+  // width below stretches by `wide`, so it reads as bulk, not scale.
+  const wide = def.style === 'fortress' ? 1.22 : 1;
+  const yokeW = (def.style === 'fortress' ? 0.86 : def.style === 'vulture' ? 0.56 : 0.62) * s;
   const yoke = new Mesh(new BoxGeometry(yokeW, 0.13 * s, 0.26 * s), chassis(accent, 0.05));
   yoke.position.y = 0.06 * s;
   chest.add(yoke);
 
   // Shoulders per style.
+  const wings: TitanRig['wings'] = [];
   for (const side of [-1, 1]) {
     if (def.style === 'vulture') {
-      // Swept wing plates, layered and angled up-and-out like folded wings.
-      for (let layer = 0; layer < 3; layer++) {
-        const wing = new Mesh(new BoxGeometry(0.3 * s, 0.02 * s, (0.24 - layer * 0.05) * s), dark());
-        wing.position.set(side * (0.36 + layer * 0.1) * s, (0.12 + layer * 0.07) * s, 0.02 * s);
-        wing.rotation.z = side * -(0.35 + layer * 0.18);
-        chest.add(wing);
+      // The WINGS — a real span, not pauldron trim: an inner spar out of the
+      // shoulder, a wrist joint kinking the outer spar higher, and primaries
+      // fanning off both, longest at the tip. Mantled up-and-back like a
+      // raptor deciding whether you're worth the swoop.
+      const wing = new Group();
+      wing.position.set(side * 0.28 * s, 0.16 * s, 0.14 * s);
+      wing.rotation.y = side * 0.35; // swept back off the shoulders
+      wing.rotation.z = side * 0.5; // raised up-and-out
+      chest.add(wing);
+      const spar1 = new Mesh(new BoxGeometry(0.5 * s, 0.05 * s, 0.035 * s), chassis(accent, 0.04));
+      spar1.position.x = side * 0.25 * s;
+      wing.add(spar1);
+      for (let f = 0; f < 3; f++) {
+        // Inner primaries hang off the arm spar, splaying slightly outward.
+        const len = (0.3 + f * 0.06) * s;
+        const rot = side * (0.08 + f * 0.1);
+        const feather = new Mesh(new BoxGeometry(0.055 * s, len, 0.018 * s), dark());
+        feather.position.set(side * (0.12 + f * 0.13) * s, -len / 2 + 0.02 * s, 0);
+        feather.rotation.z = rot;
+        wing.add(feather);
+      }
+      const wrist = new Group();
+      wrist.position.x = side * 0.5 * s;
+      wrist.rotation.z = side * 0.55; // the kink — outer wing reaches higher
+      wing.add(wrist);
+      wings.push({ group: wing, wrist, side });
+      const joint = new Mesh(new CylinderGeometry(0.045 * s, 0.045 * s, 0.06 * s, 8), dark());
+      joint.rotation.x = Math.PI / 2;
+      wrist.add(joint);
+      const spar2 = new Mesh(new BoxGeometry(0.44 * s, 0.04 * s, 0.03 * s), chassis(accent, 0.04));
+      spar2.position.x = side * 0.22 * s;
+      wrist.add(spar2);
+      for (let f = 0; f < 4; f++) {
+        // Outer primaries: the long blades, tipped in a dim ember of accent.
+        const len = (0.42 + f * 0.09) * s;
+        const rot = side * (0.12 + f * 0.11);
+        const fx = side * (0.08 + f * 0.11) * s;
+        const feather = new Mesh(new BoxGeometry(0.05 * s, len, 0.016 * s), dark());
+        feather.position.set(fx, -len / 2 + 0.02 * s, 0);
+        feather.rotation.z = rot;
+        wrist.add(feather);
+        const tip = new Mesh(new BoxGeometry(0.05 * s, 0.045 * s, 0.017 * s), glowMat(accent, 0.35));
+        // Anchor the ember on the feather's far end: the blade pivots about
+        // its centre, so the end lands at centre + R(rot)·(0, −len/2).
+        tip.position.set(fx + Math.sin(rot) * (len / 2), -len / 2 + 0.02 * s - Math.cos(rot) * (len / 2) + 0.02 * s, 0);
+        tip.rotation.z = rot;
+        wrist.add(tip);
       }
     } else if (def.style === 'hook' && side === 1) {
       // RUSTHOOK's right shoulder is a bare stub — the armour fell off years ago.
@@ -597,14 +682,14 @@ export function buildTitan(def: BossDef): TitanRig {
       stub.position.set(side * 0.34 * s, 0.08 * s, 0);
       chest.add(stub);
     } else {
-      const padW = (def.style === 'fortress' ? 0.3 : 0.24) * s;
+      const padW = (def.style === 'fortress' ? 0.36 : 0.24) * s;
       const pad = new Mesh(new BoxGeometry(padW, 0.18 * s, 0.32 * s), dark());
-      pad.position.set(side * 0.37 * s, 0.08 * s, 0);
+      pad.position.set(side * 0.37 * wide * s, 0.08 * s, 0);
       pad.rotation.z = side * -0.22;
       chest.add(pad);
       const trimMat = def.style === 'king' ? steelMat(GOLD, GOLD, 0.35) : glowMat(accent, 0.5);
       const trim = new Mesh(new BoxGeometry(padW + 0.005 * s, 0.024 * s, 0.325 * s), trimMat);
-      trim.position.set(side * 0.37 * s, 0.175 * s, 0);
+      trim.position.set(side * 0.37 * wide * s, 0.175 * s, 0);
       trim.rotation.z = side * -0.22;
       chest.add(trim);
     }
@@ -617,14 +702,18 @@ export function buildTitan(def: BossDef): TitanRig {
   );
   trunk.scale.z = 0.72;
   if (def.style === 'vulture') trunk.scale.x = 0.85;
+  if (def.style === 'fortress') {
+    trunk.scale.x = 1.35; // the hull barrels out
+    trunk.scale.z = 0.85;
+  }
   trunk.position.y = -0.2 * s;
   chest.add(trunk);
 
   if (def.style === 'fortress') {
     // Double-layered bolted front plates — the fortress doctrine made steel.
     for (const [w, h, z, y] of [
-      [0.5, 0.3, -0.19, -0.02],
-      [0.38, 0.24, -0.23, -0.3],
+      [0.62, 0.3, -0.19, -0.02],
+      [0.48, 0.24, -0.23, -0.3],
     ] as const) {
       const slab = new Mesh(new BoxGeometry(w * s, h * s, 0.04 * s), dark());
       slab.position.set(0, y * s, z * s);
@@ -638,6 +727,31 @@ export function buildTitan(def: BossDef): TitanRig {
       rib.position.set(0, ry * s, -0.16 * s);
       chest.add(rib);
     }
+    // Mismatched salvage patches riveted on at whatever angle they fit —
+    // nothing on this machine matches, that IS the machine.
+    const patchMat = steelMat(0x6b5233); // brighter, newer rust — a fresh graft
+    for (const [px, py, rot, w, h] of [
+      [-0.18, -0.14, 0.3, 0.16, 0.12],
+      [0.14, -0.3, -0.2, 0.13, 0.16],
+    ] as const) {
+      const patch = new Mesh(new BoxGeometry(w * s, h * s, 0.015 * s), patchMat);
+      patch.position.set(px * s, py * s, -0.19 * s);
+      patch.rotation.z = rot;
+      chest.add(patch);
+    }
+    // A slack chain swinging from the bare shoulder stub: links faked with
+    // alternating boxes, each a step further down-and-out.
+    for (let i = 0; i < 4; i++) {
+      const link = new Mesh(new BoxGeometry(0.035 * s, 0.05 * s, 0.02 * s), dark());
+      link.position.set((0.36 + i * 0.025) * s, (0.0 - i * 0.055) * s, 0.06 * s);
+      link.rotation.z = i % 2 ? 0.4 : 0.15;
+      link.rotation.y = i % 2 ? 0.8 : 0.1;
+      chest.add(link);
+    }
+    // An oil weep streaking down from the ribs.
+    const weep = new Mesh(new BoxGeometry(0.05 * s, 0.28 * s, 0.008 * s), steelMat(0x14110c));
+    weep.position.set(0.08 * s, -0.34 * s, -0.175 * s);
+    chest.add(weep);
   }
   if (def.style === 'piston') {
     // Riveted slab chest plate.
@@ -649,6 +763,66 @@ export function buildTitan(def: BossDef): TitanRig {
       bolt.rotation.x = Math.PI / 2;
       bolt.position.set(bx * s, by * s, -0.2 * s);
       chest.add(bolt);
+    }
+    // Furnace grate: ember light leaking between louvres low on the plate —
+    // the fire this press runs on, visible through its own chest.
+    for (const gy of [-0.3, -0.36] as const) {
+      const glowLine = new Mesh(new BoxGeometry(0.3 * s, 0.018 * s, 0.01 * s), glowMat(accent, 0.7));
+      glowLine.position.set(0, gy * s, -0.195 * s);
+      chest.add(glowLine);
+      const bar = new Mesh(new BoxGeometry(0.32 * s, 0.02 * s, 0.02 * s), dark());
+      bar.position.set(0, (gy + 0.028) * s, -0.2 * s);
+      chest.add(bar);
+    }
+    // A boiler gauge riveted beside the core, needle frozen in the red.
+    const gauge = new Mesh(new CylinderGeometry(0.05 * s, 0.05 * s, 0.025 * s, 10), steelMat(0x555a63));
+    gauge.rotation.x = Math.PI / 2;
+    gauge.position.set(0.17 * s, -0.12 * s, -0.21 * s);
+    chest.add(gauge);
+    const needle = new Mesh(new BoxGeometry(0.008 * s, 0.036 * s, 0.008 * s), glowMat(accent, 1.0));
+    needle.position.set(0.155 * s, -0.105 * s, -0.225 * s);
+    needle.rotation.z = -0.7; // pinned hard right
+    chest.add(needle);
+  }
+  if (def.style === 'king') {
+    // A gold X braced behind the core — four arms on the true diagonals,
+    // each running radially so the whole mark reads as one clean cross.
+    for (const rot of [Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4]) {
+      const strip = new Mesh(new BoxGeometry(0.14 * s, 0.018 * s, 0.012 * s), steelMat(GOLD, GOLD, 0.3));
+      strip.position.set(Math.cos(rot) * 0.15 * s, -0.12 * s + Math.sin(rot) * 0.15 * s, -0.245 * s);
+      strip.rotation.z = rot;
+      chest.add(strip);
+    }
+  }
+  if (def.style === 'vulture') {
+    // Segmented vertebra neck craning the skull off the yoke — the head
+    // floats on the shared skeleton, so these rings sell the connection.
+    for (const [ny, nr] of [
+      [0.14, 0.075],
+      [0.22, 0.062],
+    ] as const) {
+      const ring = new Mesh(new CylinderGeometry(nr * s, (nr + 0.012) * s, 0.05 * s, 8), dark());
+      ring.position.set(0, ny * s, -0.02 * s);
+      chest.add(ring);
+    }
+    // The folded-wing cloak: long plates hanging down the BACK in a loose
+    // fan — from behind it's all plumage, from the front all blade.
+    for (let f = -2; f <= 2; f++) {
+      const quill = new Mesh(new BoxGeometry(0.07 * s, (0.52 - Math.abs(f) * 0.07) * s, 0.018 * s), dark());
+      quill.position.set(f * 0.085 * s, (-0.26 + Math.abs(f) * 0.04) * s, 0.16 * s);
+      quill.rotation.z = f * 0.1;
+      quill.rotation.x = -0.1; // flared just off the back
+      chest.add(quill);
+    }
+    // The executioner keeps tallies: two scrap tags on a wire off the yoke.
+    for (const [tx, ty, rot] of [
+      [-0.2, -0.06, 0.15],
+      [-0.16, -0.09, -0.3],
+    ] as const) {
+      const tag = new Mesh(new BoxGeometry(0.045 * s, 0.07 * s, 0.012 * s), steelMat(0x51584a));
+      tag.position.set(tx * s, ty * s, -0.17 * s);
+      tag.rotation.z = rot;
+      chest.add(tag);
     }
   }
 
@@ -684,11 +858,11 @@ export function buildTitan(def: BossDef): TitanRig {
       root.add(mouth);
     } else {
       const housing = new Mesh(new BoxGeometry(0.13 * s, 0.12 * s, 0.2 * s), dark());
-      housing.position.set(side * 0.37 * s, shoulderY + 0.2 * s, 0.02 * s);
+      housing.position.set(side * 0.37 * wide * s, shoulderY + 0.2 * s, 0.02 * s);
       root.add(housing);
       const muzzle = new Mesh(new CylinderGeometry(0.035 * s, 0.045 * s, 0.1 * s, 8), mat);
       muzzle.rotation.x = Math.PI / 2.6; // tipped up-and-forward, mortar style
-      muzzle.position.set(side * 0.37 * s, shoulderY + 0.27 * s, -0.04 * s);
+      muzzle.position.set(side * 0.37 * wide * s, shoulderY + 0.27 * s, -0.04 * s);
       root.add(muzzle);
     }
   });
@@ -703,14 +877,14 @@ export function buildTitan(def: BossDef): TitanRig {
     const side = i === 0 ? -1 : 1;
     const lamp = new Mesh(new CylinderGeometry(lampR, lampR, 0.055 * s, 8), shoulderMats[i]);
     lamp.rotation.x = Math.PI / 2;
-    lamp.position.set(side * 0.38 * s, shoulderY + 0.13 * s, -0.13 * s);
+    lamp.position.set(side * 0.38 * wide * s, shoulderY + 0.13 * s, -0.13 * s);
     root.add(lamp);
     return lamp;
   };
   const shoulders: [Mesh, Mesh] = [makeShoulderLamp(0), makeShoulderLamp(1)];
 
   // ── Pelvis + hover skirt: no legs — floating hands and iron, on brand ────
-  const pelvis = new Mesh(new BoxGeometry(0.28 * s, 0.18 * s, 0.22 * s), chassis(accent, 0.03));
+  const pelvis = new Mesh(new BoxGeometry(0.28 * wide * s, 0.18 * s, 0.22 * s), chassis(accent, 0.03));
   pelvis.position.y = hipY - 0.28 * s;
   root.add(pelvis);
   // The LOW-BLOW emblem: an octagonal lamp set proud of the belt plate.
@@ -724,19 +898,87 @@ export function buildTitan(def: BossDef): TitanRig {
     // The armour curtain: a ring of riveted skirt plates.
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
-      const plate = new Mesh(new BoxGeometry(0.14 * s, 0.2 * s, 0.025 * s), dark());
-      plate.position.set(Math.cos(a) * 0.19 * s, hipY - 0.42 * s, Math.sin(a) * 0.19 * s);
+      const plate = new Mesh(new BoxGeometry(0.17 * s, 0.2 * s, 0.025 * s), dark());
+      plate.position.set(Math.cos(a) * 0.24 * s, hipY - 0.42 * s, Math.sin(a) * 0.24 * s);
       plate.rotation.y = -a + Math.PI / 2;
       plate.rotation.x = 0.12;
       root.add(plate);
     }
+    // TREAD PODS flanking the skirt — it hovers like everything else, but
+    // the fortress never stopped being a tank: road wheels in an armoured
+    // sponson either side, tracks moulded as ridged blocks.
+    for (const side of [-1, 1]) {
+      const sponson = new Mesh(new BoxGeometry(0.18 * s, 0.2 * s, 0.46 * s), dark());
+      sponson.position.set(side * 0.38 * s, hipY - 0.44 * s, 0.02 * s);
+      root.add(sponson);
+      for (let wIdx = 0; wIdx < 3; wIdx++) {
+        const wheel = new Mesh(new CylinderGeometry(0.065 * s, 0.065 * s, 0.05 * s, 10), steelMat(0x241f2e));
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * 0.46 * s, hipY - 0.5 * s, (-0.14 + wIdx * 0.15) * s);
+        root.add(wheel);
+      }
+      const guard = new Mesh(new BoxGeometry(0.05 * s, 0.05 * s, 0.5 * s), chassis(accent, 0.03));
+      guard.position.set(side * 0.44 * s, hipY - 0.32 * s, 0.02 * s);
+      root.add(guard);
+    }
+    // The glacis: a clean raked front plate behind the curtain, no glow, no
+    // trim — dark bow armour whose only statement is its rake.
+    const glacis = new Mesh(new BoxGeometry(0.5 * s, 0.22 * s, 0.03 * s), dark());
+    glacis.position.set(0, hipY - 0.4 * s, -0.2 * s);
+    glacis.rotation.x = -0.35;
+    root.add(glacis);
   }
-  const skirt = new Mesh(new CylinderGeometry(0.16 * s, 0.05 * s, 0.28 * s, 8), dark());
-  skirt.position.y = hipY - 0.48 * s;
-  root.add(skirt);
-  const skirtGlow = new Mesh(new CylinderGeometry(0.09 * s, 0.05 * s, 0.06 * s, 8), glowMat(accent, 1.2));
-  skirtGlow.position.y = hipY - 0.6 * s;
-  root.add(skirtGlow);
+  if (def.style === 'vulture') {
+    // Tail plumage: three quills raked down-and-back off the hips.
+    for (let f = -1; f <= 1; f++) {
+      const quill = new Mesh(new BoxGeometry(0.05 * s, 0.36 * s, 0.016 * s), dark());
+      quill.position.set(f * 0.08 * s, hipY - 0.42 * s, 0.16 * s);
+      quill.rotation.x = 0.55; // swept back like a diving bird's tail
+      quill.rotation.z = f * 0.16;
+      root.add(quill);
+    }
+  }
+  if (def.style === 'king') {
+    // The war cape: long near-black plates hanging from the shoulder line
+    // down past the hips, each tipped in gold — royalty you can count in
+    // silhouette alone.
+    for (let f = -2; f <= 2; f++) {
+      const drop = (0.78 - Math.abs(f) * 0.06) * s;
+      const plate = new Mesh(new BoxGeometry(0.11 * s, drop, 0.02 * s), steelMat(0x101014));
+      plate.position.set(f * 0.115 * s, shoulderY - drop / 2 + 0.04 * s, 0.2 * s);
+      plate.rotation.x = -0.08;
+      plate.rotation.z = f * 0.05;
+      root.add(plate);
+      const tip = new Mesh(new BoxGeometry(0.11 * s, 0.035 * s, 0.022 * s), steelMat(GOLD, GOLD, 0.3));
+      tip.position.set(f * 0.115 * s, shoulderY - drop + 0.05 * s, 0.2 * s);
+      tip.rotation.x = -0.08;
+      tip.rotation.z = f * 0.05;
+      root.add(tip);
+    }
+    // Gold fringe ringing the hover skirt — even the exhaust wears trim.
+    const fringe = new Mesh(new CylinderGeometry(0.165 * s, 0.14 * s, 0.035 * s, 8), steelMat(GOLD, GOLD, 0.3));
+    fringe.position.y = hipY - 0.36 * s;
+    root.add(fringe);
+  }
+  if (def.style === 'fortress') {
+    // No dangling exhaust funnel on the fortress — a tapered spout under
+    // that hull read like a spinning top. Instead a wide, shallow hover
+    // PLENUM tucked between the sponsons: a flat tank belly with its glow
+    // recessed underneath, so the bulk sits on a cushion, not a point.
+    const plenum = new Mesh(new CylinderGeometry(0.26 * s, 0.28 * s, 0.1 * s, 10), dark());
+    plenum.position.y = hipY - 0.5 * s;
+    root.add(plenum);
+    const cushion = new Mesh(new CylinderGeometry(0.21 * s, 0.19 * s, 0.045 * s, 10), glowMat(accent, 1.2));
+    cushion.position.y = hipY - 0.56 * s;
+    root.add(cushion);
+  } else {
+    const skirt = new Mesh(new CylinderGeometry(0.16 * s, 0.05 * s, 0.28 * s, 8), dark());
+    skirt.position.y = hipY - 0.48 * s;
+    root.add(skirt);
+    const skirtGlow = new Mesh(new CylinderGeometry(0.09 * s, 0.05 * s, 0.06 * s, 8), glowMat(accent, 1.2));
+    skirtGlow.position.y = hipY - 0.6 * s;
+    root.add(skirtGlow);
+  }
 
   // ── ARMS: shoulder pivots carrying girder arms + bespoke hands ───────────
   const buildHand = (side: -1 | 1): Group => {
@@ -778,6 +1020,12 @@ export function buildTitan(def: BossDef): TitanRig {
       const ring = new Mesh(new BoxGeometry(0.32 * s, 0.03 * s, 0.32 * s), glowMat(accent, 0.9));
       ring.position.y = 0.1 * s;
       hand.add(ring);
+      // Forge bolts studding the striking face's rim.
+      for (const [bx, bz] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]] as const) {
+        const bolt = new Mesh(new CylinderGeometry(0.025 * s, 0.025 * s, 0.03 * s, 6), steelMat(0x555a63));
+        bolt.position.set(bx * s, -0.2 * s, bz * s);
+        hand.add(bolt);
+      }
       return hand;
     }
     if (def.style === 'vulture') {
@@ -818,6 +1066,17 @@ export function buildTitan(def: BossDef): TitanRig {
     const upper = new Mesh(new BoxGeometry(0.11 * s, 0.62 * s, 0.13 * s), chassis(accent, 0.03));
     upper.position.y = -0.31 * s;
     pivot.add(upper);
+    if (def.style === 'piston') {
+      // The drive piston riding each girder arm: sleeve up top, bright rod
+      // below — the press's whole anatomy on display. Parented to the pivot
+      // so it swings with every hammer stroke.
+      const sleeve = new Mesh(new CylinderGeometry(0.045 * s, 0.045 * s, 0.26 * s, 8), dark());
+      sleeve.position.set(side * 0.02 * s, -0.16 * s, -0.1 * s);
+      pivot.add(sleeve);
+      const rod = new Mesh(new CylinderGeometry(0.02 * s, 0.02 * s, 0.3 * s, 6), steelMat(0x8d949f));
+      rod.position.set(side * 0.02 * s, -0.42 * s, -0.1 * s);
+      pivot.add(rod);
+    }
     const elbow = new Mesh(new CylinderGeometry(0.075 * s, 0.075 * s, 0.14 * s, 8), dark());
     elbow.rotation.z = Math.PI / 2;
     elbow.position.y = -0.62 * s;
@@ -844,6 +1103,7 @@ export function buildTitan(def: BossDef): TitanRig {
     coreMat,
     low,
     lowMat,
+    wings,
     shoulders,
     shoulderMats,
     podMats,

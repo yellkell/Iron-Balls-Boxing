@@ -1169,6 +1169,7 @@ function buildFightHall(root: Group): {
   hallPoster('posters/city-mountain.jpg', cx - 2.6, 2.2, SZ, Math.PI, -0.03, 1.7, 0.71); // south-left
   hallPoster('posters/city-trails.jpg', cx + 3.4, 2.2, SZ, Math.PI, -0.03, 0.8, 1.2); // south-right
   hallPoster('posters/city-alley.jpg', WX, 2.25, -3.4, Math.PI / 2, 0.04, 0.8, 1.2); // west-north
+  hallGraffiti('posters/blaston-graffiti.png', WX, 2.2, 3.8, Math.PI / 2, -0.02); // west-south — the far wall opposite the club door
 
   return {
     consolePanels: [consolePanels[0], consolePanels[1]],

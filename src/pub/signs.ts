@@ -183,7 +183,10 @@ export function buildGraffiti(url: string, wMeters: number, hMeters: number, til
     url,
     (tex) => {
       tex.colorSpace = SRGBColorSpace;
-      tex.minFilter = LinearFilter;
+      // Keep mipmaps ON (the default): spray art is hard black outline on
+      // hot colour, and without mips it crawls/flickers in the headset the
+      // moment your head moves. Anisotropy keeps the glancing view crisp.
+      tex.anisotropy = 8;
       mat.map = tex;
       mat.opacity = 1;
       mat.needsUpdate = true;
@@ -214,7 +217,7 @@ export function buildPoster(url: string, wMeters: number, hMeters: number, tilt 
     url,
     (tex) => {
       tex.colorSpace = SRGBColorSpace;
-      tex.minFilter = LinearFilter;
+      tex.anisotropy = 8; // mipmaps stay on — flat prints shimmer without them
       mat.map = tex;
       mat.color.setHex(0xa8a8a8); // knock the print back so it doesn't stand out
       mat.needsUpdate = true;

@@ -37,6 +37,7 @@ import {
   PointLight,
 } from 'three';
 import { BOSSES, GOOPLIATH_DEF, buildTitan, goopliathBoss, raidBoss, runLineup, type AttackKind, type BossDef, type RunStage, type TitanRig } from '../campaign/bosses.js';
+import { playBossVoice, preloadBossVoice } from '../audio/bossVoice.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { GooFx } from '../goopliath/splats.js';
 import { ATTACKS as GOOP_ATTACKS, CREATURE as GOOP_BODY, type AttackName as GoopAttackName } from '../goopliath/goopConfig.js';
@@ -673,6 +674,9 @@ export class CampaignSystem extends createSystem({
     }
     this.introStep = 0;
     this.entrancePose(0);
+    // Start the entrance line fetching now — it has the klaxon + rise to
+    // arrive before the name card asks for it.
+    preloadBossVoice(this.def.name);
 
     // Health pools: the titan carries its OWN pool (bossEnt — every weak-point
     // hitbox's owner). In a SOLO campaign the slot-1 humanoid also stands down
@@ -926,12 +930,13 @@ export class CampaignSystem extends createSystem({
       }
     }
 
-    // Name reveal + roar once it stands.
+    // Name reveal once it stands — the boss speaks its line if one shipped,
+    // and roars the old roar if not (or if the file hasn't arrived yet).
     const titleStart = klaxonTime + riseTime;
     if (this.t >= titleStart && this.t - delta < titleStart) {
       this.entrancePose(1);
       this.hud.title(this.def.name, this.def.epithet, this.accentCss());
-      sfx.bossRoar(this.def.scale * 0.8);
+      if (!playBossVoice(this.def.name)) sfx.bossRoar(this.def.scale * 0.8);
     }
 
     // FIGHT flash, then the bell — the same neon FIGHT plate the ring
@@ -1001,6 +1006,16 @@ export class CampaignSystem extends createSystem({
         const e = k * k * (3 - 2 * k); // smoothstep
         root.position.set(3.4 * (1 - e), 2.6 * (1 - e) * (1 - e), z - 1.6 * (1 - e));
         root.rotation.z = -0.5 * Math.sin(e * Math.PI);
+        // Wings ride the swoop: full span with a slow beat through the dive,
+        // then folding down to the mantled rest as it flares onto the mark.
+        const fold = clamp((k - 0.7) / 0.3, 0, 1);
+        const spread = 1 - fold * fold * (3 - 2 * fold);
+        const beat = Math.sin(this.time * 8) * 0.06 * spread;
+        for (const w of this.rig!.wings) {
+          w.group.rotation.y = w.side * (0.35 - 0.3 * spread);
+          w.group.rotation.z = w.side * (0.5 - 0.35 * spread) + w.side * beat;
+          w.wrist.rotation.z = w.side * (0.55 - 0.45 * spread) - w.side * beat * 0.7;
+        }
         break;
       }
       case 'fortress': {
