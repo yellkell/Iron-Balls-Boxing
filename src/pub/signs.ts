@@ -160,6 +160,49 @@ export function buildSign(
  * art letterbox-fits the w×h box (never stretched). Returns the mesh facing +z;
  * the caller orients it onto a wall (e.g. inside a Group rotated to face in).
  */
+/**
+ * GRAFFITI sprayed straight onto the wall: a transparent decal plane. Unlike
+ * buildPoster there is no paper rectangle — the keyed-out PNG's alpha IS the
+ * paint, so the wall shows through everywhere the can didn't reach. Lit like
+ * the wall (StandardMaterial), depthWrite off so the soft overspray edges
+ * never z-halo against the surface it's painted on. Invisible until the PNG
+ * decodes (a missing file is just bare wall). `tilt` rolls it like buildPoster.
+ */
+export function buildGraffiti(url: string, wMeters: number, hMeters: number, tilt = 0): Mesh {
+  const mat = new MeshStandardMaterial({
+    transparent: true,
+    opacity: 0, // nothing until the art decodes — bare wall, never a blank plate
+    depthWrite: false,
+    roughness: 0.9,
+    metalness: 0,
+  });
+  const mesh = new Mesh(new PlaneGeometry(wMeters, hMeters), mat);
+  mesh.name = 'pub-poster'; // same merge exemption as posters — texture arrives async
+  mesh.rotation.z = tilt;
+  new TextureLoader().load(
+    url,
+    (tex) => {
+      tex.colorSpace = SRGBColorSpace;
+      tex.minFilter = LinearFilter;
+      mat.map = tex;
+      mat.opacity = 1;
+      mat.needsUpdate = true;
+      const img = tex.image as { width?: number; height?: number } | undefined;
+      if (img?.width && img.height) {
+        const imgAspect = img.width / img.height;
+        const boxAspect = wMeters / hMeters;
+        if (imgAspect > boxAspect) mesh.scale.y = boxAspect / imgAspect;
+        else mesh.scale.x = imgAspect / boxAspect;
+      }
+    },
+    undefined,
+    () => {
+      /* image not present — stay invisible, it's just wall */
+    },
+  );
+  return mesh;
+}
+
 export function buildPoster(url: string, wMeters: number, hMeters: number, tilt = 0): Mesh {
   // Dark matte stand-in until the image loads — a missing file is just a dim
   // rectangle, never a bright blank.
