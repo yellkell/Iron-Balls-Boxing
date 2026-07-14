@@ -401,6 +401,15 @@ export class FireballSystem extends createSystem({
           (state !== BallState.Dead && obj.position.distanceTo(_grip) <= FIREBALL.nearHandRadius))
       ) {
         if (state !== BallState.Orbit) {
+          // Snatching a RETURNING ball out of the air lands here, not in the
+          // catch check below (this branch flips the state first) — so the
+          // recall attachment stayed on the ball in your fist: still shrunk
+          // or swollen, still carrying the modified damage. Revert it like
+          // any other completed catch.
+          if (state === BallState.Returning || (ball.getValue(Fireball, 'attach') ?? 0) !== 0) {
+            this.revertBall(ball);
+            this.destroyShards(0, hand);
+          }
           ball.setValue(Fireball, 'state', BallState.Orbit);
           ball.setValue(Fireball, 'spin', 0);
           sfx.ignite();

@@ -65,12 +65,12 @@ export function buildPintGlass(): Group {
   base.position.y = 0.006;
   g.add(base);
 
-  // The pint itself: amber column with a pale head.
+  // The pint itself: a deep RED pour (the house brew) with a pale head.
   const beer = new Mesh(
     new CylinderGeometry(GLASS.radiusTop * 0.88, GLASS.radiusBottom * 0.88, GLASS.height * 0.72, 12),
     new MeshStandardMaterial({
-      color: 0xc97a1e,
-      emissive: 0x4a2605,
+      color: 0xb01f24,
+      emissive: 0x400608,
       emissiveIntensity: 0.5,
       roughness: 0.4,
       transparent: true,
