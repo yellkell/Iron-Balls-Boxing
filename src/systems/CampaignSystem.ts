@@ -647,11 +647,16 @@ export class CampaignSystem extends createSystem({
       // work matches the solo fight at that tier.
       {
         const d = this.activeDifficulty();
-        const pool = d === 'blazing' ? GOOPLIATH.hitsCampaignBlazing : d === 'hard' ? GOOPLIATH.hitsCampaignHard : null;
-        if (pool !== null) {
-          const fists = this.raid() ? this.raidSize() : 1;
-          this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
-        }
+        const pool =
+          d === 'blazing'
+            ? GOOPLIATH.hitsCampaignBlazing
+            : d === 'hard'
+              ? GOOPLIATH.hitsCampaignHard
+              : d === 'easy'
+                ? GOOPLIATH.hitsEasy
+                : GOOPLIATH.hitsCampaign;
+        const fists = this.raid() ? this.raidSize() : 1;
+        this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
       }
       this.def = this.applyGoopTier(this.def);
       this.runLen = 1;
@@ -664,6 +669,10 @@ export class CampaignSystem extends createSystem({
       const rs = lineup[clamp(app.campaignStage, 0, lineup.length - 1)];
       if (rs.kind === 'goop') {
         this.def = this.applyGoopTier(goopliathBoss(this.raid(), this.raidSize()));
+        // The run WEDGE is one stage of six, not the dedicated fight — a
+        // short hand-set pool (pre-divided so the hp line lands exactly).
+        const fists = this.raid() ? this.raidSize() : 1;
+        this.def = { ...this.def, health: (GOOPLIATH.hitsRunWedge * fists) / this.diff.health };
         goopStage = true;
       } else {
         const base = BOSSES[rs.index];
@@ -1750,7 +1759,7 @@ export class CampaignSystem extends createSystem({
           zoneSeats.push(seat);
           telegraphs.push(tg);
           beamOffsets.push(offset);
-          staggers.push((ti * strips + i) * 0.35);
+          staggers.push((ti * strips + i) * 0.5); // half a beat between shots of a battery
           this.aimBeam(zone, tg, offset, seat); // initial aim (tracking re-aims)
         }
       });
