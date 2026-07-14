@@ -205,6 +205,7 @@ export type MenuAction =
   /** Open / close the SETTINGS modal (the gear disc left of the paper). */
   | 'open-settings'
   | 'settings-close'
+  | 'settings-report'
   /** Toggle the lobby/battle music mute (now inside the SETTINGS modal). */
   | 'toggle-mute'
   /** Dragging the SFX / music volume sliders (continuous — MenuSystem reads UV). */
@@ -1923,12 +1924,23 @@ function hitSettingsButton(u: number, v: number): MenuAction | null {
 // branches there).
 
 const SET_W = 560;
-const SET_H = 500;
+const SET_H = 560;
 const SFX_BAR = { x: 48, y: 150, w: SET_W - 96, h: 40 };
 const MUSIC_BAR = { x: 48, y: 252, w: SET_W - 96, h: 40 };
 const SET_MUTE_Y = 322;
 const SET_VOICE_Y = 378;
-const SET_CLOSE_BTN = { x: SET_W / 2 - 90, y: SET_H - 72, w: 180, h: 50 };
+const SET_REPORT_BTN = { x: SET_W / 2 - 150, y: 428, w: 300, h: 46 };
+const SET_CLOSE_BTN = { x: SET_W / 2 - 90, y: SET_H - 66, w: 180, h: 50 };
+
+/** Flips after a report goes out so the button says it landed; settings-close
+ *  resets it (module state — the panel repaints on hover changes anyway). */
+let reportSent = false;
+export function markReportSent(): void {
+  reportSent = true;
+}
+export function clearReportSent(): void {
+  reportSent = false;
+}
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
@@ -2011,6 +2023,16 @@ function drawSettings(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
   settingsBreaker(ctx, 'mute music', isMusicMuted(), hoverAction === 'toggle-mute', SET_MUTE_Y, 'rgba(232,53,42,0.28)', UI.danger);
   settingsBreaker(ctx, 'voice chat', voiceEnabled(), hoverAction === 'toggle-voice', SET_VOICE_Y, 'rgba(57,217,138,0.28)', '#39d98a');
 
+  // REPORT — a player, a bug, anything harmful. Typed on the keyboard and
+  // filed to the backend; no address, no mail client, no fuss.
+  buttonPlate(
+    ctx, SET_REPORT_BTN.x, SET_REPORT_BTN.y, SET_REPORT_BTN.w, SET_REPORT_BTN.h,
+    reportSent ? 'REPORT SENT — THANK YOU' : 'REPORT A PROBLEM',
+    reportSent ? '#39d98a' : UI.danger,
+    !reportSent && hoverAction === 'settings-report',
+    reportSent,
+  );
+
   buttonPlate(ctx, SET_CLOSE_BTN.x, SET_CLOSE_BTN.y, SET_CLOSE_BTN.w, SET_CLOSE_BTN.h, 'CLOSE', UI.steel, hoverAction === 'settings-close');
 }
 
@@ -2023,6 +2045,7 @@ function hitSettings(u: number, v: number): MenuAction | null {
   if (inBar(MUSIC_BAR)) return 'music-vol';
   if (y >= SET_MUTE_Y - 4 && y <= SET_MUTE_Y + 40) return 'toggle-mute';
   if (y >= SET_VOICE_Y - 4 && y <= SET_VOICE_Y + 40) return 'toggle-voice';
+  if (inBar(SET_REPORT_BTN)) return 'settings-report';
   if (inBar(SET_CLOSE_BTN)) return 'settings-close';
   return null;
 }
