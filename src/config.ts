@@ -516,11 +516,11 @@ export const GOOPLIATH = {
   hitsCampaign: 75,
   /** The HARD and BLAZING pools PER PAIR OF FISTS (hand-set, not multiplier
    *  math). The campaign fight takes one pool; a raid takes its pool × squad,
-   *  so every raider's share matches the solo fight at that tier. BLAZING is
-   *  the outlier: a SHORT pool — on that tier the danger is the damage you
-   *  take, not the grind. */
-  hitsCampaignHard: 135,
-  hitsCampaignBlazing: 50,
+   *  so every raider's share matches the solo fight at that tier. Paced so
+   *  the tiers escalate without ever turning into a grind — the tier
+   *  dressing (extra beams / volleys / seesaw rocks) carries the danger. */
+  hitsCampaignHard: 115,
+  hitsCampaignBlazing: 185,
   /** Raid hit count PER RAIDER — a 4-squad lands on the original 300. */
   hitsPerRaider: 75,
   /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
