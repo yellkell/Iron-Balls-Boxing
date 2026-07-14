@@ -95,7 +95,7 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   // The bunny: the biggest head on the roster, buck teeth, a puff tail and
   // two long LOP EARS folded down past the jaw. Dusty warm-grey steel with
   // a soft rose glow — looks huggable, hits like a freight train.
-  { id: 'bunny', name: 'LOP', chassis: 0x413a36, trim: 0x211c19, accent: 0xff8fb3, price: 250 },
+  { id: 'bunny', name: 'LOPPY', chassis: 0x413a36, trim: 0x211c19, accent: 0xff8fb3, price: 250 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [
