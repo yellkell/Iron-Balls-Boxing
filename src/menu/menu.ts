@@ -2618,7 +2618,7 @@ function drawCampaign(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
       kind === 'hardcore'
         ? 'no healing between titans — pick your damage'
         : kind === 'goopliath'
-          ? 'the tide beneath the pit — normal 75 · hard 135 · blazing 250'
+          ? 'the tide rises from beneath'
           : 'all five titans, on the clock — pick your damage';
     plate(ctx, m.x, m.y, m.w, m.h, { cut: 18, fill: 'rgba(14,15,20,0.97)', stroke: accent });
     ctx.textAlign = 'center';

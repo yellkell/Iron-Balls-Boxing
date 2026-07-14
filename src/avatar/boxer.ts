@@ -469,18 +469,18 @@ function buildPantherHead(accent: number): Group {
     // read as hovering off the skull's curve.
     const muff = new Mesh(new SphereGeometry(r * 0.14, 12, 10), chassisMat(accent, 0.05));
     muff.scale.set(1.0, 0.6, 0.85);
-    muff.position.set(side * r * 0.33, r * 0.56, r * 0.06);
-    muff.rotation.z = side * -0.3;
+    muff.position.set(side * r * 0.27, r * 0.58, r * 0.06);
+    muff.rotation.z = side * -0.15;
     g.add(muff);
     const ear = new Mesh(new ConeGeometry(r * 0.24, r * 0.42, 10), chassisMat(accent, 0.05));
     ear.scale.z = 0.6;
-    ear.position.set(side * r * 0.34, r * 0.68, r * 0.07);
-    ear.rotation.set(-0.1, 0, side * -0.18);
+    ear.position.set(side * r * 0.27, r * 0.72, r * 0.07);
+    ear.rotation.set(-0.1, 0, side * -0.06);
     g.add(ear);
     const inner = new Mesh(new ConeGeometry(r * 0.15, r * 0.32, 10), darkMat());
     inner.scale.z = 0.5;
-    inner.position.set(side * r * 0.35, r * 0.655, r * 0.02);
-    inner.rotation.set(-0.1, 0, side * -0.18);
+    inner.position.set(side * r * 0.28, r * 0.695, r * 0.02);
+    inner.rotation.set(-0.1, 0, side * -0.06);
     g.add(inner);
   }
 
@@ -1332,17 +1332,22 @@ function buildStallionHead(accent: number): Group {
   // Ears: close-set on the poll, tall and alert, elliptical in section with
   // a dark inner scoop facing forward — set as a shadow inside the rim, not
   // a black slab. Bases sink into the poll so they grow from the head.
+  // Shell + scoop live in ONE pivot group so the dark inner can never drift
+  // off the rim — they used to be placed independently and the scoop sat
+  // visibly off-axis from the shell.
   for (const side of [-1, 1]) {
-    const ear = new Mesh(new ConeGeometry(r * 0.17, r * 0.62, 10), chassisMat(accent, 0.05));
-    ear.scale.z = 0.75;
-    ear.position.set(side * r * 0.24, r * 1.14, r * 0.1);
-    ear.rotation.set(0.12, 0, side * -0.12);
+    const ear = new Group();
+    ear.position.set(side * r * 0.18, r * 1.12, r * 0.08);
+    ear.rotation.set(0.12, 0, side * -0.04);
     g.add(ear);
+    const shell = new Mesh(new ConeGeometry(r * 0.17, r * 0.62, 10), chassisMat(accent, 0.05));
+    shell.scale.z = 0.75;
+    shell.position.y = r * 0.02;
+    ear.add(shell);
     const inner = new Mesh(new ConeGeometry(r * 0.08, r * 0.4, 10), darkMat());
     inner.scale.z = 0.55;
-    inner.position.set(side * r * 0.245, r * 1.1, r * 0.055);
-    inner.rotation.set(0.12, 0, side * -0.12);
-    g.add(inner);
+    inner.position.set(side * r * 0.005, -r * 0.04, -r * 0.045);
+    ear.add(inner);
   }
 
   // Nostrils: large comma-shaped dark openings set into the SIDES of the
@@ -1907,6 +1912,190 @@ function buildFrogPelvis(accent: number): Group {
   return g;
 }
 
+/** BUNNY (LOPPY) — the big soft one that hits like a freight train. A HUGE
+ *  round skull (the biggest head in the roster), a short blunt muzzle with
+ *  buck teeth, big round eyes — and the signature: two LONG LOP EARS that
+ *  kick out sideways at the root, hinge, and FLOP down past the jaw. Each
+ *  ear is one pivot group (root → hinge → blade) so the whole thing reads
+ *  as a single soft fold, never separate parts. */
+function buildBunnyHead(accent: number): Group {
+  const r = BODY_IK.headRadius;
+  const g = taggedHead('bunny');
+  g.scale.setScalar(1.58); // the biggest head on the roster — that's the joke
+  g.position.y = 0.04;
+
+  // The skull loft: one big rounded dome, cheeks nearly as wide as the
+  // crown, and a short blunt muzzle — all curve, no blade.
+  const skull = new Mesh(
+    loftGeometry(
+      [
+        { top: [0.3, 0.6], bot: [-0.48, 0.52], w: 0.4, n: 2.1 }, // occiput
+        { top: [0.7, 0.28], bot: [-0.6, 0.38], w: 0.52, n: 2.15 }, // crown — tall and round
+        { top: [0.68, -0.08], bot: [-0.65, 0.14], w: 0.56, n: 2.15 }, // brow (widest)
+        { top: [0.44, -0.4], bot: [-0.6, -0.16], w: 0.5, n: 2.1 }, // cheeks
+        { top: [0.16, -0.64], bot: [-0.46, -0.46], w: 0.32, n: 2.0 }, // muzzle root
+        { top: [0.02, -0.82], bot: [-0.32, -0.72], w: 0.2, n: 1.9 }, // blunt nose end
+      ],
+      r,
+    ),
+    chassisMat(accent, 0.06),
+  );
+  g.add(skull);
+
+  // THE EARS. Root kicks out sideways off the crown, then the blade folds
+  // at the hinge and hangs down-and-out past the jaw line — the lop fold.
+  for (const side of [-1, 1]) {
+    const ear = new Group();
+    // Pivot buried INSIDE the dome (0.22r in, 0.58r up) with the root run
+    // long past it — pivoted at crown height the base hovered visibly clear
+    // of the skull and the ears read as detached.
+    ear.position.set(side * r * 0.22, r * 0.58, r * 0.16);
+    ear.rotation.set(0.12, 0, side * -0.6);
+    g.add(ear);
+    const root = new Mesh(new CylinderGeometry(r * 0.14, r * 0.19, r * 0.46, 10), chassisMat(accent, 0.05));
+    root.scale.z = 0.6;
+    root.position.y = r * 0.05;
+    ear.add(root);
+    // The hinge — everything below hangs from here.
+    const flop = new Group();
+    flop.position.y = r * 0.26;
+    flop.rotation.z = side * -2.3; // fold: the blade drapes down the head side
+    flop.rotation.x = 0.1; // drifting a touch back with gravity
+    ear.add(flop);
+    const blade = new Mesh(new CylinderGeometry(r * 0.17, r * 0.12, r * 0.95, 10), chassisMat(accent, 0.05));
+    blade.scale.z = 0.45;
+    blade.position.y = r * 0.44;
+    flop.add(blade);
+    const tip = new Mesh(new SphereGeometry(r * 0.12, 10, 8), chassisMat(accent, 0.05));
+    tip.scale.set(1.3, 0.9, 0.45);
+    tip.position.y = r * 0.9;
+    flop.add(tip);
+    // Dark inner face turned to the front — the soft shadow inside the fold.
+    const inner = new Mesh(new BoxGeometry(r * 0.18, r * 0.74, r * 0.02), darkMat());
+    inner.position.set(0, r * 0.42, -r * 0.05);
+    flop.add(inner);
+  }
+
+  // Big round eyes, wide-set and high — soft, not a glare.
+  for (const side of [-1, 1]) {
+    const socket = new Mesh(new SphereGeometry(r * 0.14, 14, 12), darkMat());
+    socket.scale.set(1.0, 1.0, 0.55);
+    socket.position.set(side * r * 0.27, r * 0.2, -r * 0.5);
+    g.add(socket);
+    const eye = new Mesh(new SphereGeometry(r * 0.105, 14, 12), glowMat(accent, 2.6));
+    eye.scale.set(1.0, 1.0, 0.6);
+    eye.position.set(side * r * 0.27, r * 0.2, -r * 0.54);
+    g.add(eye);
+  }
+
+  // Blunt muzzle furniture: nose pad, philtrum, and the BUCK TEETH — two
+  // little plates dropping from the mouth line, the rabbit's own signature.
+  const nose = new Mesh(new SphereGeometry(r * 0.085, 10, 8), darkMat());
+  nose.scale.set(1.15, 0.7, 0.7);
+  nose.position.set(0, -r * 0.06, -r * 0.84);
+  g.add(nose);
+  const philtrum = new Mesh(new BoxGeometry(r * 0.028, r * 0.14, r * 0.03), darkMat());
+  philtrum.position.set(0, -r * 0.18, -r * 0.83);
+  philtrum.rotation.x = 0.15;
+  g.add(philtrum);
+  for (const side of [-1, 1]) {
+    const tooth = new Mesh(new BoxGeometry(r * 0.085, r * 0.13, r * 0.045), chassisMat(accent, 0.05));
+    tooth.position.set(side * r * 0.05, -r * 0.36, -r * 0.76);
+    tooth.rotation.x = 0.1;
+    g.add(tooth);
+  }
+  // Cheek puffs — the soft jowls that round the face out under the eyes.
+  for (const side of [-1, 1]) {
+    const puff = new Mesh(new SphereGeometry(r * 0.17, 12, 10), chassisMat(accent, 0.05));
+    puff.scale.set(1.0, 0.8, 0.8);
+    puff.position.set(side * r * 0.26, -r * 0.24, -r * 0.5);
+    g.add(puff);
+  }
+  return g;
+}
+
+/** BUNNY chest: soft armour over a slugger's frame — rounded shoulder pads
+ *  with a glow lip, a FUR BIB fanned across the upper chest (the cotton
+ *  ruff), a slim dark trunk with belly bands and glow seams. */
+function buildBunnyChest(accent: number): Group {
+  const g = taggedHead('bunny');
+  const collar = new Mesh(new BoxGeometry(0.4, 0.08, 0.19), chassisMat(accent, 0.05));
+  collar.position.y = 0.11;
+  g.add(collar);
+
+  for (const side of [-1, 1]) {
+    const pad = new Mesh(new SphereGeometry(0.1, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), chassisMat(accent, 0.05));
+    pad.scale.set(1, 0.7, 1);
+    pad.position.set(side * 0.27, 0.09, 0);
+    pad.rotation.z = side * -0.2;
+    g.add(pad);
+    const lip = new Mesh(new CylinderGeometry(0.097, 0.102, 0.018, 16), glowMat(accent, 0.5));
+    lip.position.set(side * 0.27, 0.068, 0);
+    lip.rotation.z = side * -0.2;
+    g.add(lip);
+  }
+
+  // The fur bib: five soft plates fanned across the upper chest.
+  for (let i = -2; i <= 2; i++) {
+    const bib = new Mesh(new BoxGeometry(0.085, 0.16 - Math.abs(i) * 0.02, 0.03), chassisMat(accent, 0.04));
+    bib.position.set(i * 0.065, -0.02 - Math.abs(i) * 0.025, -0.135);
+    bib.rotation.set(0.12, 0, i * 0.18);
+    g.add(bib);
+  }
+
+  const trunk = new Mesh(new CylinderGeometry(0.15, 0.08, 0.42, 8), darkMat());
+  trunk.scale.z = 0.7;
+  trunk.position.y = -0.13;
+  g.add(trunk);
+
+  // Belly bands with glow seams — the shared underbody, rounded corners.
+  for (let i = 0; i < 3; i++) {
+    const w = 0.17 - i * 0.03;
+    const band = new Mesh(new BoxGeometry(w, 0.05, 0.07), chassisMat(accent, 0.04));
+    band.position.set(0, -0.16 - i * 0.07, -0.1);
+    band.rotation.x = -0.1;
+    g.add(band);
+    const seam = new Mesh(new BoxGeometry(w * 0.88, 0.009, 0.072), glowMat(accent, 0.3));
+    seam.position.set(0, -0.187 - i * 0.07, -0.1);
+    g.add(seam);
+  }
+  for (const side of [-1, 1]) {
+    const flank = new Mesh(new BoxGeometry(0.045, 0.25, 0.19), chassisMat(accent, 0.04));
+    flank.position.set(side * 0.14, -0.08, 0);
+    flank.rotation.z = side * 0.12;
+    g.add(flank);
+  }
+  return g;
+}
+
+/** BUNNY hips: a soft belt, wide sprung tassets over the powerhouse
+ *  haunches — and the PUFF TAIL riding the back of the belt. */
+function buildBunnyPelvis(accent: number): Group {
+  const g = taggedHead('bunny');
+  const belt = new Mesh(new BoxGeometry(0.19, 0.05, 0.15), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const clasp = new Mesh(new SphereGeometry(0.024, 10, 8), glowMat(accent, 1.0));
+  clasp.scale.set(1, 0.8, 0.5);
+  clasp.position.set(0, 0.05, -0.08);
+  g.add(clasp);
+  // The puff tail — nobody ships a rabbit without one.
+  const tail = new Mesh(new SphereGeometry(0.055, 12, 10), chassisMat(accent, 0.05));
+  tail.position.set(0, 0.0, 0.1);
+  g.add(tail);
+  for (const side of [-1, 1]) {
+    const tasset = new Mesh(new BoxGeometry(0.085, 0.15, 0.12), chassisMat(accent, 0.04));
+    tasset.position.set(side * 0.11, -0.1, 0);
+    tasset.rotation.z = side * 0.3;
+    g.add(tasset);
+    const edge = new Mesh(new BoxGeometry(0.087, 0.013, 0.125), glowMat(accent, 0.4));
+    edge.position.set(side * 0.11, -0.155, 0);
+    edge.rotation.z = side * 0.3;
+    g.add(edge);
+  }
+  return g;
+}
+
 /** Per-skin builders, keyed by skin id — pick one (a fixed wearer) or all
  *  of them (the customisation mirror, which toggles between them live). */
 const HEAD_BUILDERS: Record<string, (accent: number) => Group> = {
@@ -1917,6 +2106,7 @@ const HEAD_BUILDERS: Record<string, (accent: number) => Group> = {
   stallion: buildStallionHead,
   wolf: buildWolfHead,
   frog: buildFrogHead,
+  bunny: buildBunnyHead,
 };
 const CHEST_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearChest,
@@ -1926,6 +2116,7 @@ const CHEST_BUILDERS: Record<string, (accent: number) => Group> = {
   stallion: buildStallionChest,
   wolf: buildWolfChest,
   frog: buildFrogChest,
+  bunny: buildBunnyChest,
 };
 const PELVIS_BUILDERS: Record<string, (accent: number) => Group> = {
   cobalt: buildBearPelvis,
@@ -1935,8 +2126,9 @@ const PELVIS_BUILDERS: Record<string, (accent: number) => Group> = {
   stallion: buildStallionPelvis,
   wolf: buildWolfPelvis,
   frog: buildFrogPelvis,
+  bunny: buildBunnyPelvis,
 };
-const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'stallion', 'wolf', 'frog'];
+const ALL_SKIN_IDS = ['cobalt', 'crimson', 'valkyrie', 'knight', 'stallion', 'wolf', 'frog', 'bunny'];
 
 /**
  * Build the full opponent rig. Pieces start hidden; add them to the scene.

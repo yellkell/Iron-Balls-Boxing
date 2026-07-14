@@ -390,6 +390,23 @@ export class CampaignSystem extends createSystem({
     return { ...def, weights };
   }
 
+  /** GOOPLIATH's tier dressing — difficulty changes the FIGHT, not just the
+   *  pool (the generic knobs already quicken him; these are the tide's own):
+   *  HARD volleys wider and angers sooner; BLAZING adds a second beam strip,
+   *  volleys wider still, and rages from over half health. (The seesaw also
+   *  rocks one extra half per swing on blazing — see seesawStages.) */
+  private applyGoopTier(def: BossDef): BossDef {
+    const d = this.activeDifficulty();
+    if (d !== 'hard' && d !== 'blazing') return def;
+    const blazing = d === 'blazing';
+    return {
+      ...def,
+      volleyCount: def.volleyCount + (blazing ? 2 : 1),
+      beams: def.beams + (blazing ? 1 : 0),
+      enrageAt: blazing ? 0.55 : 0.45,
+    };
+  }
+
   // --- RAID plumbing -----------------------------------------------------------
 
   private raid(): boolean {
@@ -636,6 +653,7 @@ export class CampaignSystem extends createSystem({
           this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
         }
       }
+      this.def = this.applyGoopTier(this.def);
       this.runLen = 1;
       goopStage = true;
     } else if (this.runMode()) {
@@ -645,7 +663,7 @@ export class CampaignSystem extends createSystem({
       this.runLen = lineup.length;
       const rs = lineup[clamp(app.campaignStage, 0, lineup.length - 1)];
       if (rs.kind === 'goop') {
-        this.def = goopliathBoss(this.raid(), this.raidSize());
+        this.def = this.applyGoopTier(goopliathBoss(this.raid(), this.raidSize()));
         goopStage = true;
       } else {
         const base = BOSSES[rs.index];
@@ -1151,9 +1169,13 @@ export class CampaignSystem extends createSystem({
     }
 
     // Endings are the AUTHORITY's call (guests follow the echo): the kill —
-    // or, for a raid GOLIATH not yet on his second life, the false kill.
+    // or the false kill, for a finale GOLIATH not yet on his second life.
+    // The second wind belongs to every raid AND to BLAZING campaign runs —
+    // the hottest solo tier earns the raid king (other tiers kill him once).
     if (this.isAuthority() && bossHp <= 0) {
-      if (this.raid() && !this.goopStage && app.campaignStage === this.runLen - 1 && !this.p2) this.toResurrect();
+      const finaleKing = !this.goopStage && app.campaignStage === this.runLen - 1 && !this.p2;
+      const secondWind = this.raid() || this.activeDifficulty() === 'blazing';
+      if (finaleKing && secondWind) this.toResurrect();
       else this.toVictory();
       return;
     }
@@ -2069,7 +2091,9 @@ export class CampaignSystem extends createSystem({
     const table = GOOPLIATH.seesawStages;
     const frac = this.bossHpFrac();
     const idx = frac > 0.75 ? 0 : frac > 0.5 ? 1 : frac > 0.25 ? 2 : 3;
-    return table[Math.min(idx, table.length - 1)] ?? 2;
+    // BLAZING rocks one extra half per swing, at every health quarter.
+    const extra = this.activeDifficulty() === 'blazing' ? 1 : 0;
+    return (table[Math.min(idx, table.length - 1)] ?? 2) + extra;
   }
 
   /** A zone goes off: strike visual + sound on the TARGET's platform, and
@@ -2683,6 +2707,10 @@ export class CampaignSystem extends createSystem({
     // of the view — exactly when frame time spikes — so the step budget
     // drops for the swing and snaps back with the limb.
     goop.qualityOverride = goop.isPunching ? GOOPLIATH.attackQuality : GOOPLIATH.quality;
+
+    // THE TIDE RISES in colour too: the gel palette runs to blood as the
+    // enrage takes hold (a ~1.4 s bleed-in, not a light switch).
+    goop.enrage += ((this.enraged ? 1 : 0) - goop.enrage) * Math.min(1, delta * 2.2);
 
     goop.update(delta * GOOPLIATH.timeScale, _head);
 

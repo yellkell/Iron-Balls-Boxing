@@ -37,6 +37,9 @@ export function drawAvatarIcon(ctx: CanvasRenderingContext2D, id: string, cx: nu
     case 'frog':
       drawFrog(ctx, cx, cy, r);
       break;
+    case 'bunny':
+      drawBunny(ctx, cx, cy, r);
+      break;
     case 'crimson':
     default:
       drawPanther(ctx, cx, cy, r);
@@ -111,6 +114,41 @@ function drawFrog(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
   ctx.moveTo(cx - r * 0.68, cy + r * 0.1);
   ctx.quadraticCurveTo(cx, cy + r * 0.5, cx + r * 0.68, cy + r * 0.1);
   ctx.stroke();
+  ctx.restore();
+}
+
+/** Bunny head-on: a big round face with two LOP EARS drooping down past the
+ *  cheeks, and the buck teeth knocked out dark under the nose. */
+function drawBunny(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  // The ears first (behind the face): long drops curving out then down.
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + s * r * 0.22, cy - r * 0.72);
+    ctx.quadraticCurveTo(cx + s * r * 0.95, cy - r * 0.6, cx + s * r * 0.82, cy + r * 0.25);
+    ctx.quadraticCurveTo(cx + s * r * 0.76, cy + r * 0.62, cx + s * r * 0.56, cy + r * 0.6);
+    ctx.quadraticCurveTo(cx + s * r * 0.44, cy + r * 0.1, cx + s * r * 0.1, cy - r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // The big round face.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r * 0.62, r * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#06070b';
+  // Nose + buck teeth knock-outs.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.18, r * 0.09, r * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - r * 0.1, cy + r * 0.34, r * 0.09, r * 0.2);
+  ctx.fillRect(cx + r * 0.01, cy + r * 0.34, r * 0.09, r * 0.2);
+  // Ear inner shadows.
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + s * r * 0.72, cy + r * 0.1, r * 0.07, r * 0.28, s * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

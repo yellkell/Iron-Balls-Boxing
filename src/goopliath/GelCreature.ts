@@ -110,6 +110,9 @@ export class GelCreature {
   /** Boss-scale hosts set this to bypass the man-sized distance LOD: the
    *  heuristic below reads group-local distance, which is meaningless inside
    *  a scaled parent — and a giant that fills the view is never "far". */
+  /** 0..1 — runs the gel palette to blood (CampaignSystem eases it in when
+   *  the tide rises). */
+  enrage = 0;
   qualityOverride: number | null = null;
   /** True while it's an exhausted puddle — hits do double (see EXHAUST). */
   vulnerable = false;
@@ -451,6 +454,8 @@ export class GelCreature {
     this.shadow.position.x = _v.x;
     this.shadow.position.z = _v.z;
     (this.shadow.material as MeshBasicMaterial).opacity = 0.5 + this.koVal * 0.2;
+
+    this.gel.setEnrage(this.enrage);
 
     // Distance LOD: past ~3.5 m the full step budget is invisible — shed it.
     // (A scaled-up boss overrides this — see qualityOverride.)
