@@ -3123,13 +3123,18 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     rivets: false,
   });
   const icx = r.x + r.w / 2;
-  const iconR = r.h * 0.27;
-  if (avatar) drawAvatarIcon(ctx, it.skin.id, icx, r.y + r.h * 0.34, iconR, css);
-  else drawPlatformIcon(ctx, it.skin as PlatformSkin, icx, r.y + r.h * 0.34, iconR);
+  // Short tiles (a catalogue deep enough to compress into 4 rows) tighten
+  // the WHOLE layout — icon, name and footer used to keep their full-height
+  // offsets and the name sat on top of the price line.
+  const compact = r.h < 110;
+  const iconR = r.h * (compact ? 0.23 : 0.27);
+  const iconCy = r.y + r.h * (compact ? 0.3 : 0.34);
+  if (avatar) drawAvatarIcon(ctx, it.skin.id, icx, iconCy, iconR, css);
+  else drawPlatformIcon(ctx, it.skin as PlatformSkin, icx, iconCy, iconR);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  let fs = 18;
+  let fs = compact ? 15 : 18;
   ctx.font = `700 ${fs}px system-ui, sans-serif`;
   while (fs > 11 && ctx.measureText(it.skin.name).width > r.w - 16) {
     fs -= 1;
@@ -3137,10 +3142,10 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
   }
   ctx.fillStyle = equipped || previewed || hot ? css : UI.text;
   // The BUY button needs the footer strip, so a previewed name rides higher.
-  ctx.fillText(it.skin.name, icx, r.y + r.h * (previewed ? 0.62 : 0.72));
+  ctx.fillText(it.skin.name, icx, r.y + r.h * (previewed ? (compact ? 0.56 : 0.62) : (compact ? 0.62 : 0.72)));
 
-  const fy = r.y + r.h - 14;
-  ctx.font = '800 12px system-ui, sans-serif';
+  const fy = r.y + r.h - (compact ? 10 : 14);
+  ctx.font = `800 ${compact ? 10 : 12}px system-ui, sans-serif`;
   if (equipped) {
     ctx.fillStyle = UI.amber;
     ctx.fillText('EQUIPPED', icx, fy);
@@ -3151,7 +3156,7 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
     // Earned, never sold — the tile says how to win it, shrunk to fit
     // ('FELL RAID GOOPLIATH' runs the full tile).
     const msg = (it.skin as PlatformSkin).earnedBy as string;
-    let efs = 12;
+    let efs = compact ? 10 : 12;
     while (efs > 8 && ctx.measureText(msg).width > r.w - 12) {
       efs -= 1;
       ctx.font = `800 ${efs}px system-ui, sans-serif`;
@@ -3170,9 +3175,9 @@ function drawTile(ctx: CanvasRenderingContext2D, it: DisplayItem, hoverAction: M
   } else {
     const price = (it.skin as { price?: number }).price ?? 0;
     const str = String(price);
-    ctx.font = '800 15px system-ui, sans-serif';
+    ctx.font = `800 ${compact ? 13 : 15}px system-ui, sans-serif`;
     const tw = ctx.measureText(str).width;
-    const sym = 16;
+    const sym = compact ? 13 : 16;
     const sx = icx - (sym + 4 + tw) / 2;
     drawCoinSymbol(ctx, sx, fy - sym / 2, sym, sym);
     ctx.textAlign = 'left';
