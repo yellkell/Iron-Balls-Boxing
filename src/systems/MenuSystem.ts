@@ -38,8 +38,10 @@ import {
   clickBalls,
   colorBarLight,
   campaignModal,
+  clearReportSent,
   createActionPanel,
   createMenu,
+  markReportSent,
   flashProfileKeyboardHint,
   profileHintActive,
   resetNewsScroll,
@@ -101,6 +103,7 @@ import {
   myStats,
   refreshLeaderboard,
   rival,
+  sendReport,
   scrollLeaderboard,
   setLeaderboardTab,
   setPlayerName,
@@ -158,7 +161,7 @@ export class MenuSystem extends createSystem({}) {
   /** The action waiting behind the name keyboard. */
   private kbPending: MenuAction | null = null;
   /** Whether the keyboard is editing your callsign or your profile note. */
-  private kbMode: 'name' | 'note' = 'name';
+  private kbMode: 'name' | 'note' | 'report' = 'name';
   private mirror?: { group: Group; rig: BoxerRig };
   private skinVersion = 0;
   /** The opponent pad is modelling a STORE platform try-on (needs restoring). */
@@ -827,8 +830,16 @@ export class MenuSystem extends createSystem({}) {
         break;
       case 'settings-close':
         app.settingsOpen = false;
+        clearReportSent(); // next visit gets a fresh report button
         // Repaint the gear disc so its muted-pip reflects any change made inside.
         this.menu.panels.find((p) => p.id === 'gear')?.redraw(null);
+        break;
+      case 'settings-report':
+        // The safety report: typed on the callsign keyboard, filed to the
+        // backend (net/leaderboard sendReport) — the reporter never sees an
+        // address and never leaves the game.
+        this.kbMode = 'report';
+        this.keyboard.open('', 'REPORT A PLAYER OR PROBLEM', 64);
         break;
       case 'toggle-mute':
         // Flip the music mute (persisted) and repaint the settings breaker.
@@ -1126,7 +1137,13 @@ export class MenuSystem extends createSystem({}) {
         sfx.uiClick();
         const done = this.keyboard.press(id);
         if (done !== null) {
-          if (this.kbMode === 'note') {
+          if (this.kbMode === 'report') {
+            // Empty OK = changed their mind; anything else files the report.
+            if (done.trim().length > 0) {
+              void sendReport(done);
+              markReportSent();
+            }
+          } else if (this.kbMode === 'note') {
             setPlayerNote(done); // empty clears the note
             clearProfileKeyboardHint();
           } else if (done.length > 0) {

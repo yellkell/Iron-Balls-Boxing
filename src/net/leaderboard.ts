@@ -744,3 +744,29 @@ export function reportTutorial(): void {
   writeMine({ xp: profile.xp });
   void refreshLeaderboard(true);
 }
+
+/**
+ * File a SAFETY REPORT — the settings-menu "report a problem" flow. The text
+ * lands in the 'reports' Firestore collection with the reporter's callsign
+ * and stable id attached (so repeat reports correlate and abuse of the box
+ * itself is traceable). No addresses live in the client: delivery to a human
+ * is the backend's business (read the collection in the console, or bolt the
+ * Trigger Email extension onto it). Fire-and-forget — the game never blocks
+ * on it, and with no cloud configured it just quietly does nothing.
+ */
+export async function sendReport(text: string): Promise<void> {
+  const trimmed = text.trim().slice(0, 200);
+  if (!trimmed) return;
+  const h = await firestore();
+  if (!h) return;
+  try {
+    await h.fs.addDoc(h.fs.collection(h.db, 'reports'), {
+      text: trimmed,
+      from: profile.name,
+      uid: profile.id,
+      at: h.fs.serverTimestamp(),
+    });
+  } catch {
+    /* offline or rules closed — the report is best-effort */
+  }
+}
