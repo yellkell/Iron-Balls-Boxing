@@ -518,9 +518,9 @@ export const GOOPLIATH = {
    *  board — the tier dressing (extra beams / volleys / seesaw rocks)
    *  carries the danger, not a wall of hits. */
   hitsEasy: 25,
-  hitsCampaign: 50,
-  hitsCampaignHard: 75,
-  hitsCampaignBlazing: 100,
+  hitsCampaign: 35,
+  hitsCampaignHard: 40,
+  hitsCampaignBlazing: 50,
   /** The blazing run's WEDGE stage (2nd-to-last boss): one stage of six, so
    *  it runs shorter than even the dedicated fight. */
   hitsRunWedge: 45,
