@@ -512,17 +512,21 @@ export const RAID = {
  * exact proportions of the original creature.
  */
 export const GOOPLIATH = {
-  /** Fireball hits to fell him. THE longest fight in the game by design. */
-  hitsCampaign: 75,
-  /** The HARD and BLAZING pools PER PAIR OF FISTS (hand-set, not multiplier
-   *  math). The campaign fight takes one pool; a raid takes its pool × squad,
-   *  so every raider's share matches the solo fight at that tier. Paced so
-   *  the tiers escalate without ever turning into a grind — the tier
-   *  dressing (extra beams / volleys / seesaw rocks) carries the danger. */
-  hitsCampaignHard: 115,
-  hitsCampaignBlazing: 185,
-  /** Raid hit count PER RAIDER — a 4-squad lands on the original 300. */
-  hitsPerRaider: 75,
+  /** The DEDICATED fight's hit pools, hand-set PER PAIR OF FISTS for every
+   *  tier (solo takes one pool; a raid takes the pool × squad, so each
+   *  raider's share matches the solo fight). Deliberately short across the
+   *  board — the tier dressing (extra beams / volleys / seesaw rocks)
+   *  carries the danger, not a wall of hits. */
+  hitsEasy: 25,
+  hitsCampaign: 50,
+  hitsCampaignHard: 75,
+  hitsCampaignBlazing: 100,
+  /** The blazing run's WEDGE stage (2nd-to-last boss): one stage of six, so
+   *  it runs shorter than even the dedicated fight. */
+  hitsRunWedge: 45,
+  /** Raid fallback PER RAIDER (the dedicated raid always lands on the tier
+   *  pools above — this only seeds goopliathBoss's base def). */
+  hitsPerRaider: 50,
   /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
    *  solo GOLIATH's size (~4.9 m of gel across the duel gap); the raid cut
    *  is a third taller again for the wide ring. */
@@ -598,7 +602,7 @@ export const DIFFICULTY: Record<
   Difficulty,
   { label: string; blurb: string; accent: number; health: number; charge: number; cooldown: number; stun: boolean; elite: boolean }
 > = {
-  easy: { label: 'EASY', blurb: 'slow attacks · frail · stuns', accent: 0x6fd66f, health: 0.6, charge: 1.3, cooldown: 1.5, stun: true, elite: false },
+  easy: { label: 'EASY', blurb: 'slow attacks · frail · stuns', accent: 0x6fd66f, health: 0.45, charge: 1.5, cooldown: 1.85, stun: true, elite: false },
   normal: { label: 'NORMAL', blurb: 'the standard fight', accent: 0xffb000, health: 1.0, charge: 1.0, cooldown: 1.0, stun: false, elite: false },
   hard: { label: 'HARD', blurb: 'new attacks & mechanics', accent: 0xff7a18, health: 1.0, charge: 1.0, cooldown: 1.0, stun: false, elite: true },
   blazing: { label: 'BLAZING', blurb: 'hard · tanky · relentless', accent: 0xff3b6e, health: 1.6, charge: 0.85, cooldown: 0.6, stun: false, elite: true },
