@@ -72,11 +72,13 @@ function ensurePanner(ctx: AudioContext): PannerNode {
   panner = ctx.createPanner();
   panner.panningModel = 'HRTF';
   panner.distanceModel = 'inverse';
-  panner.refDistance = 1.2;
+  panner.refDistance = 1.5;
   panner.maxDistance = 24;
-  panner.rolloffFactor = 0.8; // gentler than chat — a coach must stay legible
+  // MUCH gentler than chat — she flies to the far platform to mark targets
+  // mid-line, and at 0.8 those lines dropped to a quarter volume out there.
+  panner.rolloffFactor = 0.4;
   const gain = ctx.createGain();
-  gain.gain.value = 0.9;
+  gain.gain.value = 1.0;
   panner.connect(gain).connect(sfxOut() ?? ctx.destination);
   return panner;
 }
