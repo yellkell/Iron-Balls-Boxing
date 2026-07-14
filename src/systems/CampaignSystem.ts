@@ -491,7 +491,11 @@ export class CampaignSystem extends createSystem({
   }
 
   private crownLoopsNow(): number {
-    return this.p2 ? RAID.phase2Loops : CAMPAIGN.crownLoops;
+    // The second life is a REAL second fight above EASY: the reverse crown
+    // walks twice as many loops on every other tier (campaign blazing and
+    // all raids — the only places the king rises at all).
+    const p2Mult = this.activeDifficulty() === 'easy' ? 1 : 2;
+    return this.p2 ? RAID.phase2Loops * p2Mult : CAMPAIGN.crownLoops;
   }
 
   private crownTargetHits(): number {
@@ -3352,6 +3356,10 @@ export class CampaignSystem extends createSystem({
   }
 
   private accentCss(): string {
+    // GOOPLIATH enraged: name plate and health bar run to blood with the
+    // gel itself (setBoss/setBars re-key on the accent, so the HUD flips
+    // the moment THE TIDE RISES).
+    if (this.goopStage && this.enraged) return '#ff3b2e';
     return `#${this.def.accent.toString(16).padStart(6, '0')}`;
   }
 

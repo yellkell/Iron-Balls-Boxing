@@ -486,6 +486,13 @@ function drawDuelRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(159,226,255,0.85)';
     ctx.fillText('searching for an opponent…', PW / 2, 404);
+  } else if (locked) {
+    // The same seal note the ARCADE panel carries — greyed plates alone
+    // never said WHY everything was dead.
+    ctx.textAlign = 'center';
+    ctx.font = '600 18px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,192,77,0.78)';
+    ctx.fillText('run the tutorial once to unlock Gasket', PW / 2, 404);
   }
 }
 
