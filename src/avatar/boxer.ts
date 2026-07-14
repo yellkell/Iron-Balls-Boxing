@@ -1912,7 +1912,7 @@ function buildFrogPelvis(accent: number): Group {
   return g;
 }
 
-/** BUNNY (LOP) — the big soft one that hits like a freight train. A HUGE
+/** BUNNY (LOPPY) — the big soft one that hits like a freight train. A HUGE
  *  round skull (the biggest head in the roster), a short blunt muzzle with
  *  buck teeth, big round eyes — and the signature: two LONG LOP EARS that
  *  kick out sideways at the root, hinge, and FLOP down past the jaw. Each
