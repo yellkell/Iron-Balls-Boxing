@@ -61,6 +61,7 @@ const FRAG = /* glsl */ `
   uniform float uTime;
   uniform float uAgitation;
   uniform float uTelegraph;
+  uniform float uEnrage;
   uniform float uBlend;
   uniform float uWobble;
   uniform float uWobbleAgitated;
@@ -219,8 +220,13 @@ const FRAG = /* glsl */ `
     // ---- colour ----
     // Beer–Lambert-ish: thin edges show the bright shallow tint, deep body
     // absorbs toward dark green.
-    vec3 body = mix(uShallow, uDeep, pow(thickN, 0.55));
-    body = mix(body, uNucleus, nuc * 0.55);
+    // Enrage runs the whole palette to blood — bright furious rim, deep
+    // dark-red body, an angry orange nucleus.
+    vec3 shal = mix(uShallow, vec3(1.0, 0.26, 0.18), uEnrage);
+    vec3 deep = mix(uDeep, vec3(0.38, 0.04, 0.05), uEnrage);
+    vec3 nucl = mix(uNucleus, vec3(1.0, 0.32, 0.12), uEnrage);
+    vec3 body = mix(shal, deep, pow(thickN, 0.55));
+    body = mix(body, nucl, nuc * 0.55);
 
     // Procedural environment tint in the reflection (soft sky above,
     // dim floor below) — sells "wet" without a cubemap.
@@ -243,8 +249,8 @@ const FRAG = /* glsl */ `
     vec3 col = body * (0.45 + 0.6 * wrap);
     col += env * fresnel * 0.55;
     col += vec3(specTight) + vec3(sheen);
-    col += uShallow * fresnel * fresnel * 0.5; // lime rim glow
-    col += uNucleus * nuc * 0.35;
+    col += shal * fresnel * fresnel * 0.5; // rim glow (lime, blood when enraged)
+    col += nucl * nuc * 0.35;
 
     // Telegraph flash: the whole body pulses warm right before it swings.
     col = mix(col, uFlash, uTelegraph * 0.35 * (0.6 + 0.4 * sin(uTime * 18.0)));
@@ -277,6 +283,7 @@ export interface GelUniforms {
     invModel: Matrix4,
   ): void;
   /** Scale the march-step budget (1 = full quality; drops with distance). */
+  setEnrage(v: number): void;
   setQuality(q: number): void;
 }
 
@@ -298,6 +305,7 @@ export function createGelMaterial(): GelUniforms {
       uTime: { value: 0 },
       uAgitation: { value: 0 },
       uTelegraph: { value: 0 },
+      uEnrage: { value: 0 },
       uBlend: { value: CREATURE.blend },
       uWobble: { value: GEL_LOOK.wobble },
       uWobbleAgitated: { value: GEL_LOOK.wobbleAgitated },
@@ -323,6 +331,9 @@ export function createGelMaterial(): GelUniforms {
       u.uAgitation.value = agitation;
       u.uTelegraph.value = telegraph;
       (u.uInvModel.value as Matrix4).copy(invModel);
+    },
+    setEnrage(v) {
+      material.uniforms.uEnrage.value = v;
     },
     setQuality(q) {
       // Floor of 8, not 20 — the old floor silently pinned every configured

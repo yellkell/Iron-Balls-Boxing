@@ -2708,6 +2708,10 @@ export class CampaignSystem extends createSystem({
     // drops for the swing and snaps back with the limb.
     goop.qualityOverride = goop.isPunching ? GOOPLIATH.attackQuality : GOOPLIATH.quality;
 
+    // THE TIDE RISES in colour too: the gel palette runs to blood as the
+    // enrage takes hold (a ~1.4 s bleed-in, not a light switch).
+    goop.enrage += ((this.enraged ? 1 : 0) - goop.enrage) * Math.min(1, delta * 2.2);
+
     goop.update(delta * GOOPLIATH.timeScale, _head);
 
     if (fighting) {

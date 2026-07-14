@@ -1946,12 +1946,15 @@ function buildBunnyHead(accent: number): Group {
   // at the hinge and hangs down-and-out past the jaw line — the lop fold.
   for (const side of [-1, 1]) {
     const ear = new Group();
-    ear.position.set(side * r * 0.28, r * 0.72, r * 0.16);
-    ear.rotation.set(0.12, 0, side * -0.6); // root barely clears the crown
+    // Pivot buried INSIDE the dome (0.22r in, 0.58r up) with the root run
+    // long past it — pivoted at crown height the base hovered visibly clear
+    // of the skull and the ears read as detached.
+    ear.position.set(side * r * 0.22, r * 0.58, r * 0.16);
+    ear.rotation.set(0.12, 0, side * -0.6);
     g.add(ear);
-    const root = new Mesh(new CylinderGeometry(r * 0.14, r * 0.17, r * 0.28, 10), chassisMat(accent, 0.05));
+    const root = new Mesh(new CylinderGeometry(r * 0.14, r * 0.19, r * 0.46, 10), chassisMat(accent, 0.05));
     root.scale.z = 0.6;
-    root.position.y = r * 0.12;
+    root.position.y = r * 0.05;
     ear.add(root);
     // The hinge — everything below hangs from here.
     const flop = new Group();
