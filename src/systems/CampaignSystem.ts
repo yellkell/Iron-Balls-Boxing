@@ -630,14 +630,7 @@ export class CampaignSystem extends createSystem({
       // work matches the solo fight at that tier.
       {
         const d = this.activeDifficulty();
-        const pool =
-          d === 'blazing'
-            ? this.raid()
-              ? GOOPLIATH.hitsRaidBlazing
-              : GOOPLIATH.hitsCampaignBlazing
-            : d === 'hard'
-              ? GOOPLIATH.hitsCampaignHard
-              : null;
+        const pool = d === 'blazing' ? GOOPLIATH.hitsCampaignBlazing : d === 'hard' ? GOOPLIATH.hitsCampaignHard : null;
         if (pool !== null) {
           const fists = this.raid() ? this.raidSize() : 1;
           this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
