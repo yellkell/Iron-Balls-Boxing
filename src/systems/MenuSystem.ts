@@ -1362,7 +1362,7 @@ export class MenuSystem extends createSystem({}) {
     const rz = _fwd.x;
     this.panel.mesh.position.set(
       _head.x + _fwd.x * 0.55 + rx * 0.38,
-      0.95,
+      1.08, // chest height — at 0.95 the loadout (and its button row) sat a shade too low
       _head.z + _fwd.z * 0.55 + rz * 0.38,
     );
     // Yawed squarely toward the head with a FIXED lectern lean — a constant
@@ -1372,7 +1372,7 @@ export class MenuSystem extends createSystem({}) {
     const dx = _head.x - this.panel.mesh.position.x;
     const dz = _head.z - this.panel.mesh.position.z;
     this.panel.mesh.rotation.order = 'YXZ';
-    this.panel.mesh.rotation.set(-0.28, Math.atan2(dx, dz), 0);
+    this.panel.mesh.rotation.set(-0.24, Math.atan2(dx, dz), 0);
   }
 
   // --- controller pointers -------------------------------------------------
