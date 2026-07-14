@@ -630,7 +630,14 @@ export class CampaignSystem extends createSystem({
       // work matches the solo fight at that tier.
       {
         const d = this.activeDifficulty();
-        const pool = d === 'blazing' ? GOOPLIATH.hitsCampaignBlazing : d === 'hard' ? GOOPLIATH.hitsCampaignHard : null;
+        const pool =
+          d === 'blazing'
+            ? this.raid()
+              ? GOOPLIATH.hitsRaidBlazing
+              : GOOPLIATH.hitsCampaignBlazing
+            : d === 'hard'
+              ? GOOPLIATH.hitsCampaignHard
+              : null;
         if (pool !== null) {
           const fists = this.raid() ? this.raidSize() : 1;
           this.def = { ...this.def, health: (pool * fists) / DIFFICULTY[d].health };
@@ -1151,9 +1158,13 @@ export class CampaignSystem extends createSystem({
     }
 
     // Endings are the AUTHORITY's call (guests follow the echo): the kill —
-    // or, for a raid GOLIATH not yet on his second life, the false kill.
+    // or the false kill, for a finale GOLIATH not yet on his second life.
+    // The second wind belongs to every raid AND to BLAZING campaign runs —
+    // the hottest solo tier earns the raid king (other tiers kill him once).
     if (this.isAuthority() && bossHp <= 0) {
-      if (this.raid() && !this.goopStage && app.campaignStage === this.runLen - 1 && !this.p2) this.toResurrect();
+      const finaleKing = !this.goopStage && app.campaignStage === this.runLen - 1 && !this.p2;
+      const secondWind = this.raid() || this.activeDifficulty() === 'blazing';
+      if (finaleKing && secondWind) this.toResurrect();
       else this.toVictory();
       return;
     }
