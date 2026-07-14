@@ -469,18 +469,18 @@ function buildPantherHead(accent: number): Group {
     // read as hovering off the skull's curve.
     const muff = new Mesh(new SphereGeometry(r * 0.14, 12, 10), chassisMat(accent, 0.05));
     muff.scale.set(1.0, 0.6, 0.85);
-    muff.position.set(side * r * 0.33, r * 0.56, r * 0.06);
-    muff.rotation.z = side * -0.3;
+    muff.position.set(side * r * 0.27, r * 0.58, r * 0.06);
+    muff.rotation.z = side * -0.15;
     g.add(muff);
     const ear = new Mesh(new ConeGeometry(r * 0.24, r * 0.42, 10), chassisMat(accent, 0.05));
     ear.scale.z = 0.6;
-    ear.position.set(side * r * 0.34, r * 0.68, r * 0.07);
-    ear.rotation.set(-0.1, 0, side * -0.18);
+    ear.position.set(side * r * 0.27, r * 0.72, r * 0.07);
+    ear.rotation.set(-0.1, 0, side * -0.06);
     g.add(ear);
     const inner = new Mesh(new ConeGeometry(r * 0.15, r * 0.32, 10), darkMat());
     inner.scale.z = 0.5;
-    inner.position.set(side * r * 0.35, r * 0.655, r * 0.02);
-    inner.rotation.set(-0.1, 0, side * -0.18);
+    inner.position.set(side * r * 0.28, r * 0.695, r * 0.02);
+    inner.rotation.set(-0.1, 0, side * -0.06);
     g.add(inner);
   }
 
@@ -1335,13 +1335,13 @@ function buildStallionHead(accent: number): Group {
   for (const side of [-1, 1]) {
     const ear = new Mesh(new ConeGeometry(r * 0.17, r * 0.62, 10), chassisMat(accent, 0.05));
     ear.scale.z = 0.75;
-    ear.position.set(side * r * 0.24, r * 1.14, r * 0.1);
-    ear.rotation.set(0.12, 0, side * -0.12);
+    ear.position.set(side * r * 0.18, r * 1.14, r * 0.1);
+    ear.rotation.set(0.12, 0, side * -0.04);
     g.add(ear);
     const inner = new Mesh(new ConeGeometry(r * 0.08, r * 0.4, 10), darkMat());
     inner.scale.z = 0.55;
-    inner.position.set(side * r * 0.245, r * 1.1, r * 0.055);
-    inner.rotation.set(0.12, 0, side * -0.12);
+    inner.position.set(side * r * 0.185, r * 1.1, r * 0.055);
+    inner.rotation.set(0.12, 0, side * -0.04);
     g.add(inner);
   }
 
