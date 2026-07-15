@@ -61,9 +61,15 @@ function clearHandoff(): void {
 }
 
 /**
- * Start a random battle track (looping). Call when a bout begins. `volume`
- * defaults to the quiet background level; boss fights pass a louder one
+ * Start a random battle track. Call when a bout begins. `volume` defaults to
+ * the quiet background level; boss fights pass a louder one
  * (BOSS_BATTLE_VOLUME) so the score carries over the titan's SFX.
+ *
+ * When a track RUNS OUT mid-battle the score doesn't loop it — the `ended`
+ * hook rolls straight into a DIFFERENT track from the pool (any of the
+ * others at random), so a long bout hears the rotation, not one song on
+ * repeat. Stopping the battle track clears the hook, so nothing chains
+ * after the bout ends.
  */
 export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
   clearHandoff(); // a new bout abandons any victory handoff
@@ -74,15 +80,29 @@ export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
     return;
   }
   const url = battleUrls[Math.floor(Math.random() * battleUrls.length)];
-  if (!battle) {
-    battle = new Audio();
-    battle.loop = true;
-  }
+  if (!battle) battle = new Audio();
+  battle.loop = false;
+  battle.onended = () => rollNextTrack(volume);
   if (battle.src !== url) battle.src = url;
   battle.volume = volume * musicVolume();
   battle.currentTime = 0;
   void battle.play().catch(() => {
     /* autoplay blocked or decode failed — stay silent */
+  });
+}
+
+/** A battle track ran dry mid-bout: chain a DIFFERENT one from the pool
+ *  (same one only when the pool holds a single track). */
+function rollNextTrack(volume: number): void {
+  if (!battle || isMusicMuted()) return;
+  const others = battleUrls.filter((u) => u !== battle!.src && !battle!.src.endsWith(u));
+  const pool = others.length > 0 ? others : battleUrls;
+  const url = pool[Math.floor(Math.random() * pool.length)];
+  battle.src = url;
+  battle.volume = volume * musicVolume();
+  battle.currentTime = 0;
+  void battle.play().catch(() => {
+    /* decode failed — the bout goes unscored from here */
   });
 }
 
