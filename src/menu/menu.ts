@@ -77,8 +77,6 @@ export type PanelId =
   | 'gazette'
   /** The round passthrough toggle hanging above the BATTLE panel. */
   | 'passthrough'
-  /** The round Discord disc beside it — queues the community invite. */
-  | 'discord'
   /** The settings gear disc, left of the paper button. */
   | 'gear'
   /** The settings modal (audio sliders + music mute + voice toggle). */
@@ -146,8 +144,6 @@ export type MenuAction =
   /** Quick passthrough toggle (BATTLE-panel disc): flip the backdrop off to
    *  bare AR so you can see your real room, and back. */
   | 'toggle-passthrough'
-  /** Queue the Discord invite in a browser tab (lands when you exit VR). */
-  | 'open-discord'
   /** Arena-backdrop picker (LOCKER » ARENA tab): bare AR / desert / salt flats. */
   | 'env-ar'
   | 'env-desert'
@@ -1838,65 +1834,6 @@ function drawPassthroughButton(ctx: CanvasRenderingContext2D, hoverAction: MenuA
   ctx.beginPath();
   ctx.arc(cx, cy, 3.4, 0, Math.PI * 2);
   ctx.fill();
-}
-
-/** The official Discord mark (simple-icons, CC0-licensed data of the brand
- *  asset, 24x24 viewBox) — drawn via Path2D so it's the REAL logo, not an
- *  approximation. */
-const DISCORD_PATH =
-  'M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z';
-
-/** Set after the invite tab is queued — the disc shows a green "ready" pip
- *  (module state, same pattern as the report button). */
-let discordQueued = false;
-export function markDiscordQueued(): void {
-  discordQueued = true;
-}
-
-/** The Discord disc: steel twin of its neighbours with the blurple mark —
- *  body blob, two knocked-out eyes, wing tips. Clicking queues the invite in
- *  a browser tab; the pip says it's waiting for you outside VR. */
-function drawDiscordButton(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
-  ctx.clearRect(0, 0, GZ, GZ);
-  const hot = hoverAction === 'open-discord';
-  const cx = GZ / 2;
-  const cy = GZ / 2;
-  const r = 52;
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  const fill = hot ? 'rgba(16,18,24,0.92)' : 'rgba(9,10,14,0.82)';
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = hot ? UI.amber : discordQueued ? '#39d98a' : UI.steel;
-  ctx.stroke();
-
-  // The REAL Discord mark — the official path (via simple-icons, 24x24
-  // viewBox), scaled to the disc and filled in brand blurple.
-  const ink = hot ? UI.amber : '#5865f2';
-  const mark = new Path2D(DISCORD_PATH);
-  const scale = 62 / 24; // mark spans ~62px of the 104px disc face
-  ctx.save();
-  ctx.translate(cx - (24 * scale) / 2, cy - (24 * scale) / 2);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = ink;
-  ctx.fill(mark);
-  ctx.restore();
-  // Green pip once the invite tab is queued — it's waiting outside VR.
-  if (discordQueued) {
-    ctx.fillStyle = '#39d98a';
-    ctx.beginPath();
-    ctx.arc(cx + 34, cy - 34, 7, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-/** Inside the disc → queue the invite. */
-function hitDiscordButton(u: number, v: number): MenuAction | null {
-  const dx = u - 0.5;
-  const dy = v - 0.5;
-  return dx * dx + dy * dy <= 0.41 * 0.41 ? 'open-discord' : null;
 }
 
 /** Inside the disc → toggle passthrough. */
@@ -3655,11 +3592,6 @@ export function createMenu(scene: Scene): Menu {
     cw: GZ,
     ch: GZ,
   });
-  // The Discord disc — the community invite, one more step down the arc.
-  const discordBtn = makePanel('discord', 0.16, 0.16, drawDiscordButton, hitDiscordButton, {
-    cw: GZ,
-    ch: GZ,
-  });
   const news = makePanel('news', 0.86, 0.86 * (NH / NW), drawNews, hitNews, { cw: NW, ch: NH });
   // The ARCADE campaign line-up (the titan gauntlet) — modal over the lobby.
   const campaign = makePanel('campaign', 1.5, 1.5 * (CAMP_H / CAMP_W), drawCampaign, hitCampaign, {
@@ -3721,8 +3653,6 @@ export function createMenu(scene: Scene): Menu {
   // outward tilt so it faces you the same way.
   passthroughBtn.mesh.position.set(-0.84, 1.88, -1.05);
   passthroughBtn.mesh.rotation.y = 0.48;
-  discordBtn.mesh.position.set(-1.08, 1.88, -0.94);
-  discordBtn.mesh.rotation.y = 0.62;
   // The coin readout sits just to the RIGHT of the paper button, same height +
   // tilt — symbol and balance together, as asked.
   coinHud.mesh.position.set(1.18, 1.86, -0.94);
@@ -3744,7 +3674,7 @@ export function createMenu(scene: Scene): Menu {
   settings.mesh.position.set(0, 1.5, -1.16);
   settings.mesh.visible = false;
 
-  const panels = [train, duel, info, board, custom, balls, gazetteBtn, gearBtn, passthroughBtn, discordBtn, coinHud, shop, news, campaign, lobby, settings];
+  const panels = [train, duel, info, board, custom, balls, gazetteBtn, gearBtn, passthroughBtn, coinHud, shop, news, campaign, lobby, settings];
   for (const p of panels) {
     p.redraw(null);
     group.add(p.mesh);
