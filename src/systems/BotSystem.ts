@@ -182,12 +182,15 @@ export class BotSystem extends createSystem({
         bot.blockAt.copy(_ballPos); // keep the raised guard tracking the ball
       } else if (bot.decideTimer <= 0) {
         bot.decideTimer = BOT.decideEvery;
-        if (Math.random() < BOT.blockChance) {
+        const near: 0 | 1 = _ballPos.x - padX < bot.x ? 0 : 1;
+        const guardHand: 0 | 1 = bot.windup >= 0 && bot.windupHand === near ? ((1 - near) as 0 | 1) : near;
+        // A block needs a BALL IN THAT FIST (same law as the player's parry)
+        // — with its fire away, the bot falls back to a dodge.
+        if (Math.random() < BOT.blockChance && this.ballAtHand(bot.slot, guardHand)) {
           // BLOCK: plant the free hand between head and ball, hold it up.
           bot.blockTimer = BOT.blockHold;
           bot.blockAt.copy(_ballPos);
-          const near: 0 | 1 = _ballPos.x - padX < bot.x ? 0 : 1;
-          bot.blockHand = bot.windup >= 0 && bot.windupHand === near ? ((1 - near) as 0 | 1) : near;
+          bot.blockHand = guardHand;
         } else {
           // DODGE: the old sidestep + duck/stand.
           const away = Math.sign(bot.x - (_ballPos.x - padX)) || (Math.random() < 0.5 ? -1 : 1);
@@ -258,6 +261,18 @@ export class BotSystem extends createSystem({
       pose.fisting[hand] = false;
       pose.blocking[hand] = blocking;
     }
+  }
+
+  /** True when this bot's ball for `hand` is home in the fist (hover/orbit). */
+  private ballAtHand(owner: number, hand: 0 | 1): boolean {
+    for (const ball of this.queries.balls.entities) {
+      if ((ball.getValue(Fireball, 'owner') ?? 0) !== owner) continue;
+      if ((ball.getValue(Fireball, 'hand') ?? 0) !== hand) continue;
+      if ((ball.getValue(Fireball, 'shard') ?? 0) === 1) continue;
+      const st = ball.getValue(Fireball, 'state') ?? 0;
+      return st === BallState.Hover || st === BallState.Orbit;
+    }
+    return false;
   }
 
   /** Cadenced wind-up → throw → recall, alternating fists. */
