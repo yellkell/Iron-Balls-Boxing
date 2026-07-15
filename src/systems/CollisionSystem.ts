@@ -54,6 +54,19 @@ function pointSegDistSq(p: Vector3, a: Vector3, b: Vector3): number {
   return _seg.distanceToSquared(p);
 }
 
+/** True when `owner`'s ball for `hand` is home in the fist (hover/orbit) —
+ *  the only states a guard may block from. */
+function ballAtHand(balls: Entity[], owner: number, hand: 0 | 1): boolean {
+  for (const ball of balls) {
+    if ((ball.getValue(Fireball, 'owner') ?? 0) !== owner) continue;
+    if ((ball.getValue(Fireball, 'hand') ?? 0) !== hand) continue;
+    if ((ball.getValue(Fireball, 'shard') ?? 0) === 1) continue;
+    const st = ball.getValue(Fireball, 'state') ?? 0;
+    return st === BallState.Hover || st === BallState.Orbit;
+  }
+  return false;
+}
+
 export class CollisionSystem extends createSystem({
   balls: { required: [Fireball] },
   hitboxes: { required: [Hitbox] },
@@ -124,7 +137,7 @@ export class CollisionSystem extends createSystem({
         // Bot bouts (incl. arcade 2v2/FFA): one local sim is authoritative for
         // every fighter — a raised bot GUARD can slap the ball down first,
         // otherwise resolve it against any enemy-team body.
-        if (this.tryBotGuard(ball, ownerTeam, radius, returning)) continue;
+        if (this.tryBotGuard(ball, ownerTeam, radius, returning, balls)) continue;
         this.resolveLocalHit(ball, owner, ownerTeam, hitboxes, radius, damage, returning);
       }
     }
@@ -301,7 +314,7 @@ export class CollisionSystem extends createSystem({
    * landing. Bot bouts only: remote humans rule their own defence, and their
    * poses never set `blocking`.
    */
-  private tryBotGuard(ball: Entity, ownerTeam: number, radius: number, returning: boolean): boolean {
+  private tryBotGuard(ball: Entity, ownerTeam: number, radius: number, returning: boolean, balls: Entity[]): boolean {
     const roster = localLayout();
     for (let i = 0; i < MAX_OPPONENTS; i++) {
       const pose = opponents[i];
@@ -309,6 +322,10 @@ export class CollisionSystem extends createSystem({
       if ((roster[i + 1]?.team ?? ownerTeam) === ownerTeam) continue; // same side — not their problem
       for (const hand of [0, 1] as const) {
         if (!pose.blocking[hand]) continue;
+        // Same law as YOUR parry: a guard only counts with a ball home in
+        // that fist (hover/orbit). An empty raised glove blocks nothing —
+        // the bot could otherwise wall you out while its fire was away.
+        if (!ballAtHand(balls, i + 1, hand)) continue;
         const reach = radius + FIREBALL.radius + FIREBALL.deflectBonus;
         if (pointSegDistSq(pose.handPos[hand], _ballPrev, _ballPos) > reach * reach) continue;
         emberBurst(_ballPos, 18, true);
