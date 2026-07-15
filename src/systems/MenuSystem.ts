@@ -39,6 +39,7 @@ import {
   colorBarLight,
   campaignModal,
   clearReportSent,
+  setCreditsOpen,
   createActionPanel,
   createMenu,
   markReportSent,
@@ -828,9 +829,18 @@ export class MenuSystem extends createSystem({}) {
       case 'open-settings':
         app.settingsOpen = true;
         break;
+      case 'settings-credits':
+        setCreditsOpen(true);
+        this.menu.panels.find((p) => p.id === 'settings')?.redraw(null);
+        break;
+      case 'credits-back':
+        setCreditsOpen(false);
+        this.menu.panels.find((p) => p.id === 'settings')?.redraw(null);
+        break;
       case 'settings-close':
         app.settingsOpen = false;
         clearReportSent(); // next visit gets a fresh report button
+        setCreditsOpen(false); // reopening lands on settings, not credits
         // Repaint the gear disc so its muted-pip reflects any change made inside.
         this.menu.panels.find((p) => p.id === 'gear')?.redraw(null);
         break;

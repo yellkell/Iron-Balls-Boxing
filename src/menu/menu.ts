@@ -206,6 +206,8 @@ export type MenuAction =
   | 'open-settings'
   | 'settings-close'
   | 'settings-report'
+  | 'settings-credits'
+  | 'credits-back'
   /** Toggle the lobby/battle music mute (now inside the SETTINGS modal). */
   | 'toggle-mute'
   /** Dragging the SFX / music volume sliders (continuous — MenuSystem reads UV). */
@@ -1929,7 +1931,13 @@ const SFX_BAR = { x: 48, y: 150, w: SET_W - 96, h: 40 };
 const MUSIC_BAR = { x: 48, y: 252, w: SET_W - 96, h: 40 };
 const SET_MUTE_Y = 322;
 const SET_VOICE_Y = 378;
-const SET_REPORT_BTN = { x: SET_W / 2 - 150, y: 428, w: 300, h: 46 };
+const SET_REPORT_BTN = { x: 40, y: 428, w: 232, h: 46 };
+const SET_CREDITS_BTN = { x: SET_W - 40 - 232, y: 428, w: 232, h: 46 };
+/** True while the settings panel is showing the CREDITS face. */
+let creditsOpen = false;
+export function setCreditsOpen(open: boolean): void {
+  creditsOpen = open;
+}
 const SET_CLOSE_BTN = { x: SET_W / 2 - 90, y: SET_H - 66, w: 180, h: 50 };
 
 /** Flips after a report goes out so the button says it landed; settings-close
@@ -2010,7 +2018,40 @@ function settingsBreaker(ctx: CanvasRenderingContext2D, label: string, on: boole
   ctx.textAlign = 'center';
 }
 
+const CREDITS: [string, string][] = [
+  ['DEVELOPED BY', 'yellkell'],
+  ['VOICE ACTING', 'v0ltaVA'],
+  ['OST', 'IBWildcat1998 & poopoodoodoo698'],
+  ['CONSULTING', 'RedWolf9 & JKing123'],
+  ['SPECIAL THANKS TO', 'JakeThePro, JFighter, CrystalZach, Xyfume,'],
+  ['', 'The Blaston community'],
+  ['', '& The developers of Blaston'],
+];
+
+function drawCredits(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+  panelBg(ctx, false, UI.amber, 'CREDITS', SET_W, SET_H);
+  ctx.textAlign = 'center';
+  let y = 104;
+  for (const [role, names] of CREDITS) {
+    if (role) {
+      ctx.font = '700 16px system-ui, sans-serif';
+      ctx.fillStyle = UI.textDim;
+      ctx.fillText(role, SET_W / 2, y);
+      y += 24;
+    }
+    ctx.font = '600 21px system-ui, sans-serif';
+    ctx.fillStyle = UI.text;
+    ctx.fillText(names, SET_W / 2, y);
+    y += role ? 38 : 26;
+  }
+  buttonPlate(ctx, SET_CLOSE_BTN.x, SET_CLOSE_BTN.y, SET_CLOSE_BTN.w, SET_CLOSE_BTN.h, 'BACK', UI.steel, hoverAction === 'credits-back');
+}
+
 function drawSettings(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+  if (creditsOpen) {
+    drawCredits(ctx, hoverAction);
+    return;
+  }
   panelBg(ctx, false, UI.amber, 'SETTINGS', SET_W, SET_H);
   ctx.textAlign = 'center';
   ctx.font = '600 20px system-ui, sans-serif';
@@ -2027,11 +2068,12 @@ function drawSettings(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
   // filed to the backend; no address, no mail client, no fuss.
   buttonPlate(
     ctx, SET_REPORT_BTN.x, SET_REPORT_BTN.y, SET_REPORT_BTN.w, SET_REPORT_BTN.h,
-    reportSent ? 'REPORT SENT — THANK YOU' : 'REPORT A PROBLEM',
+    reportSent ? 'REPORT SENT ✓' : 'REPORT A PROBLEM',
     reportSent ? '#39d98a' : UI.danger,
     !reportSent && hoverAction === 'settings-report',
     reportSent,
   );
+  buttonPlate(ctx, SET_CREDITS_BTN.x, SET_CREDITS_BTN.y, SET_CREDITS_BTN.w, SET_CREDITS_BTN.h, 'CREDITS', UI.cool, hoverAction === 'settings-credits');
 
   buttonPlate(ctx, SET_CLOSE_BTN.x, SET_CLOSE_BTN.y, SET_CLOSE_BTN.w, SET_CLOSE_BTN.h, 'CLOSE', UI.steel, hoverAction === 'settings-close');
 }
@@ -2041,11 +2083,13 @@ function hitSettings(u: number, v: number): MenuAction | null {
   const y = (1 - v) * SET_H;
   const inBar = (b: { x: number; y: number; w: number; h: number }): boolean =>
     x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 10 && y <= b.y + b.h + 10;
+  if (creditsOpen) return inBar(SET_CLOSE_BTN) ? 'credits-back' : null;
   if (inBar(SFX_BAR)) return 'sfx-vol';
   if (inBar(MUSIC_BAR)) return 'music-vol';
   if (y >= SET_MUTE_Y - 4 && y <= SET_MUTE_Y + 40) return 'toggle-mute';
   if (y >= SET_VOICE_Y - 4 && y <= SET_VOICE_Y + 40) return 'toggle-voice';
   if (inBar(SET_REPORT_BTN)) return 'settings-report';
+  if (inBar(SET_CREDITS_BTN)) return 'settings-credits';
   if (inBar(SET_CLOSE_BTN)) return 'settings-close';
   return null;
 }
