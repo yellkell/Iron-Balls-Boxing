@@ -39,6 +39,7 @@ import {
   colorBarLight,
   campaignModal,
   clearReportSent,
+  markDiscordQueued,
   createActionPanel,
   createMenu,
   markReportSent,
@@ -134,7 +135,7 @@ const NEWS_SCROLL_STEP = 76;
  *  flip passthrough, tweak settings. Everything else — every fight, the
  *  loadout, the shop — clanks like sealed armour until the tutorial has been
  *  run once (app.tutorialDone; the tutorial button itself is always live). */
-const PRE_TUTORIAL_PANELS = new Set<string>(['gazette', 'news', 'passthrough', 'gear', 'settings']);
+const PRE_TUTORIAL_PANELS = new Set<string>(['gazette', 'news', 'passthrough', 'gear', 'settings', 'discord']);
 
 interface Pointer {
   line: Line;
@@ -727,6 +728,19 @@ export class MenuSystem extends createSystem({}) {
           net.joinPrivate(app.codeEntry);
         }
         break;
+      case 'open-discord': {
+        // No browsing inside the headset session — window.open QUEUES the
+        // invite: it's a waiting tab when they exit VR, and the packaged app
+        // hands it to the Discord app. The disc's green pip confirms.
+        try {
+          window.open('https://discord.gg/gJY3XhejZf', '_blank', 'noopener');
+        } catch {
+          /* popup denied — the pip still points them at the community */
+        }
+        markDiscordQueued();
+        this.menu.panels.find((p) => p.id === 'discord')?.redraw(null);
+        break;
+      }
       case 'toggle-passthrough':
         // The quick "show my real room" disc above BATTLE: flip the backdrop
         // off to bare AR, or back to whatever you last picked in the LOCKER's
