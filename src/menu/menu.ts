@@ -2019,7 +2019,7 @@ function settingsBreaker(ctx: CanvasRenderingContext2D, label: string, on: boole
 }
 
 const CREDITS: [string, string][] = [
-  ['DEVELOPED BY', 'yellkell'],
+  ['CREATED BY', 'yellkell'],
   ['VOICE ACTING', 'v0ltaVA'],
   ['OST', 'IBWildcat1998 & poopoodoodoo698'],
   ['CONSULTING', 'RedWolf9 & JKing123'],
