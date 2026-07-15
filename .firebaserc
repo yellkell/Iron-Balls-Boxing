@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "arfi-b68f9"
-  }
+  },
+  "targets": {
+    "arfi-b68f9": {
+      "hosting": {
+        "arfi": [
+          "arfi-b68f9"
+        ],
+        "playfirefight": [
+          "playfirefight"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
