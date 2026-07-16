@@ -2024,6 +2024,7 @@ const CREDITS: [string, string][] = [
   ['OST', 'IBWildcat1998 & poopoodoodoo698'],
   ['CONSULTING', 'RedWolf9 & JKing123'],
   ['SPECIAL THANKS TO', 'JakeThePro, JFighter, CrystalZach, Xyfume,'],
+  ['', 'fazeway851, GODLY,'],
   ['', 'The Blaston community'],
   ['', '& The developers of Blaston'],
 ];
@@ -2031,18 +2032,18 @@ const CREDITS: [string, string][] = [
 function drawCredits(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   panelBg(ctx, false, UI.amber, 'CREDITS', SET_W, SET_H);
   ctx.textAlign = 'center';
-  let y = 104;
+  let y = 96;
   for (const [role, names] of CREDITS) {
     if (role) {
       ctx.font = '700 16px system-ui, sans-serif';
       ctx.fillStyle = UI.textDim;
       ctx.fillText(role, SET_W / 2, y);
-      y += 24;
+      y += 22;
     }
     ctx.font = '600 21px system-ui, sans-serif';
     ctx.fillStyle = UI.text;
     ctx.fillText(names, SET_W / 2, y);
-    y += role ? 38 : 26;
+    y += role ? 36 : 24;
   }
   buttonPlate(ctx, SET_CLOSE_BTN.x, SET_CLOSE_BTN.y, SET_CLOSE_BTN.w, SET_CLOSE_BTN.h, 'BACK', UI.steel, hoverAction === 'credits-back');
 }
