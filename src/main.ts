@@ -121,7 +121,17 @@ World.create(container, {
   // The optional papercraft desert backdrop (off = bare AR passthrough).
   world.registerSystem(DesertSystem);
 
-  const xrSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
+  // Passthrough AR when the device offers it; otherwise fall back to plain
+  // immersive VR — the desert backdrop paints the world in, so nothing is
+  // lost but the passthrough novelty. Without this fallback a VR-only
+  // context (some packaged-app webviews, older headsets) left the button
+  // dead on "XR unavailable" — a player stuck at the landing page forever
+  // (Meta review VRC.Quest.Functional.3, 2026-07).
+  const arSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
+  const vrSupported =
+    arSupported || (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
+  const sessionMode = arSupported ? SessionMode.ImmersiveAR : SessionMode.ImmersiveVR;
+  const xrSupported = vrSupported;
 
   if (enterVrButton && xrSupported) {
     enterVrButton.removeAttribute('disabled');
@@ -135,7 +145,10 @@ World.create(container, {
         ensureAudio();
         preloadTutorVoice();
       }
-      launchXR(world, { sessionMode: SessionMode.ImmersiveAR });
+      // No passthrough in a plain-VR session: a saved 'ar' backdrop would
+      // render as a black void, so promote it to the desert.
+      if (!arSupported && app.environment === 'ar') app.environment = 'desert';
+      launchXR(world, { sessionMode });
 
       const watchForSession = () => {
         if (world.session) {
