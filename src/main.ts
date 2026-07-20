@@ -82,6 +82,13 @@ World.create(container, {
     camera: { position: [0, 1.6, 0] },
   },
 }).then(async (world) => {
+  // Quest's default maximum fixed foveation (super-three's WebXRManager ships
+  // foveation = 1.0) renders the display edges at lower resolution, and the
+  // boundary between foveation regions shows up as a head-locked dark band on
+  // dark/high-contrast content. Full resolution kills it outright; raise toward
+  // ~0.2 later if we want some of the perf back without exposing the seam.
+  world.renderer.xr.setFoveation(0);
+
   initLeaderboard(); // anonymous profile + first board fetch
   initGazette(); // pull the day's Gasket Gazette for the lobby paper button
   setupEnvironment(world);

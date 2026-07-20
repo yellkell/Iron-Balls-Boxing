@@ -109,6 +109,13 @@ World.create(container, {
     camera: { position: [PUB.spawn.x, 1.6, PUB.spawn.z] },
   },
 }).then(async (world) => {
+  // This is a fully virtual (no-passthrough) interior — the exact dark,
+  // high-contrast VR case where Quest's default maximum fixed foveation
+  // (super-three's WebXRManager foveation = 1.0) reveals a head-locked dark
+  // boundary between foveation regions. Full resolution removes it; raise
+  // toward ~0.2 later to recover perf without re-exposing the seam.
+  world.renderer.xr.setFoveation(0);
+
   pub.myName = resolveName();
   pub.refs = buildPub(world);
   initFirePools(world.scene); // ember/trail pools for the fight hall
