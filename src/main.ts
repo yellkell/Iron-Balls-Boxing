@@ -133,43 +133,59 @@ World.create(container, {
   const sessionMode = arSupported ? SessionMode.ImmersiveAR : SessionMode.ImmersiveVR;
   const xrSupported = vrSupported;
 
+  const startXR = () => {
+    enterVrButton?.setAttribute('disabled', '');
+    enterMenuMusic(); // lobby music (unless muted last time) — within the gesture
+    // A boxer who hasn't run the tutorial is headed straight for it — warm
+    // Ember's voice clips now (decode works while the context is young), so
+    // her very first "Over here." speaks instead of falling back to caption.
+    if (!app.tutorialDone) {
+      ensureAudio();
+      preloadTutorVoice();
+    }
+    // No passthrough in a plain-VR session: a saved 'ar' backdrop would
+    // render as a black void, so promote it to the desert.
+    if (!arSupported && app.environment === 'ar') app.environment = 'desert';
+    launchXR(world, { sessionMode });
+
+    const watchForSession = () => {
+      if (world.session) {
+        hideLanding();
+        world.session.addEventListener('end', showLanding, { once: true });
+        return;
+      }
+
+      if (!document.body.classList.contains('app-entered')) {
+        requestAnimationFrame(watchForSession);
+      }
+    };
+
+    requestAnimationFrame(watchForSession);
+    window.setTimeout(() => {
+      if (!world.session) enterVrButton?.removeAttribute('disabled');
+    }, 4000);
+  };
+
   if (enterVrButton && xrSupported) {
     enterVrButton.removeAttribute('disabled');
-    enterVrButton.addEventListener('click', () => {
-      enterVrButton.setAttribute('disabled', '');
-      enterMenuMusic(); // lobby music (unless muted last time) — within the gesture
-      // A boxer who hasn't run the tutorial is headed straight for it — warm
-      // Ember's voice clips now (decode works while the context is young), so
-      // her very first "Over here." speaks instead of falling back to caption.
-      if (!app.tutorialDone) {
-        ensureAudio();
-        preloadTutorVoice();
-      }
-      // No passthrough in a plain-VR session: a saved 'ar' backdrop would
-      // render as a black void, so promote it to the desert.
-      if (!arSupported && app.environment === 'ar') app.environment = 'desert';
-      launchXR(world, { sessionMode });
-
-      const watchForSession = () => {
-        if (world.session) {
-          hideLanding();
-          world.session.addEventListener('end', showLanding, { once: true });
-          return;
-        }
-
-        if (!document.body.classList.contains('app-entered')) {
-          requestAnimationFrame(watchForSession);
-        }
-      };
-
-      requestAnimationFrame(watchForSession);
-      window.setTimeout(() => {
-        if (!world.session) enterVrButton.removeAttribute('disabled');
-      }, 4000);
-    });
+    enterVrButton.addEventListener('click', startXR);
   } else if (enterVrButton) {
     enterVrButton.textContent = 'XR unavailable';
   }
+
+  // Inside the packaged Horizon OS app there may be no visible 2D panel at
+  // all: an immersive-mode PWA launches behind the system splash and the OS
+  // waits for the CONTENT to start XR. Waiting for a button tap there means
+  // waiting forever (Meta review: "stuck for an indefinite period after
+  // launching"). The immersive PWA runtime permits a session request without
+  // user activation at launch, so enter directly; in a regular browser this
+  // path never runs and the landing button behaves exactly as before. If the
+  // runtime does demand a gesture after all, the request rejects harmlessly
+  // and the 4s re-arm above hands control back to the button.
+  const packaged =
+    document.referrer.startsWith('android-app://') ||
+    window.matchMedia?.('(display-mode: standalone)')?.matches === true;
+  if (packaged && xrSupported) startXR();
 
   // eslint-disable-next-line no-console
   console.info('[FIRE FIGHT] World ready — platforms set, fists hot.');
