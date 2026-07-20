@@ -65,12 +65,12 @@ export function buildPintGlass(): Group {
   base.position.y = 0.006;
   g.add(base);
 
-  // The pint itself: a deep RED pour (the house brew) with a pale head.
+  // The pint itself: an electric BLUE pour (the house brew) with a pale head.
   const beer = new Mesh(
     new CylinderGeometry(GLASS.radiusTop * 0.88, GLASS.radiusBottom * 0.88, GLASS.height * 0.72, 12),
     new MeshStandardMaterial({
-      color: 0xb01f24,
-      emissive: 0x400608,
+      color: 0x1f7ad4,
+      emissive: 0x082b50,
       emissiveIntensity: 0.5,
       roughness: 0.4,
       transparent: true,
@@ -97,7 +97,7 @@ export function buildPintGlass(): Group {
 }
 
 /**
- * Set how full a pint is (0 = empty, 1 = full): the amber column scales up
+ * Set how full a pint is (0 = empty, 1 = full): the blue column scales up
  * from the glass base and the foam head rides on top. PropSystem animates
  * this as a fresh pour settles.
  */
