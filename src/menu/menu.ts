@@ -363,7 +363,7 @@ function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,192,77,0.78)';
-    ctx.fillText('run the tutorial once to unlock Gasket', PW / 2, 334);
+    ctx.fillText('you must complete the tutorial to advance', PW / 2, 334);
   }
 
   // Two industrial breaker switches: targets-shoot-back, then only-play-bots.
@@ -495,7 +495,7 @@ function drawDuelRoot(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
     ctx.textAlign = 'center';
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,192,77,0.78)';
-    ctx.fillText('run the tutorial once to unlock Gasket', PW / 2, 404);
+    ctx.fillText('you must complete the tutorial to advance', PW / 2, 404);
   }
 }
 
