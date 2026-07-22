@@ -353,7 +353,10 @@ function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
   const locked = !app.tutorialDone;
 
   // TUTORIAL sits at the top — the very first thing a new boxer should tap.
-  buttonPlate(ctx, 70, 80, PW - 140, 54, 'TUTORIAL', UI.emberBright, hoverAction === 'start-tutorial');
+  // Until it's been completed it breathes ember (MenuSystem repaints this
+  // panel every frame while locked) so there's no hunting for the next step.
+  const pulse = locked ? 0.5 + 0.5 * Math.sin(performance.now() / 320) : 0;
+  buttonPlate(ctx, 70, 80, PW - 140, 54, 'TUTORIAL', UI.emberBright, hoverAction === 'start-tutorial', false, pulse);
   // The single-player CAMPAIGN — the titan gauntlet — right below it.
   buttonPlate(ctx, 70, 140, PW - 140, 54, 'CAMPAIGN', UI.danger, !locked && hoverAction === 'open-campaign', locked);
   // The RAID — up to five raiders, five titans, one lobby.

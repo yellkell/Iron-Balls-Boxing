@@ -280,7 +280,10 @@ export function solidBar(
   }
 }
 
-/** A small chamfered industrial button plate with a stencilled label. */
+/** A small chamfered industrial button plate with a stencilled label.
+ *  `pulse` (0..1) breathes the accent over the resting plate — for the one
+ *  button that IS the next step, so it beckons even before the pointer lands.
+ *  Hover and disabled both win over it. */
 export function buttonPlate(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
@@ -288,6 +291,7 @@ export function buttonPlate(
   accent: string,
   hot: boolean,
   disabled = false,
+  pulse = 0,
 ): void {
   plate(ctx, x, y, w, h, {
     cut: 14,
@@ -295,6 +299,18 @@ export function buttonPlate(
     stroke: hot ? accent : UI.steel,
     rivets: false,
   });
+  if (pulse > 0 && !hot && !disabled) {
+    // Breathing accent outline laid over the steel stroke.
+    chamferPath(ctx, x, y, w, h, 14);
+    ctx.globalAlpha = pulse;
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 8 + 12 * pulse;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
   // Accent keying notch on the left edge — dimmed (no glow) when disabled.
   ctx.shadowColor = disabled ? 'transparent' : accent;
   ctx.shadowBlur = disabled ? 0 : 10;
@@ -307,9 +323,9 @@ export function buttonPlate(
   // (the tutorial console's title) used to push the label low off-centre.
   ctx.textBaseline = 'middle';
   ctx.fillStyle = disabled ? 'rgba(180,186,196,0.38)' : hot ? accent : UI.text;
-  if (hot && !disabled) {
+  if (!disabled && (hot || pulse > 0)) {
     ctx.shadowColor = accent;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = hot ? 12 : 12 * pulse;
   }
   ctx.fillText(label.toUpperCase(), x + w / 2, y + h / 2 + 2);
   ctx.shadowBlur = 0;

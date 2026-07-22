@@ -484,6 +484,13 @@ export class MenuSystem extends createSystem({}) {
     if (tickCoinRollup(delta)) {
       this.menu.panels.find((p) => p.id === 'coins')?.redraw(null);
     }
+
+    // Pre-tutorial, the TUTORIAL plate breathes — repaint just the ARCADE
+    // panel each frame so the pulse animates. Ends for good once completed.
+    if (!app.tutorialDone) {
+      const train = this.menu.panels.find((p) => p.id === 'train');
+      if (train?.mesh.visible) train.redraw(this.hovered === 'train' ? this.hoveredAction : null);
+    }
   }
 
   /** Repaint one panel by id, preserving its live hover highlight. */
