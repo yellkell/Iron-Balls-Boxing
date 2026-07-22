@@ -1989,7 +1989,7 @@ function buildBunnyHead(accent: number): Group {
   }
 
   // Blunt muzzle furniture: nose pad, philtrum, and the BUCK TEETH — two
-  // little plates dropping from the mouth line, the rabbit's own signature.
+  // NEON plates dropping from the mouth line, the rabbit's own signature.
   const nose = new Mesh(new SphereGeometry(r * 0.085, 10, 8), darkMat());
   nose.scale.set(1.15, 0.7, 0.7);
   nose.position.set(0, -r * 0.06, -r * 0.84);
@@ -1999,7 +1999,7 @@ function buildBunnyHead(accent: number): Group {
   philtrum.rotation.x = 0.15;
   g.add(philtrum);
   for (const side of [-1, 1]) {
-    const tooth = new Mesh(new BoxGeometry(r * 0.085, r * 0.13, r * 0.045), chassisMat(accent, 0.05));
+    const tooth = new Mesh(new BoxGeometry(r * 0.085, r * 0.13, r * 0.045), glowMat(accent, 2.2));
     tooth.position.set(side * r * 0.05, -r * 0.36, -r * 0.76);
     tooth.rotation.x = 0.1;
     g.add(tooth);
