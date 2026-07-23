@@ -17,8 +17,10 @@ import {
   AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
+  CircleGeometry,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Group,
   HemisphereLight,
   LinearFilter,
@@ -29,7 +31,9 @@ import {
   PointLight,
   Shape,
   ShapeGeometry,
+  SphereGeometry,
   SRGBColorSpace,
+  TorusGeometry,
   type Object3D,
 } from 'three';
 import type { World } from '@iwsdk/core';
@@ -262,12 +266,10 @@ export function makePlatform(color: number): Group {
   grid.visible = false;
   group.add(grid);
 
-  // BLAZING: a big flame licking across the deck — the earned pad for
-  // clearing anything on the blazing breaker. The SAME leaning-tongue
-  // silhouette as the leaderboard's blazing feat marker (drawFlame): an
-  // outer tongue in neon-core (retints with the skin/team like the
-  // fins/bolt) and a hot AMBER core with no retint role at all — fire's
-  // heart stays yellow, matching the store tile, whatever the pad wears.
+  // BLAZING: not merely a flame decal. The earned pad carries a white-hot
+  // deck brand, a burning outer rail, eight animated flame crowns and sparks
+  // lifting off the steel. The low effects stay outside the standing area, so
+  // the silhouette reads as a trophy without filling the player's play space.
   const flameTongue = (h: number): Shape => {
     const w = h * 0.62;
     const s = new Shape();
@@ -279,34 +281,185 @@ export function makePlatform(color: number): Group {
   };
   const FLAME_H = 1.15;
   const flame = new Group();
-  const outerMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  flame.name = 'blazing-platform-fx';
+  flame.userData.skinTag = 'blazing';
+  flame.userData.platformFx = 'blazing';
+  const outerMat = new MeshBasicMaterial({
+    color: new Color(color).lerp(new Color(0xffffff), 0.45),
+    transparent: true,
+    opacity: 0.96,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
   outerMat.userData.role = 'neon-core';
   const outer = new Mesh(new ShapeGeometry(flameTongue(FLAME_H)), outerMat);
-  const coreMat = new MeshBasicMaterial({ color: 0xffb000 }); // no role: never retinted
+  outer.userData.fxRole = 'blazing-emblem';
+  const coreMat = new MeshBasicMaterial({
+    color: 0xffc21a,
+    transparent: true,
+    opacity: 0.98,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  }); // no role: fire's amber heart is never retinted
   const core = new Mesh(new ShapeGeometry(flameTongue(FLAME_H * 0.55)), coreMat);
   core.position.z = 0.001; // proud of the outer tongue
-  flame.add(outer, core);
-  flame.rotation.x = -Math.PI / 2; // flat on the deck, tip toward the foe
-  flame.position.set(0, DECK_TOP + 0.001, FLAME_H / 2); // shape grows +y → -z; recentre
-  flame.userData.skinTag = 'blazing';
+  core.userData.fxRole = 'blazing-emblem-core';
+  const deckBrand = new Group();
+  deckBrand.add(outer, core);
+  deckBrand.rotation.x = -Math.PI / 2; // flat on deck, tip toward the foe
+  deckBrand.position.set(0, DECK_TOP + 0.004, FLAME_H / 2);
+  flame.add(deckBrand);
+
+  const fireRailMat = outerMat.clone();
+  fireRailMat.userData.role = 'neon-halo';
+  fireRailMat.opacity = 0.72;
+  const fireRail = new Mesh(new TorusGeometry(0.735, 0.027, 6, 56), fireRailMat);
+  fireRail.rotation.x = Math.PI / 2;
+  fireRail.position.y = DECK_TOP + 0.012;
+  fireRail.userData.fxRole = 'blazing-rail';
+  flame.add(fireRail);
+
+  // Crown every corner with a two-tone lick of fire. Each crown is a vertical
+  // double-sided mesh, readable from the pad opposite as well as from above.
+  const jetOuterGeo = new ShapeGeometry(flameTongue(0.24));
+  const jetCoreGeo = new ShapeGeometry(flameTongue(0.14));
+  const jetCoreMat = coreMat.clone();
+  OCTAGON_VERTICES.forEach(([x, z], i) => {
+    const jet = new Group();
+    jet.position.set(x * 0.94, DECK_TOP, z * 0.94);
+    jet.rotation.y = Math.atan2(x, z);
+    jet.userData.fxRole = 'blazing-jet';
+    jet.userData.fxPhase = i * 0.79;
+    const shell = new Mesh(jetOuterGeo, outerMat);
+    const heart = new Mesh(jetCoreGeo, jetCoreMat);
+    heart.position.z = 0.003;
+    jet.add(shell, heart);
+    flame.add(jet);
+  });
+
+  const emberGeo = new SphereGeometry(0.014, 6, 4);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const radius = 0.5 + (i % 3) * 0.1;
+    const ember = new Mesh(emberGeo, i % 2 ? coreMat : outerMat);
+    ember.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
+    ember.userData.fxRole = 'blazing-ember';
+    ember.userData.fxPhase = i / 12;
+    ember.userData.fxBaseY = ember.position.y;
+    flame.add(ember);
+  }
+  const fireLight = new PointLight(0xff5a24, 2.8, 2.6, 2);
+  fireLight.position.y = 0.14;
+  fireLight.userData.fxRole = 'blazing-light';
+  flame.add(fireLight);
   flame.visible = false;
   group.add(flame);
 
-  // TIDEBREAKER: GOOPLIATH's gel drop, big on the deck — the raid trophy pad.
+  // TIDEBREAKER: a luminous pool, rolling wave crown, bubbles and hanging
+  // droplets. It should look as if GOOPLIATH is still alive beneath the slab,
+  // not like somebody painted a green raindrop on ordinary diamond plate.
   const D = 0.52;
   const gel = new Shape();
   gel.moveTo(0, D); // pinched crown
   gel.quadraticCurveTo(0.95 * D, -0.1 * D, 0.55 * D, -0.55 * D);
   gel.quadraticCurveTo(0, -0.98 * D, -0.55 * D, -0.55 * D); // round belly
   gel.quadraticCurveTo(-0.95 * D, -0.1 * D, 0, D);
-  const gelMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  const tide = new Group();
+  tide.name = 'tidebreaker-platform-fx';
+  tide.userData.skinTag = 'tidebreaker';
+  tide.userData.platformFx = 'tidebreaker';
+  const gelMat = new MeshBasicMaterial({
+    color: new Color(color).lerp(new Color(0xffffff), 0.45),
+    transparent: true,
+    opacity: 0.9,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
   gelMat.userData.role = 'neon-core';
   const drop = new Mesh(new ShapeGeometry(gel), gelMat);
   drop.rotation.x = -Math.PI / 2; // crown pointing at the foe
-  drop.position.y = DECK_TOP + 0.001;
-  drop.userData.skinTag = 'tidebreaker';
-  drop.visible = false;
-  group.add(drop);
+  drop.position.y = DECK_TOP + 0.006;
+  drop.userData.fxRole = 'tide-emblem';
+  tide.add(drop);
+
+  const poolMat = new MeshBasicMaterial({
+    color: 0x24ff9a,
+    transparent: true,
+    opacity: 0.28,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  poolMat.userData.role = 'neon-halo';
+  const pool = new Mesh(new CircleGeometry(0.62, 40), poolMat);
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = DECK_TOP + 0.002;
+  pool.userData.fxRole = 'tide-pool';
+  tide.add(pool);
+
+  for (let i = 0; i < 3; i++) {
+    const ringMat = poolMat.clone();
+    ringMat.opacity = 0.5;
+    const ring = new Mesh(new TorusGeometry(0.31 + i * 0.13, 0.012, 5, 40), ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = DECK_TOP + 0.011 + i * 0.002;
+    ring.userData.fxRole = 'tide-ring';
+    ring.userData.fxPhase = i / 3;
+    tide.add(ring);
+  }
+
+  const wave = new Shape();
+  wave.moveTo(-0.17, 0);
+  wave.bezierCurveTo(-0.09, 0.01, -0.06, 0.12, 0.02, 0.16);
+  wave.bezierCurveTo(0.02, 0.09, 0.1, 0.05, 0.17, 0.06);
+  wave.lineTo(0.17, 0);
+  wave.closePath();
+  const waveGeo = new ShapeGeometry(wave);
+  OCTAGON_VERTICES.forEach(([x, z], i) => {
+    const crest = new Mesh(waveGeo, gelMat);
+    crest.position.set(x * 0.93, DECK_TOP, z * 0.93);
+    crest.rotation.y = Math.atan2(x, z);
+    crest.userData.fxRole = 'tide-crest';
+    crest.userData.fxPhase = i * 0.73;
+    tide.add(crest);
+  });
+
+  const bubbleGeo = new SphereGeometry(0.022, 8, 6);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + 0.2;
+    const radius = 0.52 + (i % 2) * 0.16;
+    const bubbleMat = gelMat.clone();
+    bubbleMat.opacity = 0.58;
+    const bubble = new Mesh(bubbleGeo, bubbleMat);
+    bubble.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
+    bubble.userData.fxRole = 'tide-bubble';
+    bubble.userData.fxPhase = i / 10;
+    bubble.userData.fxBaseY = bubble.position.y;
+    tide.add(bubble);
+  }
+
+  // Long luminous drops hang below alternate corners, giving the pad an
+  // unmistakable profile even when the deck art is foreshortened.
+  const dripGeo = new SphereGeometry(0.05, 8, 6);
+  OCTAGON_VERTICES.forEach(([x, z], i) => {
+    if (i % 2) return;
+    const drip = new Mesh(dripGeo, gelMat);
+    drip.position.set(x * 0.9, -PLATFORM.thickness - 0.07, z * 0.9);
+    drip.scale.set(0.65, 1.75 + i * 0.04, 0.65);
+    drip.userData.fxRole = 'tide-drip';
+    drip.userData.fxPhase = i * 0.55;
+    drip.userData.fxBaseY = drip.position.y;
+    tide.add(drip);
+  });
+  const tideLight = new PointLight(0x35ff9a, 2.2, 2.4, 2);
+  tideLight.position.y = 0.12;
+  tideLight.userData.fxRole = 'tide-light';
+  tide.add(tideLight);
+  tide.visible = false;
+  group.add(tide);
 
   // EMBER: the classic look — banding + bolts, no extra furniture.
   return group;

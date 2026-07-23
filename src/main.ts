@@ -41,6 +41,7 @@ import { PlayerGloveSystem } from './systems/PlayerGloveSystem.js';
 import { PlayerGestureSystem } from './systems/PlayerGestureSystem.js';
 import { FXSystem } from './systems/FXSystem.js';
 import { DesertSystem } from './systems/DesertSystem.js';
+import { PlatformFXSystem } from './systems/PlatformFXSystem.js';
 
 installCrashTrap(); // headset playtests have no console — trap + persist crashes
 
@@ -125,6 +126,8 @@ World.create(container, {
   world.registerSystem(PlayerGloveSystem);
   world.registerSystem(PlayerGestureSystem);
   world.registerSystem(FXSystem);
+  // Earned trophy pads stay alive: BLAZING burns and TIDEBREAKER surges.
+  world.registerSystem(PlatformFXSystem);
   // The optional papercraft desert backdrop (off = bare AR passthrough).
   world.registerSystem(DesertSystem);
 

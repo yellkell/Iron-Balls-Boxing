@@ -53,6 +53,8 @@ export interface PlatformSkin {
    * (0x000000) while the rim + any decal still burn the neon. Omitted = neon.
    */
   slabEmissive?: number;
+  /** Stronger deck bloom for rare earned pads; ordinary steel rests at 0.08. */
+  slabGlow?: number;
   /**
    * Earned, never sold: how this skin is won (shown on its shop tile in place
    * of a price; tapping it there does nothing until it's yours). The CHAMPION
@@ -133,13 +135,13 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // championship-crimson deck.
   { id: 'champion', name: 'CHAMPION', neon: 0xfff3cf, slab: 0x8c2620, earnedBy: 'FELL GOLIATH' },
   // TIDEBREAKER — never sold. Felling GOOPLIATH with a raid squad slicks the
-  // deck bottle-green under bright gel piping, GOOPLIATH's own drop splashed
-  // big across it (built in arena.ts, shown by its skinTag).
-  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x14522c, earnedBy: 'FELL RAID GOOPLIATH' },
+  // deck bottle-green under bright gel piping, GOOPLIATH's pool surging across
+  // it with wave crests, bubbles and hanging drips (arena.ts).
+  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x0d3f2b, slabGlow: 0.18, earnedBy: 'FELL RAID GOOPLIATH' },
   // BLAZING — never sold. Clear any run or raid on the blazing breaker:
-  // fire-red piping over scorched steel, wearing a raised flame across the
-  // deck (built in arena.ts, shown by its skinTag).
-  { id: 'blazing', name: 'BLAZING', neon: 0xff4a26, slab: 0x2a0c0a, earnedBy: 'WIN ON BLAZING' },
+  // fire-red piping over scorched steel, wearing a burning rail, corner flame
+  // crowns and airborne embers (arena.ts).
+  { id: 'blazing', name: 'BLAZING', neon: 0xff4a26, slab: 0x210605, slabGlow: 0.2, earnedBy: 'WIN ON BLAZING' },
 ];
 
 /** How the OPPONENT looks when they haven't picked (bot bouts): team blue. */
@@ -248,6 +250,7 @@ export function applyPlatformSkin(root: Object3D, skin: PlatformSkin): void {
         // Deck glows faintly in the neon by default; slabEmissive overrides
         // it (VOLT wants a black deck under its yellow rim, not olive).
         m.emissive.setHex(skin.slabEmissive ?? skin.neon);
+        m.emissiveIntensity = skin.slabGlow ?? 0.08;
         // Premium pads repaint the steel; plain recolours restore the default.
         m.color.setHex(skin.slab ?? DEFAULT_SLAB_TINT);
         break;
