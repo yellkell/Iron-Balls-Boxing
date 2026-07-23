@@ -150,7 +150,13 @@ World.create(container, {
   // Browser-only moderation: hold Z+A+P to open the admin ban panel.
   installAdminPanel();
 
-  const xrSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
+  // isSessionSupported can hang in the packaged-PWA webview (see src/main.ts)
+  // — race it against a timeout and let the click's requestSession decide.
+  const xrSupported =
+    (await Promise.race([
+      navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false) ?? Promise.resolve(false),
+      new Promise<boolean>((resolve) => window.setTimeout(() => resolve(true), 1500)),
+    ])) === true;
 
   if (enterVrButton && xrSupported) {
     enterVrButton.removeAttribute('disabled');

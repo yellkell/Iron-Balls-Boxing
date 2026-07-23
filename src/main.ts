@@ -134,9 +134,20 @@ World.create(container, {
   // context (some packaged-app webviews, older headsets) left the button
   // dead on "XR unavailable" — a player stuck at the landing page forever
   // (Meta review VRC.Quest.Functional.3, 2026-07).
-  const arSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
-  const vrSupported =
-    arSupported || (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
+  //
+  // isSessionSupported can HANG (never settle) in the Horizon OS packaged-PWA
+  // webview when the runtime already holds the immersive session slot —
+  // observed on-device 2026-07-23. Never gate the button on an unsettled
+  // promise: race each probe against a short timeout and, on timeout, assume
+  // entry is possible. The click path's requestSession is the real arbiter —
+  // if it throws, that surfaces visibly rather than as a dead grey button.
+  const probe = (mode: SessionMode): Promise<boolean> =>
+    Promise.race([
+      navigator.xr?.isSessionSupported(mode).catch(() => false) ?? Promise.resolve(false),
+      new Promise<boolean>((resolve) => window.setTimeout(() => resolve(true), 1500)),
+    ]);
+  const arSupported = (await probe(SessionMode.ImmersiveAR)) === true;
+  const vrSupported = arSupported || (await probe(SessionMode.ImmersiveVR)) === true;
   const sessionMode = arSupported ? SessionMode.ImmersiveAR : SessionMode.ImmersiveVR;
   const xrSupported = vrSupported;
 
