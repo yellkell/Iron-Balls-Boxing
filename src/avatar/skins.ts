@@ -137,11 +137,11 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // TIDEBREAKER — never sold. Felling GOOPLIATH with a raid squad slicks the
   // deck bottle-green under bright gel piping, GOOPLIATH's pool surging across
   // it with wave crests, bubbles and hanging drips (arena.ts).
-  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x0d3f2b, slabGlow: 0.18, earnedBy: 'FELL RAID GOOPLIATH' },
+  { id: 'tidebreaker', name: 'TIDEBREAKER', neon: 0x5aff7a, slab: 0x0d3f2b, slabGlow: 0.14, earnedBy: 'FELL RAID GOOPLIATH' },
   // BLAZING — never sold. Clear any run or raid on the blazing breaker:
   // fire-red piping over scorched steel, wearing a burning rail, corner flame
   // crowns and airborne embers (arena.ts).
-  { id: 'blazing', name: 'BLAZING', neon: 0xff4a26, slab: 0x210605, slabGlow: 0.2, earnedBy: 'WIN ON BLAZING' },
+  { id: 'blazing', name: 'BLAZING', neon: 0xff4a26, slab: 0x210605, slabGlow: 0.15, earnedBy: 'WIN ON BLAZING' },
 ];
 
 /** How the OPPONENT looks when they haven't picked (bot bouts): team blue. */

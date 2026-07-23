@@ -287,7 +287,7 @@ export function makePlatform(color: number): Group {
   const outerMat = new MeshBasicMaterial({
     color: new Color(color).lerp(new Color(0xffffff), 0.45),
     transparent: true,
-    opacity: 0.96,
+    opacity: 0.82,
     side: DoubleSide,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -298,7 +298,7 @@ export function makePlatform(color: number): Group {
   const coreMat = new MeshBasicMaterial({
     color: 0xffc21a,
     transparent: true,
-    opacity: 0.98,
+    opacity: 0.88,
     side: DoubleSide,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -314,7 +314,7 @@ export function makePlatform(color: number): Group {
 
   const fireRailMat = outerMat.clone();
   fireRailMat.userData.role = 'neon-halo';
-  fireRailMat.opacity = 0.72;
+  fireRailMat.opacity = 0.42;
   const fireRail = new Mesh(new TorusGeometry(0.735, 0.027, 6, 56), fireRailMat);
   fireRail.rotation.x = Math.PI / 2;
   fireRail.position.y = DECK_TOP + 0.012;
@@ -327,6 +327,7 @@ export function makePlatform(color: number): Group {
   const jetCoreGeo = new ShapeGeometry(flameTongue(0.14));
   const jetCoreMat = coreMat.clone();
   OCTAGON_VERTICES.forEach(([x, z], i) => {
+    if (i % 2) return; // four deliberate corner crowns, not a picket fence
     const jet = new Group();
     jet.position.set(x * 0.94, DECK_TOP, z * 0.94);
     jet.rotation.y = Math.atan2(x, z);
@@ -340,17 +341,17 @@ export function makePlatform(color: number): Group {
   });
 
   const emberGeo = new SphereGeometry(0.014, 6, 4);
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    const radius = 0.5 + (i % 3) * 0.1;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const radius = 0.54 + (i % 2) * 0.1;
     const ember = new Mesh(emberGeo, i % 2 ? coreMat : outerMat);
     ember.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
     ember.userData.fxRole = 'blazing-ember';
-    ember.userData.fxPhase = i / 12;
+    ember.userData.fxPhase = i / 6;
     ember.userData.fxBaseY = ember.position.y;
     flame.add(ember);
   }
-  const fireLight = new PointLight(0xff5a24, 2.8, 2.6, 2);
+  const fireLight = new PointLight(0xff5a24, 1.8, 2.4, 2);
   fireLight.position.y = 0.14;
   fireLight.userData.fxRole = 'blazing-light';
   flame.add(fireLight);
@@ -373,7 +374,7 @@ export function makePlatform(color: number): Group {
   const gelMat = new MeshBasicMaterial({
     color: new Color(color).lerp(new Color(0xffffff), 0.45),
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.78,
     side: DoubleSide,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -388,7 +389,7 @@ export function makePlatform(color: number): Group {
   const poolMat = new MeshBasicMaterial({
     color: 0x24ff9a,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.18,
     side: DoubleSide,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -400,14 +401,14 @@ export function makePlatform(color: number): Group {
   pool.userData.fxRole = 'tide-pool';
   tide.add(pool);
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const ringMat = poolMat.clone();
-    ringMat.opacity = 0.5;
-    const ring = new Mesh(new TorusGeometry(0.31 + i * 0.13, 0.012, 5, 40), ringMat);
+    ringMat.opacity = 0.34;
+    const ring = new Mesh(new TorusGeometry(0.35 + i * 0.18, 0.011, 5, 40), ringMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = DECK_TOP + 0.011 + i * 0.002;
     ring.userData.fxRole = 'tide-ring';
-    ring.userData.fxPhase = i / 3;
+    ring.userData.fxPhase = i / 2;
     tide.add(ring);
   }
 
@@ -419,6 +420,7 @@ export function makePlatform(color: number): Group {
   wave.closePath();
   const waveGeo = new ShapeGeometry(wave);
   OCTAGON_VERTICES.forEach(([x, z], i) => {
+    if (i % 2) return; // four crests leave clean steel between the surges
     const crest = new Mesh(waveGeo, gelMat);
     crest.position.set(x * 0.93, DECK_TOP, z * 0.93);
     crest.rotation.y = Math.atan2(x, z);
@@ -428,15 +430,15 @@ export function makePlatform(color: number): Group {
   });
 
   const bubbleGeo = new SphereGeometry(0.022, 8, 6);
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2 + 0.2;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.2;
     const radius = 0.52 + (i % 2) * 0.16;
     const bubbleMat = gelMat.clone();
     bubbleMat.opacity = 0.58;
     const bubble = new Mesh(bubbleGeo, bubbleMat);
     bubble.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
     bubble.userData.fxRole = 'tide-bubble';
-    bubble.userData.fxPhase = i / 10;
+    bubble.userData.fxPhase = i / 5;
     bubble.userData.fxBaseY = bubble.position.y;
     tide.add(bubble);
   }
@@ -445,7 +447,7 @@ export function makePlatform(color: number): Group {
   // unmistakable profile even when the deck art is foreshortened.
   const dripGeo = new SphereGeometry(0.05, 8, 6);
   OCTAGON_VERTICES.forEach(([x, z], i) => {
-    if (i % 2) return;
+    if (i % 4) return; // two opposing drips are enough to carry the silhouette
     const drip = new Mesh(dripGeo, gelMat);
     drip.position.set(x * 0.9, -PLATFORM.thickness - 0.07, z * 0.9);
     drip.scale.set(0.65, 1.75 + i * 0.04, 0.65);
@@ -454,7 +456,7 @@ export function makePlatform(color: number): Group {
     drip.userData.fxBaseY = drip.position.y;
     tide.add(drip);
   });
-  const tideLight = new PointLight(0x35ff9a, 2.2, 2.4, 2);
+  const tideLight = new PointLight(0x35ff9a, 1.55, 2.2, 2);
   tideLight.position.y = 0.12;
   tideLight.userData.fxRole = 'tide-light';
   tide.add(tideLight);

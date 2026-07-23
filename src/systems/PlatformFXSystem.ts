@@ -17,66 +17,66 @@ export function animatePlatformFxNode(node: Object3D, t: number): void {
   switch (role) {
     case 'blazing-emblem':
     case 'blazing-emblem-core': {
-      const pulse = 1 + Math.sin(t * 3.4) * 0.035;
+      const pulse = 1 + Math.sin(t * 2.8) * 0.02;
       node.scale.set(pulse, pulse, 1);
       break;
     }
     case 'blazing-rail': {
-      node.rotation.z = t * 0.18;
+      node.rotation.z = t * 0.1;
       const mat = (node as Mesh).material as MeshBasicMaterial;
-      mat.opacity = 0.58 + Math.sin(t * 4.2) * 0.14;
+      mat.opacity = 0.34 + Math.sin(t * 3.2) * 0.06;
       break;
     }
     case 'blazing-jet': {
-      const lick = 0.82 + Math.sin(t * 5.6 + phase) * 0.18;
-      node.scale.set(0.9 + lick * 0.1, lick, 1);
+      const lick = 0.9 + Math.sin(t * 4.2 + phase) * 0.1;
+      node.scale.set(0.94 + lick * 0.06, lick, 1);
       break;
     }
     case 'blazing-ember': {
-      const rise = (t * 0.42 + phase) % 1;
-      node.position.y = (node.userData.fxBaseY as number) + rise * 0.38;
-      const size = Math.sin(rise * Math.PI) * 0.9 + 0.12;
+      const rise = (t * 0.3 + phase) % 1;
+      node.position.y = (node.userData.fxBaseY as number) + rise * 0.26;
+      const size = Math.sin(rise * Math.PI) * 0.65 + 0.12;
       node.scale.setScalar(size);
       break;
     }
     case 'blazing-light':
-      (node as PointLight).intensity = 2.5 + Math.sin(t * 4.6) * 0.55;
+      (node as PointLight).intensity = 1.65 + Math.sin(t * 3.8) * 0.2;
       break;
     case 'tide-emblem': {
-      const breathe = 1 + Math.sin(t * 2.1) * 0.045;
+      const breathe = 1 + Math.sin(t * 1.8) * 0.025;
       node.scale.set(breathe, breathe, 1);
       break;
     }
     case 'tide-pool': {
       const mat = (node as Mesh).material as MeshBasicMaterial;
-      mat.opacity = 0.23 + Math.sin(t * 1.9) * 0.07;
+      mat.opacity = 0.16 + Math.sin(t * 1.5) * 0.03;
       break;
     }
     case 'tide-ring': {
-      const wash = (t * 0.28 + phase) % 1;
-      const scale = 0.72 + wash * 0.5;
+      const wash = (t * 0.2 + phase) % 1;
+      const scale = 0.82 + wash * 0.3;
       node.scale.setScalar(scale);
       const mat = (node as Mesh).material as MeshBasicMaterial;
-      mat.opacity = (1 - wash) * 0.5;
+      mat.opacity = (1 - wash) * 0.34;
       break;
     }
     case 'tide-crest': {
-      const swell = 0.82 + Math.sin(t * 2.6 + phase) * 0.18;
+      const swell = 0.9 + Math.sin(t * 2 + phase) * 0.1;
       node.scale.y = swell;
       break;
     }
     case 'tide-bubble': {
-      const rise = (t * 0.24 + phase) % 1;
-      node.position.y = (node.userData.fxBaseY as number) + rise * 0.3;
-      const size = Math.sin(rise * Math.PI) * 0.7 + 0.25;
+      const rise = (t * 0.18 + phase) % 1;
+      node.position.y = (node.userData.fxBaseY as number) + rise * 0.22;
+      const size = Math.sin(rise * Math.PI) * 0.55 + 0.2;
       node.scale.setScalar(size);
       break;
     }
     case 'tide-drip':
-      node.position.y = (node.userData.fxBaseY as number) + Math.sin(t * 2.2 + phase) * 0.015;
+      node.position.y = (node.userData.fxBaseY as number) + Math.sin(t * 1.7 + phase) * 0.008;
       break;
     case 'tide-light':
-      (node as PointLight).intensity = 2.0 + Math.sin(t * 2.3) * 0.35;
+      (node as PointLight).intensity = 1.45 + Math.sin(t * 1.9) * 0.15;
       break;
   }
 }
