@@ -32,13 +32,6 @@ export function animatePlatformFxNode(node: Object3D, t: number): void {
       node.scale.set(0.94 + lick * 0.06, lick, 1);
       break;
     }
-    case 'blazing-ember': {
-      const rise = (t * 0.3 + phase) % 1;
-      node.position.y = (node.userData.fxBaseY as number) + rise * 0.26;
-      const size = Math.sin(rise * Math.PI) * 0.65 + 0.12;
-      node.scale.setScalar(size);
-      break;
-    }
     case 'blazing-light':
       (node as PointLight).intensity = 1.65 + Math.sin(t * 3.8) * 0.2;
       break;
@@ -63,13 +56,6 @@ export function animatePlatformFxNode(node: Object3D, t: number): void {
     case 'tide-crest': {
       const swell = 0.9 + Math.sin(t * 2 + phase) * 0.1;
       node.scale.y = swell;
-      break;
-    }
-    case 'tide-bubble': {
-      const rise = (t * 0.18 + phase) % 1;
-      node.position.y = (node.userData.fxBaseY as number) + rise * 0.22;
-      const size = Math.sin(rise * Math.PI) * 0.55 + 0.2;
-      node.scale.setScalar(size);
       break;
     }
     case 'tide-drip':

@@ -267,9 +267,9 @@ export function makePlatform(color: number): Group {
   group.add(grid);
 
   // BLAZING: not merely a flame decal. The earned pad carries a white-hot
-  // deck brand, a burning outer rail, eight animated flame crowns and sparks
-  // lifting off the steel. The low effects stay outside the standing area, so
-  // the silhouette reads as a trophy without filling the player's play space.
+  // deck brand, a burning outer rail and an animated flame crown at every
+  // outline point. The low effects stay outside the standing area, so the
+  // silhouette reads as a trophy without filling the player's play space.
   const flameTongue = (h: number): Shape => {
     const w = h * 0.62;
     const s = new Shape();
@@ -327,7 +327,6 @@ export function makePlatform(color: number): Group {
   const jetCoreGeo = new ShapeGeometry(flameTongue(0.14));
   const jetCoreMat = coreMat.clone();
   OCTAGON_VERTICES.forEach(([x, z], i) => {
-    if (i % 2) return; // four deliberate corner crowns, not a picket fence
     const jet = new Group();
     jet.position.set(x * 0.94, DECK_TOP, z * 0.94);
     jet.rotation.y = Math.atan2(x, z);
@@ -340,17 +339,6 @@ export function makePlatform(color: number): Group {
     flame.add(jet);
   });
 
-  const emberGeo = new SphereGeometry(0.014, 6, 4);
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const radius = 0.54 + (i % 2) * 0.1;
-    const ember = new Mesh(emberGeo, i % 2 ? coreMat : outerMat);
-    ember.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
-    ember.userData.fxRole = 'blazing-ember';
-    ember.userData.fxPhase = i / 6;
-    ember.userData.fxBaseY = ember.position.y;
-    flame.add(ember);
-  }
   const fireLight = new PointLight(0xff5a24, 1.8, 2.4, 2);
   fireLight.position.y = 0.14;
   fireLight.userData.fxRole = 'blazing-light';
@@ -358,9 +346,9 @@ export function makePlatform(color: number): Group {
   flame.visible = false;
   group.add(flame);
 
-  // TIDEBREAKER: a luminous pool, rolling wave crown, bubbles and hanging
-  // droplets. It should look as if GOOPLIATH is still alive beneath the slab,
-  // not like somebody painted a green raindrop on ordinary diamond plate.
+  // TIDEBREAKER: a luminous pool, a rolling crest at every outline point and
+  // hanging droplets. It should look as if GOOPLIATH is still alive beneath
+  // the slab, not like somebody painted a green raindrop on diamond plate.
   const D = 0.52;
   const gel = new Shape();
   gel.moveTo(0, D); // pinched crown
@@ -420,7 +408,6 @@ export function makePlatform(color: number): Group {
   wave.closePath();
   const waveGeo = new ShapeGeometry(wave);
   OCTAGON_VERTICES.forEach(([x, z], i) => {
-    if (i % 2) return; // four crests leave clean steel between the surges
     const crest = new Mesh(waveGeo, gelMat);
     crest.position.set(x * 0.93, DECK_TOP, z * 0.93);
     crest.rotation.y = Math.atan2(x, z);
@@ -428,20 +415,6 @@ export function makePlatform(color: number): Group {
     crest.userData.fxPhase = i * 0.73;
     tide.add(crest);
   });
-
-  const bubbleGeo = new SphereGeometry(0.022, 8, 6);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + 0.2;
-    const radius = 0.52 + (i % 2) * 0.16;
-    const bubbleMat = gelMat.clone();
-    bubbleMat.opacity = 0.58;
-    const bubble = new Mesh(bubbleGeo, bubbleMat);
-    bubble.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
-    bubble.userData.fxRole = 'tide-bubble';
-    bubble.userData.fxPhase = i / 5;
-    bubble.userData.fxBaseY = bubble.position.y;
-    tide.add(bubble);
-  }
 
   // Long luminous drops hang below alternate corners, giving the pad an
   // unmistakable profile even when the deck art is foreshortened.
