@@ -38,16 +38,16 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PlaneGeometry,
   Quaternion,
   RepeatWrapping,
   Vector3,
+  type Object3D,
 } from 'three';
 import type { XROrigin } from '@iwsdk/xr-input';
 import { ATTACH, BODY_IK, BOUNDARY, CURL, FIREBALL, NET, OCTAGON_VERTICES, PALETTE, teamColor } from '../../config.js';
 import { buildBoxer, solveTorso, type BoxerRig } from '../../avatar/boxer.js';
-import { applyAvatarSkin, platformSkin } from '../../avatar/skins.js';
+import { applyAvatarSkin, applyPlatformSkin, platformSkin, type PlatformSkin } from '../../avatar/skins.js';
 import { customization, myAvatarSkin } from '../../menu/customization.js';
 import {
   createFireVisual,
@@ -73,6 +73,7 @@ import { UI, fitStencilText, metalText, solidBar, stencilFont } from '../../ui/i
 import { countdownArt } from '../../ui/countdownArt.js';
 import { verdictArt } from '../../ui/verdictArt.js';
 import { drawContentPlate } from '../../ui/plateArt.js';
+import { animatePlatformFxNode } from '../../systems/PlatformFXSystem.js';
 import { teleportPlayer } from './TeleportSystem.js';
 
 const HANDS = ['left', 'right'] as const;
@@ -400,6 +401,9 @@ export class FightSystem extends createSystem({}) {
   private headOutside = false;
   /** 0.2 s drain-tick accumulator, same cadence as the arena guardian. */
   private drainTick = 0;
+  /** Animated nodes belonging to BLAZING/TIDEBREAKER on the two real arena
+   *  platforms. Cached once so the club adds no per-frame scene traversal. */
+  private platformFxNodes: Object3D[] = [];
 
   init(): void {
     preloadAnnouncer(); // decode 3/2/1/FIGHT so the countdown speaks like the arena
@@ -414,6 +418,11 @@ export class FightSystem extends createSystem({}) {
     this.bodyRig.torso.visible = false;
     applyAvatarSkin(this.bodyRig.torso, mySkin);
     pub.refs!.root.add(this.bodyRig.torso);
+    for (const platform of pub.refs!.fightPlatforms) {
+      platform.traverse((node) => {
+        if (node.userData?.fxRole) this.platformFxNodes.push(node);
+      });
+    }
 
     this.cleanupFuncs.push(
       bus.on('fight', (f) => this.onFight(f)),
@@ -544,19 +553,16 @@ export class FightSystem extends createSystem({}) {
     this.betSettled = false;
   }
 
-  private rimKey = '';
-  /** Each slab's native deck colour, captured before any skin re-tint. */
-  private slabBase: number[] = [];
+  private platformSkinKey = '';
 
   /**
-   * Dress each platform rim AND slab in its claimant's PLATFORM skin the moment
-   * a corner locks in (back to corner colours when it frees up) — your arena
-   * cosmetics follow you onto the fight-hall floor.
+   * Apply each claimant's complete PLATFORM skin to the same platform object
+   * used by the arena. This carries the real deck, rim, decals, ornaments and
+   * earned-pad effects into the club; an empty corner returns to its team tint.
    */
-  private dressRims(): void {
-    const rims = pub.refs?.fightRims;
-    const slabs = pub.refs?.fightSlabs;
-    if (!rims) return;
+  private dressPlatforms(): void {
+    const platforms = pub.refs?.fightPlatforms;
+    if (!platforms) return;
     const pfFor = (side: 0 | 1): string => {
       const id = pub.fight.sides[side];
       if (!id) return '';
@@ -564,25 +570,27 @@ export class FightSystem extends createSystem({}) {
       return pub.punters.get(id)?.pf ?? '';
     };
     const key = `${pfFor(0)}|${pfFor(1)}`;
-    if (key === this.rimKey) return;
-    this.rimKey = key;
+    if (key === this.platformSkinKey) return;
+    this.platformSkinKey = key;
     ([0, 1] as const).forEach((side) => {
       const pf = pfFor(side);
-      const skin = pf ? platformSkin(pf) : null;
-      const colour = skin ? skin.neon : teamColor(side);
-      const mat = rims[side].material as MeshStandardMaterial;
-      mat.color.setHex(colour);
-      mat.emissive.setHex(colour);
-      if (slabs) {
-        const sm = slabs[side].material as MeshStandardMaterial;
-        if (this.slabBase[side] === undefined) this.slabBase[side] = sm.color.getHex();
-        sm.emissive.setHex(colour);
-        // Premium pads carry an explicit deck tint (gold deck, XD black) — apply
-        // it so the arena's slab look follows the claimant in; otherwise keep the
-        // hall's native gunmetal deck.
-        sm.color.setHex(skin?.slab ?? this.slabBase[side]);
-      }
+      const skin: PlatformSkin = pf
+        ? platformSkin(pf)
+        : { id: '', name: '', neon: teamColor(side) };
+      applyPlatformSkin(platforms[side], skin);
     });
+  }
+
+  /** The arena's PlatformFXSystem is paused while the club is active, so the
+   *  pub fight system drives the exact same lightweight effect function. */
+  private animatePlatforms(): void {
+    for (const node of this.platformFxNodes) {
+      let visible = node.visible;
+      for (let parent = node.parent; visible && parent; parent = parent.parent) {
+        visible = parent.visible;
+      }
+      if (visible) animatePlatformFxNode(node, this.time);
+    }
   }
 
   /** Build the eight octagon-edge barrier walls once (local to a platform-sized
@@ -676,7 +684,8 @@ export class FightSystem extends createSystem({}) {
     this.camera.getWorldQuaternion(_camQ);
 
     this.checkConsoles();
-    this.dressRims();
+    this.dressPlatforms();
+    this.animatePlatforms();
     this.renderConsoles(); // cheap — the key guard skips the redraw unless it changed
     this.updateRimBarrier(delta); // my platform's guardian walls (forfeit warning)
 

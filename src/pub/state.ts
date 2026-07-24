@@ -63,11 +63,9 @@ export interface PubRefs {
   snakeStick: Group;
   /** The Octa Hunt all-time high-score poster on the wall beside the cabinet. */
   octaBoard: Panel;
-  /** Fight hall: each platform's glowing rim — re-skinned per claimant. */
-  fightRims: [Mesh, Mesh];
-  /** Fight hall: each platform's slab — its underglow follows the claimant's
-   *  chosen platform skin (alongside the rim). */
-  fightSlabs: [Mesh, Mesh];
+  /** Fight hall: the main arena's complete platform objects, fully re-skinned
+   *  per claimant (deck ornaments and earned-platform effects included). */
+  fightPlatforms: [Group, Group];
   /** Fight hall: claim console panels (side 0, side 1) + the big display. */
   consolePanels: [Panel, Panel];
   fightDisplay: Panel;
