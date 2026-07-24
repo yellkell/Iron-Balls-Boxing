@@ -52,6 +52,9 @@ interface PropRec {
   angVel: Vector3;
   /** Seconds left of the settle's upright ease (0 = standing straight). */
   uprighting: number;
+  /** Surface height beneath a glass while it eases upright. The mesh origin
+   *  rises temporarily so its tilted rim remains tangent to this plane. */
+  uprightSupportY: number;
   ring: { pos: Vector3; t: number }[];
   stuckTimer: number;
   fadeTimer: number;
@@ -86,6 +89,7 @@ const _rayOrigin = new Vector3();
 const _rayDir = new Vector3();
 const _toProp = new Vector3();
 const _q = new Quaternion();
+const _glassAxis = new Vector3();
 
 const recs: PropRec[] = [];
 const byId = new Map<number, PropRec>();
@@ -93,6 +97,48 @@ const byId = new Map<number, PropRec>();
 /** A glass's world-space footprint radius — the wider TOP of the taper, so the
  *  overlap check is conservative (no flared rims clipping a neighbour). */
 const GLASS_FOOT_R = GLASS.radiusTop * GLASS.scale;
+const GLASS_BODY_H = GLASS.height * GLASS.scale;
+const GLASS_TOP_R = GLASS.radiusTop * GLASS.scale;
+const GLASS_BOTTOM_R = GLASS.radiusBottom * GLASS.scale;
+
+interface AxisBounds {
+  min: number;
+  max: number;
+}
+
+const _glassBoundsX: AxisBounds = { min: 0, max: 0 };
+const _glassBoundsY: AxisBounds = { min: 0, max: 0 };
+const _glassBoundsZ: AxisBounds = { min: 0, max: 0 };
+const _glassPrevBoundsY: AxisBounds = { min: 0, max: 0 };
+
+/**
+ * Exact support bounds of the tapered glass along one world-space axis.
+ *
+ * The glass is a frustum from local y=0..height. Projecting either end circle
+ * onto an axis gives a linear function along the taper, so its extrema are at
+ * the bottom or top rim. This keeps the complete body outside a surface at any
+ * tumble angle without approximating it as an oversized sphere.
+ */
+function glassAxisBounds(
+  q: Quaternion,
+  nx: number,
+  ny: number,
+  nz: number,
+  out: AxisBounds,
+): AxisBounds {
+  _glassAxis.copy(UP).applyQuaternion(q);
+  const along = _glassAxis.x * nx + _glassAxis.y * ny + _glassAxis.z * nz;
+  const radial = Math.sqrt(Math.max(0, 1 - along * along));
+  out.min = Math.min(
+    -GLASS_BOTTOM_R * radial,
+    GLASS_BODY_H * along - GLASS_TOP_R * radial,
+  );
+  out.max = Math.max(
+    GLASS_BOTTOM_R * radial,
+    GLASS_BODY_H * along + GLASS_TOP_R * radial,
+  );
+  return out;
+}
 
 /** The y a glass standing at (x,z) rests at: a table/bar top if it's over one,
  *  else the floor. A simplified re-snap (no "falling from above" gating) —
@@ -167,6 +213,7 @@ function addProp(
     vel: new Vector3(),
     angVel: new Vector3(),
     uprighting: 0,
+    uprightSupportY: 0,
     ring: [],
     stuckTimer: 0,
     fadeTimer: 0,
@@ -342,8 +389,11 @@ export class PropSystem extends createSystem({
           // A freshly settled glass eases upright rather than snapping there.
           if (rec.uprighting > 0) {
             rec.mesh.quaternion.slerp(_identityQ, 1 - Math.exp(-PROP_PHYS.uprightEase * delta));
+            glassAxisBounds(rec.mesh.quaternion, 0, 1, 0, _glassBoundsY);
+            rec.mesh.position.y = rec.uprightSupportY - _glassBoundsY.min;
             if (rec.mesh.quaternion.angleTo(_identityQ) < 0.01) {
               rec.mesh.quaternion.identity();
+              rec.mesh.position.y = rec.uprightSupportY;
               rec.uprighting = 0;
             }
           }
@@ -642,44 +692,65 @@ export class PropSystem extends createSystem({
     }
 
     // --- pint glass: bounce around the room, then settle ---
-    const prevY = p.y;
+    glassAxisBounds(rec.mesh.quaternion, 0, 1, 0, _glassPrevBoundsY);
+    const prevBottomY = p.y + _glassPrevBoundsY.min;
     p.add(step);
 
-    // Walls.
-    const wx = PUB.halfWidth - 0.06;
-    const wz = PUB.halfDepth - 0.06;
-    if (p.x > wx || p.x < -wx) {
-      p.x = Math.max(-wx, Math.min(wx, p.x));
+    // Integrate the tumble BEFORE collision so the support bounds below use
+    // the glass's actual pose for this frame. Applying rotation afterwards let
+    // a rim rotate through the floor for one frame before being corrected.
+    const w = rec.angVel.length();
+    if (w > 1e-3) {
+      _spinQ.setFromAxisAngle(_a.copy(rec.angVel).divideScalar(w), w * delta);
+      rec.mesh.quaternion.premultiply(_spinQ);
+    }
+
+    // Full-body support bounds: walls and ceiling stop the rim/body, not just
+    // the base origin. These are exact for the tapered cylinder.
+    glassAxisBounds(rec.mesh.quaternion, 1, 0, 0, _glassBoundsX);
+    glassAxisBounds(rec.mesh.quaternion, 0, 1, 0, _glassBoundsY);
+    glassAxisBounds(rec.mesh.quaternion, 0, 0, 1, _glassBoundsZ);
+    const wx = PUB.halfWidth;
+    const wz = PUB.halfDepth;
+    if (p.x + _glassBoundsX.max > wx || p.x + _glassBoundsX.min < -wx) {
+      p.x = Math.max(-wx - _glassBoundsX.min, Math.min(wx - _glassBoundsX.max, p.x));
       rec.vel.x *= -PROP_PHYS.restitution;
       glassTap(true);
     }
-    if (p.z > wz || p.z < -wz) {
-      p.z = Math.max(-wz, Math.min(wz, p.z));
+    if (p.z + _glassBoundsZ.max > wz || p.z + _glassBoundsZ.min < -wz) {
+      p.z = Math.max(-wz - _glassBoundsZ.min, Math.min(wz - _glassBoundsZ.max, p.z));
       rec.vel.z *= -PROP_PHYS.restitution;
       glassTap(true);
     }
-    if (p.y > PUB.ceiling - 0.08) {
-      p.y = PUB.ceiling - 0.08;
+    if (p.y + _glassBoundsY.max > PUB.ceiling) {
+      p.y = PUB.ceiling - _glassBoundsY.max;
       rec.vel.y *= -PROP_PHYS.restitution;
       rec.angVel.multiplyScalar(PROP_PHYS.spinDamping);
     }
 
-    // Floor + table/bar tops (glass origin is its base).
+    // Floor + table/bar tops. Test the lowest point of the complete tilted
+    // frustum and lift the origin by exactly the penetration depth.
     if (rec.vel.y <= 0) {
       let landY: number | null = null;
+      const bottomY = p.y + _glassBoundsY.min;
       for (const s of SURFACES) {
-        if (p.x >= s.minX && p.x <= s.maxX && p.z >= s.minZ && p.z <= s.maxZ) {
-          if (prevY >= s.y - 0.01 && p.y <= s.y) landY = Math.max(landY ?? -1, s.y);
+        const overlaps =
+          p.x + _glassBoundsX.max >= s.minX &&
+          p.x + _glassBoundsX.min <= s.maxX &&
+          p.z + _glassBoundsZ.max >= s.minZ &&
+          p.z + _glassBoundsZ.min <= s.maxZ;
+        if (overlaps && prevBottomY >= s.y - 0.01 && bottomY <= s.y) {
+          landY = Math.max(landY ?? -1, s.y);
         }
       }
-      if (landY === null && p.y <= 0) landY = 0;
+      if (landY === null && bottomY <= 0) landY = 0;
       // Land on TOP of a resting glass we're dropping onto — that's how a pint
       // stacks. Nest on the highest one in the column so a glass piles onto the
       // top of a stack rather than passing through it to the table.
-      const stackTop = this.glassStackTopUnder(rec, prevY);
+      const stackTop = this.glassStackTopUnder(rec, prevBottomY, bottomY);
       if (stackTop !== null) landY = Math.max(landY ?? -1, stackTop);
       if (landY !== null) {
-        p.y = landY;
+        p.y = landY - _glassBoundsY.min;
         const speed = rec.vel.length();
         if (speed < PROP_PHYS.settleSpeed) {
           this.settleGlass(rec);
@@ -702,14 +773,6 @@ export class PropSystem extends createSystem({
           rec.angVel.multiplyScalar(f);
         }
       }
-    }
-
-    // Integrate the tumble: a real angular velocity carried from the throw,
-    // shed at each bounce — not the old per-frame velocity-coupled wobble.
-    const w = rec.angVel.length();
-    if (w > 1e-3) {
-      _spinQ.setFromAxisAngle(_a.copy(rec.angVel).divideScalar(w), w * delta);
-      rec.mesh.quaternion.premultiply(_spinQ);
     }
   }
 
@@ -767,6 +830,11 @@ export class PropSystem extends createSystem({
       p.z = resolved.z;
     }
     setRestCircle(`glass:${rec.id}`, p.x, p.y, p.z, GLASS_FOOT_R);
+    rec.uprightSupportY = p.y;
+    // Keep the current tilted pose tangent to its support while the rest-state
+    // easing begins. The origin returns to uprightSupportY as the glass rights.
+    glassAxisBounds(rec.mesh.quaternion, 0, 1, 0, _glassBoundsY);
+    p.y = rec.uprightSupportY - _glassBoundsY.min;
     // Glass-on-glass clinks; glass-on-surface gives a soft tap.
     if (stacked) glassClink();
     else glassTap(false);
@@ -779,7 +847,7 @@ export class PropSystem extends createSystem({
   /** Base height a falling glass should nest at if a resting glass sits in its
    *  column (within stackSnap XZ) and it's descending onto it — the highest
    *  such support, so it tops a tall stack. Null if there's nothing to stack on. */
-  private glassStackTopUnder(rec: PropRec, prevY: number): number | null {
+  private glassStackTopUnder(rec: PropRec, prevBottomY: number, bottomY: number): number | null {
     const p = rec.mesh.position;
     let best: number | null = null;
     for (const other of recs) {
@@ -790,7 +858,7 @@ export class PropSystem extends createSystem({
       const dz = op.z - p.z;
       if (dx * dx + dz * dz > GLASS.stackSnap * GLASS.stackSnap) continue;
       const top = op.y + GLASS.stackRise;
-      if (prevY >= top - 0.02 && p.y <= top && (best === null || top > best)) best = top;
+      if (prevBottomY >= top - 0.02 && bottomY <= top && (best === null || top > best)) best = top;
     }
     return best;
   }
@@ -886,7 +954,7 @@ export class PropSystem extends createSystem({
     pubSendRaw({
       t: 'settle',
       id: rec.id,
-      pos: [p.x, p.y, p.z] as Vec3T,
+      pos: [p.x, upright ? rec.uprightSupportY : p.y, p.z] as Vec3T,
       quat: [q.x, q.y, q.z, q.w] as QuatT,
     });
   }
