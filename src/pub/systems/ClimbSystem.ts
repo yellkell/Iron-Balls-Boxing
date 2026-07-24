@@ -44,6 +44,15 @@ export class ClimbSystem extends createSystem({}) {
   private fallVel = 0;
   private dbgTimer = 0;
 
+  /** Clear a latched wall/fall so vertical movement cannot cross experiences. */
+  resetMovement(): void {
+    this.active = null;
+    this.gripping.left = false;
+    this.gripping.right = false;
+    this.fallVel = 0;
+    this.dbgTimer = 0;
+  }
+
   update(delta: number): void {
     const player = this.player;
     if (!player) return;

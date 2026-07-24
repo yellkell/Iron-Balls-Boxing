@@ -413,7 +413,7 @@ export class FightSystem extends createSystem({}) {
     this.bodyRig.torso.name = 'pub-fighter-torso';
     this.bodyRig.torso.visible = false;
     applyAvatarSkin(this.bodyRig.torso, mySkin);
-    this.scene.add(this.bodyRig.torso);
+    pub.refs!.root.add(this.bodyRig.torso);
 
     this.cleanupFuncs.push(
       bus.on('fight', (f) => this.onFight(f)),
@@ -623,7 +623,7 @@ export class FightSystem extends createSystem({}) {
       group.add(mesh);
       this.rimEdges.push({ ax, az, nx, nz, mat, glow: 0 });
     }
-    this.scene.add(group);
+    pub.refs!.root.add(group);
     this.rimGroup = group;
   }
 
@@ -723,7 +723,7 @@ export class FightSystem extends createSystem({}) {
     for (const [id, balls] of this.remoteBalls) {
       if (f.phase === 'idle' || !f.sides.includes(id)) {
         for (const b of balls) b.visual.dispose();
-        for (const b of balls) this.scene.remove(b.visual.group);
+        for (const b of balls) pub.refs!.root.remove(b.visual.group);
         this.remoteBalls.delete(id);
         this.dropRemoteShards(id);
         continue;
@@ -1093,7 +1093,7 @@ export class FightSystem extends createSystem({}) {
     const team = this.teamFor(pub.myId); // a fighter's own fire is always ember
     const mk = (hand: Hand): LocalBall => {
       const visual = createFireVisual(team);
-      this.scene.add(visual.group);
+      pub.refs!.root.add(visual.group);
       this.handPose(hand);
       return {
         state: HOVER,
@@ -1124,7 +1124,7 @@ export class FightSystem extends createSystem({}) {
     this.clearMyShards();
     if (!this.myBalls) return;
     for (const b of this.myBalls) {
-      this.scene.remove(b.visual.group);
+      pub.refs!.root.remove(b.visual.group);
       b.visual.dispose();
     }
     this.myBalls = null;
@@ -1134,7 +1134,7 @@ export class FightSystem extends createSystem({}) {
     const shards = this.remoteShards.get(id);
     if (!shards) return;
     for (const g of shards) {
-      this.scene.remove(g.visual.group);
+      pub.refs!.root.remove(g.visual.group);
       g.visual.dispose();
     }
     this.remoteShards.delete(id);
@@ -1182,7 +1182,7 @@ export class FightSystem extends createSystem({}) {
         const visual = createFireVisual(team);
         visual.group.scale.setScalar(ATTACH.splitSize);
         visual.group.position.copy(ball.pos);
-        this.scene.add(visual.group);
+        pub.refs!.root.add(visual.group);
         this.myShards.push({ visual, pos: ball.pos.clone(), hand, shardIndex: i, heat: 0.8, trailAcc: 0 });
       }
       return;
@@ -1254,7 +1254,7 @@ export class FightSystem extends createSystem({}) {
       this.handPose(s.hand);
       const dist = alive ? this.homeToward(s.pos, _grip, true, s.shardIndex, delta) : 0;
       if (!alive || dist <= FIREBALL.catchRadius) {
-        this.scene.remove(s.visual.group);
+        pub.refs!.root.remove(s.visual.group);
         s.visual.dispose();
         this.myShards.splice(i, 1);
         continue;
@@ -1266,7 +1266,7 @@ export class FightSystem extends createSystem({}) {
 
   private clearMyShards(): void {
     for (const s of this.myShards) {
-      this.scene.remove(s.visual.group);
+      pub.refs!.root.remove(s.visual.group);
       s.visual.dispose();
     }
     this.myShards.length = 0;
@@ -1646,7 +1646,7 @@ export class FightSystem extends createSystem({}) {
       const team = this.teamFor(from);
       const mk = (): RemoteBall => {
         const visual = createFireVisual(team);
-        this.scene.add(visual.group);
+        pub.refs!.root.add(visual.group);
         return {
           visual,
           target: new Vector3(),
@@ -1710,7 +1710,7 @@ export class FightSystem extends createSystem({}) {
     const balls = this.remoteBalls.get(id);
     if (!balls) return;
     for (const b of balls) {
-      this.scene.remove(b.visual.group);
+      pub.refs!.root.remove(b.visual.group);
       b.visual.dispose();
     }
     this.remoteBalls.delete(id);
@@ -1733,12 +1733,12 @@ export class FightSystem extends createSystem({}) {
     while (list.length < shards.length) {
       const visual = createFireVisual(team);
       visual.group.scale.setScalar(ATTACH.splitSize);
-      this.scene.add(visual.group);
+      pub.refs!.root.add(visual.group);
       list.push({ visual, pos: new Vector3(), heat: 0.8, trailAcc: 0, hitCooldown: 0 });
     }
     while (list.length > shards.length) {
       const g = list.pop()!;
-      this.scene.remove(g.visual.group);
+      pub.refs!.root.remove(g.visual.group);
       g.visual.dispose();
     }
     for (let i = 0; i < shards.length; i++) {
@@ -1900,7 +1900,7 @@ export class FightSystem extends createSystem({}) {
       // Wide plate echoing quick match's layout: YOU (left) + clock + RIVAL
       // (right) side by side, hung behind the opponent.
       this.matchBoard = new Panel(3.4, 1.05);
-      this.scene.add(this.matchBoard.mesh);
+      pub.refs!.root.add(this.matchBoard.mesh);
       this.boardSide = -1;
     }
     this.matchBoard.mesh.visible = true;

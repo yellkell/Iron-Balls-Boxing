@@ -92,6 +92,7 @@ function roundedPuck(radius: number, height: number, fillet = 0.025): LatheGeome
 export function buildPub(world: World): PubRefs {
   const root = new Group();
   root.name = 'iron-balls-pub';
+  const rootEntity = world.createTransformEntity(root, { persistent: true });
 
   const W = PUB.halfWidth;
   const D = PUB.halfDepth;
@@ -99,8 +100,8 @@ export function buildPub(world: World): PubRefs {
 
   // Warm dim base light: amber from the lamps below, cold steel from above.
   world.scene.background = new Color(0x0c0d11);
-  const env = world.createTransformEntity(undefined, { persistent: true });
-  env.addComponent(IBLGradient, {
+  const environmentEntity = world.createTransformEntity(undefined, { persistent: true });
+  environmentEntity.addComponent(IBLGradient, {
     sky: rgba(0x4a5160),
     equator: rgba(0x8a7a60),
     ground: rgba(0x6e4a26),
@@ -694,6 +695,8 @@ export function buildPub(world: World): PubRefs {
 
   const refs: PubRefs = {
     root,
+    rootEntity,
+    environmentEntity,
     dartboard,
     corkSurround,
     dartCatchers: [northWall],
@@ -745,7 +748,6 @@ export function buildPub(world: World): PubRefs {
   }
   collapseStatic(root, (o) => keep.has(o));
 
-  world.scene.add(root);
   return refs;
 }
 

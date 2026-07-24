@@ -12,6 +12,8 @@
 
 import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { installCrashTrap } from './debug/crashTrap.js';
+import { installClubExperienceManager } from './experience/ClubExperienceManager.js';
+import { requestArenaReturn, requestClubEntry } from './experience/clubNavigation.js';
 import { initLeaderboard } from './net/leaderboard.js';
 import { initGazette } from './net/gazette.js';
 import { enterMenuMusic } from './audio/menuMusic.js';
@@ -42,6 +44,7 @@ import { PlayerGestureSystem } from './systems/PlayerGestureSystem.js';
 import { FXSystem } from './systems/FXSystem.js';
 import { DesertSystem } from './systems/DesertSystem.js';
 import { PlatformFXSystem } from './systems/PlatformFXSystem.js';
+import { pubUrl } from './config.js';
 
 installCrashTrap(); // headset playtests have no console — trap + persist crashes
 
@@ -66,10 +69,12 @@ World.create(container, {
     sessionMode: SessionMode.ImmersiveAR,
     offer: 'none',
   },
-  // A stationary dodge game: no locomotion (you stay on your platform), no
-  // grab system (the fireballs are bonded to your fists, not grabbed).
+  // A stationary dodge game: no locomotion (you stay on your platform).
+  // Grabbing stays registered for the lazily loaded club.
   features: {
-    grabbing: false,
+    // Registered once for the shared app shell. The arena has no grabbable
+    // entities, while the lazily mounted club uses it for pints and darts.
+    grabbing: true,
     locomotion: false,
     spatialUI: false,
   },
@@ -83,6 +88,12 @@ World.create(container, {
     camera: { position: [0, 1.6, 0] },
   },
 }).then(async (world) => {
+  // IWSDK infrastructure already present before either experience is built.
+  // The transition manager uses these baselines to hide arena-owned nodes
+  // without ever hiding the camera, XR origin or controller spaces.
+  const sceneBaseline = new Set(world.scene.children);
+  const levelBaseline = new Set(world.getActiveRoot().children);
+
   // Quest's default maximum fixed foveation (super-three's WebXRManager ships
   // foveation = 1.0) renders the display edges at lower resolution, and the
   // boundary between foveation regions shows up as a head-locked dark band on
@@ -130,6 +141,59 @@ World.create(container, {
   world.registerSystem(PlatformFXSystem);
   // The optional papercraft desert backdrop (off = bare AR passthrough).
   world.registerSystem(DesertSystem);
+
+  const arenaSystems = [
+    world.getSystem(PlayerBodySystem)!,
+    world.getSystem(BotSystem)!,
+    world.getSystem(NetworkSystem)!,
+    world.getSystem(MeshSystem)!,
+    world.getSystem(OpponentSystem)!,
+    world.getSystem(TrainingSystem)!,
+    world.getSystem(CampaignSystem)!,
+    world.getSystem(TutorialSystem)!,
+    world.getSystem(FireballSystem)!,
+    world.getSystem(CollisionSystem)!,
+    world.getSystem(BoundarySystem)!,
+    world.getSystem(GameStateSystem)!,
+    world.getSystem(CountdownSystem)!,
+    world.getSystem(MenuSystem)!,
+    world.getSystem(PromotionSystem)!,
+    world.getSystem(PlayerFeedbackSystem)!,
+    world.getSystem(PlayerGloveSystem)!,
+    world.getSystem(PlayerGestureSystem)!,
+    world.getSystem(PlatformFXSystem)!,
+    world.getSystem(DesertSystem)!,
+  ];
+  installClubExperienceManager(world, arenaSystems, {
+    scene: sceneBaseline,
+    level: levelBaseline,
+  });
+
+  // Desktop-only transition harness for repeatable production-build smoke
+  // tests. It is absent from normal URLs and never changes the headset UI.
+  if (new URLSearchParams(location.search).get('clubtest') === '1') {
+    const controls = document.createElement('aside');
+    controls.setAttribute('aria-label', 'Club transition test');
+    controls.style.cssText =
+      'position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;gap:8px;' +
+      'padding:10px;background:#090b10;color:white;font:700 14px system-ui;border:1px solid #ff7a18';
+    const status = document.createElement('output');
+    status.textContent = 'arena';
+    const enter = document.createElement('button');
+    enter.textContent = 'Test Enter Club';
+    enter.addEventListener('click', () => {
+      document.body.classList.add('app-entered');
+      requestClubEntry(world, pubUrl());
+    });
+    const leave = document.createElement('button');
+    leave.textContent = 'Test Return Arena';
+    leave.addEventListener('click', () => requestArenaReturn(world));
+    window.addEventListener('ibb:location', ((event: CustomEvent<string>) => {
+      status.textContent = event.detail;
+    }) as EventListener);
+    controls.append(enter, leave, status);
+    document.body.append(controls);
+  }
 
   // Passthrough AR when the device offers it; otherwise fall back to plain
   // immersive VR — the desert backdrop paints the world in, so nothing is

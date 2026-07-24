@@ -66,6 +66,16 @@ export class MusicSystem extends createSystem({}) {
   /** Set by the last render: does the main line overflow (and so scroll)? */
   private marqueeScrolls = false;
 
+  /** Silence every jukebox element when the shared app returns to the arena. */
+  leaveClub(): void {
+    for (const audio of this.audios) audio?.pause();
+    this.station = -1;
+    this.pendingPlay = false;
+    this.ended = false;
+    this.setLit(false);
+    this.drawMarquee();
+  }
+
   init(): void {
     // The room (or another punter) chose a station: switch to match.
     this.cleanupFuncs.push(

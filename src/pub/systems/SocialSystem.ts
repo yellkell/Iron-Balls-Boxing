@@ -54,7 +54,7 @@ export class SocialSystem extends createSystem({}) {
     this.panel = new Panel(PANEL_W, PANEL_H, PX);
     this.panel.mesh.visible = false;
     this.panel.mesh.rotation.order = 'YXZ';
-    this.scene.add(this.panel.mesh);
+    pub.refs!.root.add(this.panel.mesh);
   }
 
   update(): void {

@@ -145,14 +145,15 @@ function addProp(
   active: boolean,
   place: (mesh: Group) => void,
 ): void {
+  const refs = pub.refs!;
   place(mesh);
   // Darts begin tucked in the box, so they start HIDDEN (the crate reads
   // "GRAB DARTS"); the update loop reveals one the moment it leaves the box.
   // Inactive glasses stay VISIBLE — empties stocked under the counter — just
   // ungrabbable until the barkeep brings them out.
   mesh.visible = kind === 'dart' ? false : active || kind === 'glass';
-  world.scene.add(mesh);
-  const entity = world.createTransformEntity(mesh);
+  refs.root.add(mesh);
+  const entity = world.createTransformEntity(mesh, { parent: refs.rootEntity });
   // Inactive glasses get their grab handle only when they come out — the
   // invisible grab proxy would otherwise let you grab thin air.
   if (active) entity.addComponent(OneHandGrabbable, { rotate: true });
@@ -199,6 +200,20 @@ export class PropSystem extends createSystem({
   /** Eased glow on the dart-crate walls while a hand can pull a dart (0..1). */
   private dartGlow = 0;
 
+  /** Detach anything held from a controller before the club root is hidden. */
+  leaveClub(): void {
+    this.highlight(null);
+    this.pendingGlasses.length = 0;
+    this.fills.length = 0;
+    for (const rec of recs) {
+      if (rec.mesh.parent !== pub.refs!.root) pub.refs!.root.attach(rec.mesh);
+      if (rec.entity.hasComponent(Grabbed)) rec.entity.removeComponent(Grabbed);
+      rec.manualHand = null;
+      rec.ring.length = 0;
+      if (rec.mode === 'held' || rec.mode === 'flight') rec.mode = 'remote';
+    }
+  }
+
   init(): void {
     this.queries.grabbedProps.subscribers.qualify.add((e: Entity) => this.onGrab(e));
     this.queries.grabbedProps.subscribers.disqualify.add((e: Entity) => this.onRelease(e));
@@ -219,7 +234,7 @@ export class PropSystem extends createSystem({
         if (holder === pub.myId) return; // our own grant echoing back
         // Someone else has it — including the case where we optimistically
         // grabbed and lost the race: yield and let the network drive it.
-        if (rec.mesh.parent !== this.scene) this.scene.attach(rec.mesh);
+        if (rec.mesh.parent !== pub.refs!.root) pub.refs!.root.attach(rec.mesh);
         rec.manualHand = null;
         if (rec.kind === 'glass') clearRestCircle(`glass:${rec.id}`); // no longer resting
         rec.mode = 'remote';
@@ -244,7 +259,7 @@ export class PropSystem extends createSystem({
         if (rec.mode === 'held' || rec.mode === 'flight' || rec.mode === 'stuck') {
           // Our optimistic local sim was overruled (rare) — server wins.
         }
-        if (rec.mesh.parent !== this.scene) this.scene.attach(rec.mesh);
+        if (rec.mesh.parent !== pub.refs!.root) pub.refs!.root.attach(rec.mesh);
         rec.manualHand = null;
         rec.mode = 'rest';
         rec.hasNetTarget = false;
@@ -581,7 +596,7 @@ export class PropSystem extends createSystem({
   private releaseHeld(rec: PropRec): void {
     // If the grab system reparented the mesh to a hand, put it back in the
     // scene without moving it.
-    if (rec.mesh.parent !== this.scene) this.scene.attach(rec.mesh);
+    if (rec.mesh.parent !== pub.refs!.root) pub.refs!.root.attach(rec.mesh);
 
     if (rec.ring.length >= 2) {
       const first = rec.ring[0];

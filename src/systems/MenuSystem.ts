@@ -114,6 +114,7 @@ import {
 import { gazette, markGazetteRead, refreshGazette } from '../net/gazette.js';
 import { hueToColor, pubUrl, teamColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
+import { requestClubEntry } from '../experience/clubNavigation.js';
 
 const _origin = new Vector3();
 const _dir = new Vector3();
@@ -1046,16 +1047,10 @@ export class MenuSystem extends createSystem({}) {
     setAvatarSkin(id); // applyOwnSkins repaints the rig + mirror next frame
   }
 
-  /** Leave for the pub page. Navigating WHILE an immersive session is live
-   *  hangs the browser, so end the XR session first, then hop pages. */
+  /** Walk into the club without leaving the active XR document. The navigation
+   *  bridge falls back to the standalone pub page when no shared shell exists. */
   private gotoPub(): void {
-    const go = (): void => window.location.assign(pubUrl());
-    const session = this.world.session as XRSession | undefined;
-    if (session) {
-      void Promise.resolve(session.end()).then(go, go);
-    } else {
-      go();
-    }
+    requestClubEntry(this.world, pubUrl());
   }
 
   // --- customisation: the avatar mirror + live skin application ---------------

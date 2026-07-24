@@ -5,6 +5,7 @@
  */
 
 import type { Group, Mesh, MeshStandardMaterial, Object3D } from 'three';
+import type { Entity } from '@iwsdk/core';
 import type { BoxerRig } from '../avatar/boxer.js';
 import type { BoardRow, DiscordMsg, FightNet, PoseTuple, PropNet, PubEvent, SnakeHi, SnakeScore } from './protocol.js';
 import type { Panel } from './panel.js';
@@ -37,6 +38,11 @@ export interface RemotePunter {
 /** Scene references built by environment.ts, consumed by the systems. */
 export interface PubRefs {
   root: Group;
+  /** ECS owner for the entire club subtree, allowing one visibility switch to
+   *  hide every club object without touching the persistent XR rig. */
+  rootEntity: Entity;
+  /** The pub's optional IBL source. Kept so an embedded visit can re-arm it. */
+  environmentEntity: Entity;
   dartboard: Mesh;
   corkSurround: Mesh;
   /** Extra dart-stick targets (walls/cabinet) so strays embed somewhere. */
