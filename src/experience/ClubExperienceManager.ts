@@ -135,7 +135,7 @@ export function installClubExperienceManager(
     if (transitioning || location !== 'club') return;
     transitioning = true;
     if (showOverlay) {
-      overlay.show('RETURNING TO THE ARENA', 'Resetting your corner');
+      overlay.show();
       await nextRenderFrame(world);
     }
 
@@ -162,7 +162,7 @@ export function installClubExperienceManager(
   const enterClub = async (): Promise<void> => {
     if (transitioning || location !== 'arena') return;
     transitioning = true;
-    overlay.show('OPENING THE CLUB', 'Keeping your headset session alive');
+    overlay.show();
     await nextRenderFrame(world);
 
     captureRenderState();
@@ -173,12 +173,12 @@ export function installClubExperienceManager(
     world.renderer.setClearColor(0x07080b, 1);
 
     try {
-      overlay.update('OPENING THE CLUB', 'Loading the room');
+      overlay.update();
       const { mountPubExperience } = await import('../pub/experience.js');
       pubExperience ??= mountPubExperience(world);
       await nextRenderFrame(world);
 
-      overlay.update('OPENING THE CLUB', 'Connecting to the club server');
+      overlay.update();
       pubExperience.enter();
       location = 'club';
       window.dispatchEvent(new CustomEvent('ibb:location', { detail: location }));
@@ -196,7 +196,7 @@ export function installClubExperienceManager(
       teleportPlayer(world.player, 0, 0, 0);
       resumeArena();
       window.dispatchEvent(new CustomEvent('ibb:location', { detail: 'arena' }));
-      overlay.update('CLUB FAILED TO OPEN', 'Back in the arena');
+      overlay.update();
       await nextRenderFrame(world);
       overlay.hide();
     } finally {

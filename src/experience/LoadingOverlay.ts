@@ -17,8 +17,6 @@ export class LoadingOverlay {
   private readonly canvas = document.createElement('canvas');
   private readonly texture: CanvasTexture;
   private readonly logo = new Image();
-  private title = 'OPENING THE CLUB';
-  private detail = 'Hold tight';
   private phase = 0;
 
   constructor(camera: PerspectiveCamera) {
@@ -61,17 +59,13 @@ export class LoadingOverlay {
     this.draw();
   }
 
-  show(title: string, detail: string): void {
-    this.title = title;
-    this.detail = detail;
+  show(): void {
     this.phase = 0;
     this.draw();
     this.root.visible = true;
   }
 
-  update(title: string, detail: string): void {
-    this.title = title;
-    this.detail = detail;
+  update(): void {
     // Advance on real loading milestones instead of uploading a large canvas
     // texture every frame; the screen stays lively without taxing Quest.
     this.phase = (this.phase + 4) % 12;
@@ -100,14 +94,6 @@ export class LoadingOverlay {
     ctx.lineTo(x, y + height - cut);
     ctx.lineTo(x, y + cut);
     ctx.closePath();
-  }
-
-  private fitTitle(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): void {
-    let size = 62;
-    do {
-      ctx.font = `900 ${size}px 'Arial Black', system-ui, sans-serif`;
-      size -= 2;
-    } while (size > 38 && ctx.measureText(text).width > maxWidth);
   }
 
   private drawLogo(ctx: CanvasRenderingContext2D): void {
@@ -179,11 +165,8 @@ export class LoadingOverlay {
 
     ctx.fillStyle = '#ff7a18';
     ctx.fillRect(44, 42, 92, 5);
-    ctx.fillStyle = 'rgba(215,221,231,0.68)';
-    ctx.font = "700 19px system-ui, sans-serif";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('FIRE FIGHT  /  TRANSIT', 154, 45);
 
     this.drawLogo(ctx);
 
@@ -194,23 +177,14 @@ export class LoadingOverlay {
     ctx.lineTo(438, 438);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255,122,24,0.72)';
-    ctx.font = "800 20px system-ui, sans-serif";
-    ctx.fillText('DESTINATION CHANGE', 486, 158);
-
-    this.fitTitle(ctx, this.title, 690);
+    ctx.font = "900 72px 'Arial Black', system-ui, sans-serif";
     ctx.fillStyle = '#f4f6fa';
     ctx.shadowColor = 'rgba(255,74,24,0.72)';
     ctx.shadowBlur = 18;
-    ctx.fillText(this.title, 486, 252);
-
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#aeb6c2';
-    ctx.font = "600 30px system-ui, sans-serif";
-    ctx.fillText(this.detail, 486, 326);
+    ctx.fillText('LOADING', 486, 278);
 
     const barX = 486;
-    const barY = 390;
+    const barY = 350;
     const segmentWidth = 47;
     const gap = 9;
     for (let i = 0; i < 12; i++) {
@@ -224,18 +198,6 @@ export class LoadingOverlay {
       ctx.fill();
     }
     ctx.shadowBlur = 0;
-
-    ctx.fillStyle = 'rgba(215,221,231,0.48)';
-    ctx.font = "700 18px system-ui, sans-serif";
-    ctx.fillText('SAME SESSION  •  NEW ROOM', 486, 454);
-
-    ctx.fillStyle = 'rgba(255,122,24,0.65)';
-    ctx.fillRect(44, h - 70, w - 88, 2);
-    ctx.fillStyle = 'rgba(174,182,194,0.46)';
-    ctx.font = "600 17px system-ui, sans-serif";
-    ctx.fillText('KEEP YOUR HEADSET ON', 44, h - 43);
-    ctx.textAlign = 'right';
-    ctx.fillText('IRON BALLS BOXING', w - 44, h - 43);
 
     this.texture.needsUpdate = true;
   }
