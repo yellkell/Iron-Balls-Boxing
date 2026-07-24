@@ -59,6 +59,7 @@ function hideLanding(): void {
 
 function showLanding(): void {
   document.body.classList.remove('app-entered');
+  if (enterVrButton) enterVrButton.textContent = app.environment === 'ar' ? 'Enter AR' : 'Enter VR';
   enterVrButton?.removeAttribute('disabled');
 }
 
@@ -66,7 +67,7 @@ World.create(container, {
   // The landing button calls IWSDK's explicit WebXR launcher from the user's
   // tap. Quest Browser needs that direct requestSession gesture path.
   xr: {
-    sessionMode: SessionMode.ImmersiveAR,
+    sessionMode: SessionMode.ImmersiveVR,
     offer: 'none',
   },
   // A stationary dodge game: no locomotion (you stay on your platform).
@@ -195,17 +196,13 @@ World.create(container, {
     document.body.append(controls);
   }
 
-  // Passthrough AR when the device offers it; otherwise fall back to plain
-  // immersive VR — the desert backdrop paints the world in, so nothing is
-  // lost but the passthrough novelty. Without this fallback a VR-only
-  // context (some packaged-app webviews, older headsets) left the button
-  // dead on "XR unavailable" — a player stuck at the landing page forever
-  // (Meta review VRC.Quest.Functional.3, 2026-07).
+  // Opaque arenas launch in immersive VR. Running a painted-in world through
+  // Quest's AR compositor exposes grey reprojection strips at the eye edges
+  // during quick head turns. Immersive AR is reserved for the one setting
+  // that actually needs it: real-room passthrough.
   const arSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
-  const vrSupported =
-    arSupported || (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
-  const sessionMode = arSupported ? SessionMode.ImmersiveAR : SessionMode.ImmersiveVR;
-  const xrSupported = vrSupported;
+  const vrSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
+  const xrSupported = arSupported || vrSupported;
 
   const startXR = () => {
     enterVrButton?.setAttribute('disabled', '');
@@ -217,9 +214,15 @@ World.create(container, {
       ensureAudio();
       preloadTutorVoice();
     }
-    // No passthrough in a plain-VR session: a saved 'ar' backdrop would
-    // render as a black void, so promote it to the desert.
-    if (!arSupported && app.environment === 'ar') app.environment = 'desert';
+    const sessionMode =
+      app.environment === 'ar' && arSupported
+        ? SessionMode.ImmersiveAR
+        : vrSupported
+          ? SessionMode.ImmersiveVR
+          : SessionMode.ImmersiveAR;
+    // No passthrough in a plain-VR fallback: a saved AR backdrop would render
+    // as a black void, so promote it to the desert.
+    if (sessionMode === SessionMode.ImmersiveVR && app.environment === 'ar') app.environment = 'desert';
     launchXR(world, { sessionMode });
 
     const watchForSession = () => {
@@ -241,6 +244,7 @@ World.create(container, {
   };
 
   if (enterVrButton && xrSupported) {
+    enterVrButton.textContent = app.environment === 'ar' ? 'Enter AR' : 'Enter VR';
     enterVrButton.removeAttribute('disabled');
     enterVrButton.addEventListener('click', startXR);
   } else if (enterVrButton) {

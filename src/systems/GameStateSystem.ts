@@ -4,9 +4,9 @@
  *
  * Two authorities live here:
  *  - the classic DUEL (1v1) — a round ends when a boxer's Health hits 0 (KO) or
- *    the timer expires (higher Health wins); first to MATCH.winTarget round
- *    wins takes it. ONLINE the HOST (side 0) runs this and echoes `state`; the
- *    GUEST applies the echoes. This path is unchanged.
+ *    the timer expires (higher Health wins); Quick Match is first to 2 (BO3)
+ *    while Ranked/private is first to 3 (BO5). ONLINE the HOST (side 0) runs
+ *    this and echoes `state`; the GUEST applies the echoes.
  *  - the ARCADE brawls (2v2 / FFA) — a team survival rule: a round ends when
  *    only one team has anyone left standing (or the timer expires, top team
  *    health wins), that team banks the round, first team to winTarget wins.
@@ -354,7 +354,7 @@ export class GameStateSystem extends createSystem({
       match.resultTimer -= delta;
       if (match.resultTimer <= 0) {
         if (match.phase === 'roundOver') {
-          if (match.myScore >= MATCH.winTarget || match.oppScore >= MATCH.winTarget) {
+          if (match.myScore >= app.duelWinTarget || match.oppScore >= app.duelWinTarget) {
             this.toMatchOver();
           } else {
             match.round += 1;
@@ -380,7 +380,7 @@ export class GameStateSystem extends createSystem({
   private endRound(outcome: RoundOutcome, result: RoundResult): void {
     if (outcome === 'win') match.myScore += 1;
     else if (outcome === 'loss') match.oppScore += 1;
-    if (match.myScore >= MATCH.winTarget || match.oppScore >= MATCH.winTarget) {
+    if (match.myScore >= app.duelWinTarget || match.oppScore >= app.duelWinTarget) {
       this.toMatchOver();
       return;
     }

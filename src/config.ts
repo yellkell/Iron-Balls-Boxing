@@ -619,7 +619,8 @@ export const BOSS_STUN = { hits: 5, decayPerSec: 1.2, duration: 2.6 };
 export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round
   roundTime: 60, // seconds per round
-  winTarget: 3, // first to N round wins takes the match
+  winTarget: 3, // ranked/private: first to 3 = best of 5
+  quickWinTarget: 2, // quick match: first to 2 = best of 3
   winTargetFfa: 2, // FFA only: a four-way scramble at first-to-3 drags — 2 crowns it
   roundOverDelay: 5, // breather between rounds before the next round's countdown
   roundCountdown: 3, // the 3-2-1 that opens every round AFTER the first

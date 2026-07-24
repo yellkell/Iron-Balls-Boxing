@@ -1,4 +1,4 @@
-import { IBLGradient, type World } from '@iwsdk/core';
+import type { World } from '@iwsdk/core';
 import { Color } from 'three';
 import { customization } from '../menu/customization.js';
 import { FXSystem } from '../systems/FXSystem.js';
@@ -127,8 +127,11 @@ export function mountPubExperience(world: World): PubExperience {
       pub.refs!.root.visible = true;
       world.scene.background = PUB_BACKGROUND;
       world.renderer.setClearColor(PUB_BACKGROUND, 1);
-      world.scene.environmentIntensity = 0.55;
-      pub.refs!.environmentEntity.setValue(IBLGradient, '_needsUpdate', true);
+      // Match the standalone club: its warm/cold fixtures light the room
+      // directly. The arena's studio PMREM made the embedded room look washed
+      // out, so it is isolated for the visit and restored by the manager.
+      world.scene.environment = null;
+      world.scene.environmentIntensity = 1;
 
       climb.resetMovement();
       teleport.enterClub();

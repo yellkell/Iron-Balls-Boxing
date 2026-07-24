@@ -162,7 +162,8 @@ function header(ctx: CanvasRenderingContext2D, title: string, neon: string): voi
 
 /** Round-win pips: chamfered studs, lit per round taken (FFA runs to 2). */
 function scorePips(ctx: CanvasRenderingContext2D, x: number, y: number, won: number, color: string): void {
-  for (let i = 0; i < winTargetFor(app.arcade); i++) {
+  const target = app.arcade === '1v1' ? app.duelWinTarget : winTargetFor(app.arcade);
+  for (let i = 0; i < target; i++) {
     const px = x + i * 58;
     ctx.save();
     ctx.translate(px, y);
@@ -348,7 +349,8 @@ export function createScoreboard(scene: Scene): Scoreboard {
     hpFrac: number,
     pips: number,
   ): void => {
-    const key = `s|${name}|${hpFrac}|${pips}`;
+    const target = app.arcade === '1v1' ? app.duelWinTarget : winTargetFor(app.arcade);
+    const key = `s|${name}|${hpFrac}|${pips}|${target}`;
     if (board.key === key) return;
     board.key = key;
     const { ctx, tex } = board;

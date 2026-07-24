@@ -31,7 +31,7 @@ import {
   TorusGeometry,
   Vector2,
 } from 'three';
-import { IBLGradient, type World } from '@iwsdk/core';
+import type { World } from '@iwsdk/core';
 import { collapseStatic } from '../arena/merge.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { OCTAGON_VERTICES, PALETTE, teamColor } from '../config.js';
@@ -42,11 +42,6 @@ import { Panel } from './panel.js';
 import { buildGraffiti, buildPoster, buildSign, ironSharpensFallback, IRON_SHARPENS_SIGN } from './signs.js';
 import type { PubRefs } from './state.js';
 import { corkTexture, dartboardTexture, fabricTexture, steelWallTexture, woodTexture } from './textures.js';
-
-function rgba(hex: number, a = 1): [number, number, number, number] {
-  const c = new Color(hex);
-  return [c.r, c.g, c.b, a];
-}
 
 const gunmetal = (rough = 0.35): MeshStandardMaterial =>
   new MeshStandardMaterial({ color: PALETTE.gunmetal, metalness: 0.85, roughness: rough });
@@ -100,13 +95,6 @@ export function buildPub(world: World): PubRefs {
 
   // Warm dim base light: amber from the lamps below, cold steel from above.
   world.scene.background = new Color(0x0c0d11);
-  const environmentEntity = world.createTransformEntity(undefined, { persistent: true });
-  environmentEntity.addComponent(IBLGradient, {
-    sky: rgba(0x4a5160),
-    equator: rgba(0x8a7a60),
-    ground: rgba(0x6e4a26),
-    intensity: 0.55,
-  });
 
   // --- shell: floor, ceiling, walls -----------------------------------------
   const plate = diamondPlateTextures();
@@ -696,7 +684,6 @@ export function buildPub(world: World): PubRefs {
   const refs: PubRefs = {
     root,
     rootEntity,
-    environmentEntity,
     dartboard,
     corkSurround,
     dartCatchers: [northWall],

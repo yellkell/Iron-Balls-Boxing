@@ -18,7 +18,7 @@ export type AppState = 'menu' | 'queueing' | 'playing' | 'training';
 export type AppMode = 'bot' | 'net' | 'campaign';
 export type { ArcadeMode } from '../config.js';
 import type { ArcadeMode, Difficulty } from '../config.js';
-import { DIFFICULTY_ORDER } from '../config.js';
+import { DIFFICULTY_ORDER, MATCH } from '../config.js';
 
 /** The player's last-picked run difficulty, remembered across sessions and
  *  clamped to a valid tier on load. */
@@ -210,6 +210,9 @@ export const app: {
   rankedHost: boolean;
   /** We entered the current bout from the ranked browser — return there after. */
   fromRanked: boolean;
+  /** Round wins required in the current 1v1 route: Quick Match is BO3;
+   *  Ranked and private matches remain BO5. */
+  duelWinTarget: number;
   /** The 5-digit code shown while hosting a private match. */
   privateCode: string;
   /** Digits typed on the join keypad (up to 5). */
@@ -263,6 +266,7 @@ export const app: {
   rankedRoomId: '',
   rankedHost: false,
   fromRanked: false,
+  duelWinTarget: MATCH.winTarget,
   privateCode: '',
   codeEntry: '',
   stats: loadStats(),
