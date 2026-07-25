@@ -36,6 +36,7 @@ import {
   Vector3,
 } from 'three';
 import { app } from '../menu/appState.js';
+import { throwProbe } from '../debug/throwProbe.js';
 
 /** ?perf=1 (or a bare ?perf) turns the readout on. */
 export function perfHudRequested(): boolean {
@@ -44,7 +45,7 @@ export function perfHudRequested(): boolean {
 }
 
 export const PANEL_W = 512;
-export const PANEL_H = 256;
+export const PANEL_H = 272;
 
 export interface PerfStats {
   /** Mean frame INTERVAL over the last repaint window, milliseconds. */
@@ -55,6 +56,8 @@ export interface PerfStats {
   triangles: number;
   programs: number;
   environment: string;
+  /** Last curveball's measured swing, or null if none thrown recently. */
+  curve: { raw: number; handSpeed: number; curl: number } | null;
 }
 
 /** Paint one readout. Exported so the visual test scene draws the real panel
@@ -91,6 +94,19 @@ export function drawPerfPanel(ctx: CanvasRenderingContext2D, s: PerfStats): void
     `progs ${s.programs}  env ${s.environment}`,
   ];
   rows.forEach((line, i) => ctx.fillText(line, 22, 104 + i * 40));
+
+  // Last curve throw: what the swing actually measured. CURL is tuned against
+  // exactly these two inputs, so this is the line that says whether the band
+  // is set where real punches land.
+  if (s.curve) {
+    ctx.fillStyle = s.curve.curl > 0 ? '#ffd479' : '#7d879a';
+    ctx.font = '28px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText(
+      `raw ${s.curve.raw.toFixed(1)}  hand ${s.curve.handSpeed.toFixed(1)}  bend ${s.curve.curl.toFixed(2)}`,
+      22,
+      224,
+    );
+  }
 }
 
 const _camPos = new Vector3();
@@ -107,6 +123,8 @@ export class PerfHudSystem extends createSystem({}) {
   private worst = 0;
   private worstAge = 0;
   private repaintIn = 0;
+  /** Seconds since boot, matched to FireballSystem's clock for probe staleness. */
+  private clock = 0;
 
   init(): void {
     if (!perfHudRequested()) return;
@@ -119,7 +137,7 @@ export class PerfHudSystem extends createSystem({}) {
     this.texture = new CanvasTexture(canvas);
     this.texture.minFilter = LinearFilter;
     this.mesh = new Mesh(
-      new PlaneGeometry(0.30, 0.15),
+      new PlaneGeometry(0.30, 0.30 * (PANEL_H / PANEL_W)),
       new MeshBasicMaterial({ map: this.texture, transparent: true, depthTest: false }),
     );
     // Draw last and ignore depth: a readout you can't see behind the boss is
@@ -133,6 +151,7 @@ export class PerfHudSystem extends createSystem({}) {
     const mesh = this.mesh;
     if (!mesh) return;
 
+    this.clock += delta;
     const ms = delta * 1000;
     this.samples.push(ms);
     this.worstAge += delta;
@@ -173,6 +192,11 @@ export class PerfHudSystem extends createSystem({}) {
       triangles: info.render.triangles,
       programs: info.programs?.length ?? 0,
       environment: app.environment,
+      // Keep the last throw up for a few seconds so it survives the follow-through.
+      curve:
+        throwProbe.at >= 0 && this.clock - throwProbe.at < 4
+          ? { raw: throwProbe.raw, handSpeed: throwProbe.handSpeed, curl: throwProbe.curl }
+          : null,
     });
 
     if (this.texture) this.texture.needsUpdate = true;

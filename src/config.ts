@@ -236,25 +236,43 @@ export const FIREBALL = {
  * in flight the velocity rotates about the curl axis while the rate decays at
  * `decay`/s — bank hard off the fist, straighten downrange.
  *
- * Retuned after the "curve doesn't feel right" reports. The old mapping was
- * `(raw - min) * 1.6` capped at 5.0 rad/s, and a real hook reads raw 5–18
- * rad/s — so EVERY hook pinned to the cap and the toggle was effectively
- * binary: dead straight, or full bend with no touch in between. Worse, 5 rad/s
- * decaying at only 1.4/s turned the ball ~140° before it had crossed the 3 m
- * gap — a boomerang, not a curveball, and impossible to aim. The band below
- * spreads realistic hook rates across the whole range and tops out at a break
- * of roughly 0.85 m over the gap (a body and a half — enough to come round a
- * guard, which is what the tutorial promises) arriving on a ~26° heading.
+ * Tuned by replaying the flight integrator and reading the answer in METRES of
+ * sideways break at the far plate (a fighter is ~0.45 m across, so half a
+ * metre is the width of a guard).
+ *
+ * The first pass, `(raw - min) * 1.6` capped at 5 rad/s decaying at 1.4/s, was
+ * a boomerang: every hook pinned the cap and turned ~156°, never reaching the
+ * far plate at all. The correction over-shot the other way. Two gates —
+ * `raw`→`full` and the hand-speed ramp — MULTIPLY, and both were set where a
+ * real punch only partly satisfies them, so a typical deliberate hook earned
+ * about a fifth of an already modest ceiling and broke 0.24 m: less than half
+ * a guard, which reads as no curve at all.
+ *
+ * Both gates now close where an ordinary committed hook actually lands. Break
+ * at the far plate, by swing:
+ *
+ *   straight jab    0.03 m -> 0.12    (still straight — the toggle stays honest)
+ *   light hook      0.08    -> 0.39
+ *   typical hook    0.24    -> 0.75   (round a guard, what the tutorial promises)
+ *   good hook       0.61    -> 1.21
+ *   hardest throw   1.03    -> 1.29 arriving at 36°, so it stays aimable
+ *
+ * If it still reads flat, the numbers to check are `raw` and `hand` in the
+ * ?perf=1 readout — everything here is calibrated against what a punch really
+ * measures, and that is the one part I cannot verify off a headset.
  */
 export const CURL = {
   min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
-  full: 10.0, // rad/s of swing turn that earns the full bend
+  full: 7.0, // rad/s of swing turn that earns the full bend
   max: 2.0, // rad/s — the hardest the ball itself will ever bank
-  decay: 3.0, // per second — high, so the arc is spent early and settles late
+  decay: 2.6, // per second — the arc is spent early and settles late
   // Curve only really bites on a committed, WIDE swing — small movements are
   // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
-  speedMin: 2.2, // below this swing speed → essentially no curve
-  speedFull: 4.0, // at/above this → full curve
+  // Both ends came down: at the old 2.2→4.0 a 3 m/s hook — a normal, committed
+  // punch — kept only 40% of its bend, and that multiplied against the raw
+  // gate is where the curve went.
+  speedMin: 2.0, // below this swing speed → essentially no curve
+  speedFull: 3.2, // at/above this → full curve
   /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
    *  launch sfx, the harder haptic and the corkscrew trail. */
   feelMin: 0.25,

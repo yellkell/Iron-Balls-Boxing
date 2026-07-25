@@ -32,6 +32,7 @@ import type { PeerMessage } from '../net/protocol.js';
 import { pulseHand } from '../input/haptics.js';
 import * as sfx from '../audio/sfx.js';
 import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, curlLead, curlRateFor, FIREBALL, NET } from '../config.js';
+import { recordThrow } from '../debug/throwProbe.js';
 
 const HANDS = ['left', 'right'] as const;
 type Hand = 0 | 1;
@@ -495,6 +496,9 @@ export class FireballSystem extends createSystem({
       // bends scales with the hook — see curlRateFor in config.ts.
       const raw = this.trackers[hand].curl(_curl, this.time);
       curlRate = curlRateFor(raw, handSpeed);
+      // What the swing measured, for the ?perf=1 readout — CURL is tuned
+      // against these two numbers and nothing else reports them.
+      recordThrow(raw, handSpeed, curlRate, this.time);
       c[0] = _curl.x * curlRate;
       c[1] = _curl.y * curlRate;
       c[2] = _curl.z * curlRate;

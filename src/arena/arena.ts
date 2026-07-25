@@ -500,10 +500,11 @@ export function makePlatform(color: number, groupScale = 1): Group {
     ember.userData.fxBaseY = ember.position.y;
     flame.add(ember);
   }
-  const fireLight = new PointLight(0xff5a24, 1.8, 2.4, 2);
-  fireLight.position.y = 0.14;
-  fireLight.userData.fxRole = 'blazing-light';
-  flame.add(fireLight);
+  // No point light here (nor on TIDEBREAKER). A deck lamp is never just its
+  // own shading cost: adding a light to the scene changes every lit material's
+  // shader permutation, so wearing the pad recompiles the whole arena — a
+  // hitch — and then charges for an extra light per pixel for as long as it is
+  // worn. The emissive jets and embers carry the look on their own.
   flame.visible = false;
   group.add(flame);
 
@@ -605,11 +606,7 @@ export function makePlatform(color: number, groupScale = 1): Group {
     drip.userData.fxBaseY = drip.position.y;
     tide.add(drip);
   });
-  const tideLight = new PointLight(0x35ff9a, 1.55, 2.2, 2);
-  tideLight.position.y = 0.12;
-  tideLight.userData.fxRole = 'tide-light';
-  tide.add(tideLight);
-  tide.visible = false;
+  tide.visible = false; // no point light — see BLAZING above
   group.add(tide);
 
   // EMBER: the classic look — banding + bolts, no extra furniture.

@@ -7,7 +7,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Mesh, MeshBasicMaterial, PointLight, type Object3D } from 'three';
+import { Mesh, MeshBasicMaterial, type Object3D } from 'three';
 
 /** Animate one tagged ornament. Exported so the lightweight visual test scene
  * can exercise the exact same motion as the in-game system. */
@@ -39,9 +39,6 @@ export function animatePlatformFxNode(node: Object3D, t: number): void {
       node.scale.setScalar(size);
       break;
     }
-    case 'blazing-light':
-      (node as PointLight).intensity = 1.65 + Math.sin(t * 3.8) * 0.2;
-      break;
     case 'tide-emblem': {
       const breathe = 1 + Math.sin(t * 1.8) * 0.025;
       node.scale.set(breathe, breathe, 1);
@@ -74,9 +71,6 @@ export function animatePlatformFxNode(node: Object3D, t: number): void {
     }
     case 'tide-drip':
       node.position.y = (node.userData.fxBaseY as number) + Math.sin(t * 1.7 + phase) * 0.008;
-      break;
-    case 'tide-light':
-      (node as PointLight).intensity = 1.45 + Math.sin(t * 1.9) * 0.15;
       break;
   }
 }
