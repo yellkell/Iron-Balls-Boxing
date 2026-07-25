@@ -67,7 +67,7 @@ import { match } from '../combat/matchState.js';
 import { applyRoster, fighterAt } from '../combat/setup.js';
 import { localIndexOf, peerPos, worldToPeer } from '../combat/layout.js';
 import { opponents } from '../combat/opponentBus.js';
-import { applyArenaLayout, platformName, tintPlatform } from '../arena/arena.js';
+import { applyArenaLayout, platformName, setPlatformHazard, tintPlatform } from '../arena/arena.js';
 import { teamColor } from '../config.js';
 import { app, saveStats } from '../menu/appState.js';
 import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customization.js';
@@ -742,6 +742,10 @@ export class CampaignSystem extends createSystem({
       if (pad) {
         const back = this.raid() ? PALETTE.danger : teamColor(1); // the pad's non-goop colour
         tintPlatform(pad, goopStage ? this.def.accent : back);
+        // This pedestal is a titan's ground for the duration — wear the hazard
+        // band. (The raid pit already has it; a campaign titan borrows slot 1's
+        // ordinary boxer pad, so it has to be switched on and off.)
+        setPlatformHazard(pad, true);
       }
     }
     this.disposeShots();
@@ -1740,7 +1744,20 @@ export class CampaignSystem extends createSystem({
         const y = params.y?.[ti] ?? 1.4;
         zones.push({ kind: 'sweep', y });
         zoneSeats.push(seat);
-        const tg = sweepTelegraph(OCTAGON_HALF_WIDTH * 2 + 0.5, OCTAGON_HALF_DEPTH * 2 + 0.3, y, CAMPAIGN.sweepThickness);
+        // Which way the cut will actually run. spawnBladeSweep starts the
+        // blade at `from * span` and drives it to `-from * span`, with
+        // from = arm === 0 ? 1 : -1 — so arm 0 travels toward −x and arm 1
+        // toward +x. The telegraph used to ignore the arm entirely and always
+        // wipe −x → +x, so every arm-0 sweep warned in the opposite direction
+        // to the blade that followed.
+        const dir: 1 | -1 = arm === 0 ? -1 : 1;
+        const tg = sweepTelegraph(
+          OCTAGON_HALF_WIDTH * 2 + 0.5,
+          OCTAGON_HALF_DEPTH * 2 + 0.3,
+          y,
+          CAMPAIGN.sweepThickness,
+          dir,
+        );
         this.seatPoint(seat, 0, 0, 0, _v);
         tg.group.position.copy(_v);
         tg.group.rotation.y = this.seatYawDelta(seat);

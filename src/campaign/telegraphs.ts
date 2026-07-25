@@ -236,17 +236,36 @@ const GO_FRAG = /* glsl */ `
   }
 `;
 
-/** Blade: a horizontal slice hanging in the air — bright core line, soft body. */
+/**
+ * Blade: a horizontal slice hanging in the air — bright core line, soft body.
+ *
+ * uDir is the direction the real blade will TRAVEL along this plane's local x:
+ * +1 for left→right, −1 for right→left. It has to be told, because the strike
+ * picks its side from the titan's striking arm (see spawnBladeSweep) while
+ * this shader used to fill u = 0 → 1 unconditionally — so on every sweep
+ * thrown with the other arm the warning wiped across one way and the blade
+ * then came through the other, which is exactly the "it comes from the wrong
+ * side" report. The leading edge is drawn bright and chevrons march ahead of
+ * it, so the side it arrives from is legible well before the fill lands.
+ */
 const BLADE_FRAG = /* glsl */ `
   ${COMMON}
+  uniform float uDir;
   void main(){
     vec3 col = warnColor();
     float mid = 1.0 - abs(vUv.y * 2.0 - 1.0); // 1 at the slice centre line
     float a = pow(mid, 3.0) * 0.75 + mid * 0.12;
-    // Fill sweeps across the width as the swing charges. Softened: a hard
-    // step drew the sweeping front as a ragged vertical staircase along the
-    // blade, which is the one edge the player is actually tracking.
-    a *= 0.35 + 0.65 * (1.0 - aaStep(uFill, vUv.x));
+    // Travel coordinate: 0 is where the blade STARTS, 1 is where it ends up.
+    float u = uDir < 0.0 ? 1.0 - vUv.x : vUv.x;
+    // The swept-through region behind the front. Softened: a hard step drew
+    // this as a ragged vertical staircase, and it's the one edge a player is
+    // actually tracking.
+    a *= 0.35 + 0.65 * (1.0 - aaStep(uFill, u));
+    // The leading edge itself — a hot line sitting where the cut has reached.
+    a += mid * (1.0 - smoothstep(0.0, 0.06, abs(u - uFill))) * 0.55;
+    // Chevrons running the way the blade will come, so the direction reads
+    // from the first frame rather than only once the fill is well across.
+    a += aaStripe(u * 7.0 - uTime * 2.6, 0.55) * mid * 0.16;
     a *= pulse();
     gl_FragColor = vec4(col, ink(a));
   }
@@ -361,14 +380,49 @@ export function beamTelegraph(halfWidth: number, length: number): Telegraph {
  * the platform itself carries the warning. Place the group at the platform
  * centre on the floor; `width` spans the endangered lane, `depth` the floor
  * band's front-to-back reach.
+ *
+ * `dir` is which way the blade will actually travel along local x: +1 for
+ * left→right, −1 for right→left. It MUST match spawnBladeSweep's `from` for
+ * the same attack, or the warning wipes across opposite to the cut.
  */
-export function sweepTelegraph(width: number, depth: number, bladeY: number, thickness: number): Telegraph {
-  const bladeMat = warnMat(BLADE_FRAG);
-  const blade = new Mesh(new PlaneGeometry(width, thickness * 2), bladeMat);
-  blade.position.y = bladeY;
-  const bandMat = warnMat(BLADE_FRAG);
-  const band = new Mesh(new PlaneGeometry(width, depth), bandMat);
+export function sweepTelegraph(
+  width: number,
+  depth: number,
+  bladeY: number,
+  thickness: number,
+  dir: 1 | -1 = 1,
+): Telegraph {
+  const mats: ShaderMaterial[] = [];
+  const mat = (): ShaderMaterial => {
+    const m = warnMat(BLADE_FRAG, { uDir: { value: dir } });
+    mats.push(m);
+    return m;
+  };
+
+  // The FACE: a bar hanging at the strike height across the platform's FRONT
+  // edge — the one piece of this warning that lands in the player's forward
+  // view, because a player being swept at is looking at the titan.
+  //
+  // This used to be a single vertical plane at z = 0, i.e. at the player's own
+  // depth, which is a plane that CONTAINS the viewer: edge-on, zero pixels,
+  // invisible. The floor band was the only other part, and when you're facing
+  // a titan the deck at your feet is below your field of view — so the whole
+  // sweep telegraph could not be seen at all from where it had to be read, and
+  // the blade appeared to arrive out of nowhere behind you.
+  const face = new Mesh(new PlaneGeometry(width, thickness * 2), mat());
+  face.position.set(0, bladeY, -depth / 2);
+
+  // The SLICE: the horizontal sheet the blade actually cuts through, at head
+  // height — spells out the height you have to get under, and stays readable
+  // when you turn your head to follow the cut.
+  const slice = new Mesh(new PlaneGeometry(width, depth), mat());
+  slice.rotation.x = -Math.PI / 2;
+  slice.position.y = bladeY;
+
+  // The FOOTPRINT on the deck, unchanged: which ground the cut covers.
+  const band = new Mesh(new PlaneGeometry(width, depth), mat());
   band.rotation.x = -Math.PI / 2;
   band.position.y = CAMPAIGN.decalY;
-  return makeTelegraph([blade, band], [bladeMat, bandMat]);
+
+  return makeTelegraph([face, slice, band], mats);
 }

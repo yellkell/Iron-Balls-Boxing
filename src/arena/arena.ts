@@ -155,7 +155,11 @@ function makeNeonRim(color: number): Group {
 
 /**
  * The hazard-striped kick-band: an amber warning ring painted round the inside
- * of the rim, marking the edge the boundary drains you for crossing.
+ * of the rim. It belongs on a TITAN's ground, not a boxer's — on a fighter's
+ * pad it just crowds the deck you stand on, but round a boss pedestal it reads
+ * as the machine's own danger marking. Built on every pad and hidden by
+ * default; setPlatformHazard turns it on for whichever pedestal is currently
+ * carrying a boss (the raid pit always, slot 1 while a campaign titan is up).
  *
  * Built as ONE mitred ring rather than eight separate quads. Eight quads can't
  * meet cleanly at an octagon's corners — butted they leave a wedge of bare
@@ -248,7 +252,14 @@ function makeHazardBand(uvScale = 1): Group {
   geo.setIndex(idx);
   geo.computeVertexNormals();
   band.add(new Mesh(geo, hazardMat));
+  band.visible = false; // boss pedestals only — see setPlatformHazard
   return band;
+}
+
+/** Show/hide a pedestal's hazard kick-band. On for a boss's ground only. */
+export function setPlatformHazard(pad: Object3D, on: boolean): void {
+  const band = pad.getObjectByName('hazard-band');
+  if (band) band.visible = on;
 }
 
 /** Bolted corner studs at each rim vertex — armour the silhouette. */
@@ -454,16 +465,27 @@ export function makePlatform(color: number, groupScale = 1): Group {
   const jetCoreGeo = new ShapeGeometry(flameTongue(0.14));
   const jetCoreMat = coreMat.clone();
   OCTAGON_VERTICES.forEach(([x, z], i) => {
-    if (i % 2) return; // four deliberate corner crowns, not a picket fence
+    // Every corner, all eight — the pad is a trophy, and crowning only the
+    // alternate vertices left it looking half-lit from most angles rather
+    // than deliberate.
     const jet = new Group();
     jet.position.set(x * 0.94, DECK_TOP, z * 0.94);
     jet.rotation.y = Math.atan2(x, z);
     jet.userData.fxRole = 'blazing-jet';
     jet.userData.fxPhase = i * 0.79;
-    const shell = new Mesh(jetOuterGeo, outerMat);
-    const heart = new Mesh(jetCoreGeo, jetCoreMat);
-    heart.position.z = 0.003;
-    jet.add(shell, heart);
+    // CROSSED pair, not a single card. A flat flame is a flat flame: seen
+    // edge-on it collapses to a sliver, and with eight of them round the rim
+    // two or three are always near edge-on from wherever you stand. The second
+    // card at 90° keeps every corner reading as fire from any angle.
+    for (const yaw of [0, Math.PI / 2]) {
+      const card = new Group();
+      card.rotation.y = yaw;
+      const shell = new Mesh(jetOuterGeo, outerMat);
+      const heart = new Mesh(jetCoreGeo, jetCoreMat);
+      heart.position.z = 0.003;
+      card.add(shell, heart);
+      jet.add(card);
+    }
     flame.add(jet);
   });
 
@@ -660,6 +682,9 @@ export function applyArenaLayout(scene: Object3D): void {
       pad.position.set(seat.pos[0], seat.pos[1], seat.pos[2]);
       pad.rotation.y = seat.yaw;
       tintPlatform(pad, teamColor(seat.team));
+      // A re-seated pad is a BOXER's pad again until a titan claims it; the
+      // campaign turns its own boss pedestal's band back on when it takes over.
+      setPlatformHazard(pad, false);
     } else {
       pad.visible = false;
     }
@@ -701,6 +726,7 @@ export function buildArena(world: World): Object3D {
   pit.position.set(0, 0, -RAID_RING_RADIUS);
   pit.scale.set(2.4, 1, 2.4);
   pit.visible = false;
+  setPlatformHazard(pit, true); // the pit is only ever a titan's ground
   arena.add(pit);
 
   // "FIRE FIGHT" signage hung high behind the opponent.
