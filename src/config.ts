@@ -578,11 +578,20 @@ export const GOOPLIATH = {
   /** Raid fallback PER RAIDER (the dedicated raid always lands on the tier
    *  pools above — this only seeds goopliathBoss's base def). */
   hitsPerRaider: 50,
-  /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
-   *  solo GOLIATH's size (~4.9 m of gel across the duel gap); the raid cut
-   *  is a third taller again for the wide ring. */
-  scaleCampaign: 2.65,
-  scaleRaid: 3.45,
+  /** Body size in TITAN scale units (duel boxer ≈ 1); world height is this
+   *  times titanHeightPerScale, so campaign is ~4.15 m of gel across the duel
+   *  gap and the raid cut a third taller again for the wide ring.
+   *
+   *  Trimmed back from GOLIATH's 2.65 (~4.9 m): the gel shader is fill-rate
+   *  bound and its cost scales with his PROJECTED AREA, so taking ~15% off
+   *  his height takes ~28% off the frame time he costs — the single biggest
+   *  lever on this fight, worth more than everything in the raymarch put
+   *  together. It costs nothing in danger: the floor zones carry the threat
+   *  and they are platform-relative, and his swings are capped at
+   *  gestureReach BODY-units so they shrink with him and still land where
+   *  they always did. */
+  scaleCampaign: 2.25,
+  scaleRaid: 2.93,
   /** Titan rigs stand ~1.85 m per scale unit; the gel sim is 1.78 m tall at
    *  native size — this converts def.scale into the parent group's scale. */
   titanHeightPerScale: 1.85,
@@ -590,16 +599,21 @@ export const GOOPLIATH = {
    *  jiggling at man-sized frequency reads as a miniature; slowed, the same
    *  dynamics read as tons of gel in motion. (Sounds stay real-time.) */
   timeScale: 0.55,
-  /** Raymarch quality override (1 = the full step budget). The gel shader is
-   *  fill-rate bound and a boss this size covers a LOT of Quest pixels.
-   *  (These overrides only started biting once setQuality's floor dropped
-   *  from 20 steps to 8 — they were silently pinned to 20 before.) */
-  quality: 0.72,
-  /** Step budget while an attack is mid-swing: an extended limb stretches
-   *  the march's bounding box across far more of the view — the exact moment
-   *  frame time spikes — so the budget drops while he's punching and comes
-   *  back the moment the limb snaps home. */
-  attackQuality: 0.5,
+  /** Raymarch quality override (1 = the full step budget) — 13 steps. The gel
+   *  shader is fill-rate bound and a boss this size covers a LOT of Quest
+   *  pixels. Was 0.72/16 steps: the over-relaxed march (see MARCH in
+   *  goopConfig) reaches further per step and no longer punches see-through
+   *  holes when it runs short, so the budget buys surface precision now
+   *  rather than basic correctness. Verified hole-free down to 8. */
+  quality: 0.6,
+  /** Step budget while an attack is mid-swing — 9 steps. The old reason for
+   *  this dip was that an extended limb stretched the march's bounding box
+   *  across far more of the view; the march is bounded by his blob spheres
+   *  now, so a limb only costs its own pixels and this is a plain quality
+   *  trade. Kept (and lowered) because a swing is the busiest the frame ever
+   *  gets — and because it was the swing budget that used to tear the hole
+   *  under his fists, which it no longer can. */
+  attackQuality: 0.4,
   /** How far his gesture swings extend, in body-scale units from his centre.
    *  He never needs to reach the player's platform — the floor zones carry
    *  the danger — and the swing must stay basically WITHIN his silhouette:
