@@ -60,6 +60,11 @@ class NetClient {
 
   /** Pick a transport and enter the quick-match queue. */
   queue(): void {
+    // Every caller of this is quick match: the menu action, the background hunt
+    // that runs through a bot bout, and the requeue retries. Ranked and private
+    // use their own methods below, so setting the format here rather than in the
+    // menu means it can never drift from the pool the bout came from.
+    app.quickDuel = true; // best of three — see MATCH.winTargetQuick
     this.disconnect();
     const events = this.makeEvents();
     const force = new URLSearchParams(location.search).get('net');
@@ -86,6 +91,7 @@ class NetClient {
 
   /** Host a private match (always P2P — the relay has no rooms). */
   createPrivate(): void {
+    app.quickDuel = false; // an arranged match keeps the best-of-five format
     this.disconnect();
     const events = this.makeEvents();
     void (async () => {
@@ -107,6 +113,7 @@ class NetClient {
 
   /** Join a private match by its 5-digit code. */
   joinPrivate(code: string): void {
+    app.quickDuel = false;
     this.disconnect();
     const events = this.makeEvents();
     void (async () => {
@@ -128,6 +135,7 @@ class NetClient {
 
   /** Host a PUBLIC ranked room, listed in the server browser (always P2P). */
   hostRanked(name: string): void {
+    app.quickDuel = false; // RANKED stays best of five
     this.disconnect();
     const events = this.makeEvents();
     void (async () => {
@@ -149,6 +157,7 @@ class NetClient {
 
   /** Join a listed ranked room by its id (always P2P). */
   joinRanked(id: string): void {
+    app.quickDuel = false; // RANKED stays best of five
     this.disconnect();
     const events = this.makeEvents();
     void (async () => {

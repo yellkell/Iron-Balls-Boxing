@@ -210,6 +210,15 @@ export const app: {
   rankedHost: boolean;
   /** We entered the current bout from the ranked browser — return there after. */
   fromRanked: boolean;
+  /**
+   * This duel came out of the QUICK MATCH queue, so it runs best of three
+   * (MATCH.winTargetQuick) rather than the best of five ranked and private
+   * matches keep. Set by the net client's matchmaking entry points, which are
+   * the only ways a duel can begin, so it always agrees with the pool the bout
+   * actually came from — and therefore with the opponent, who came from the
+   * same pool. See MATCH.winTargetQuick for why that matters.
+   */
+  quickDuel: boolean;
   /** The 5-digit code shown while hosting a private match. */
   privateCode: string;
   /** Digits typed on the join keypad (up to 5). */
@@ -263,6 +272,7 @@ export const app: {
   rankedRoomId: '',
   rankedHost: false,
   fromRanked: false,
+  quickDuel: false,
   privateCode: '',
   codeEntry: '',
   stats: loadStats(),

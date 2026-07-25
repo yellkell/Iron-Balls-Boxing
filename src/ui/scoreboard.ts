@@ -162,7 +162,7 @@ function header(ctx: CanvasRenderingContext2D, title: string, neon: string): voi
 
 /** Round-win pips: chamfered studs, lit per round taken (FFA runs to 2). */
 function scorePips(ctx: CanvasRenderingContext2D, x: number, y: number, won: number, color: string): void {
-  for (let i = 0; i < winTargetFor(app.arcade); i++) {
+  for (let i = 0; i < winTargetFor(app.arcade, app.quickDuel); i++) {
     const px = x + i * 58;
     ctx.save();
     ctx.translate(px, y);

@@ -4,9 +4,10 @@
  *
  * Two authorities live here:
  *  - the classic DUEL (1v1) — a round ends when a boxer's Health hits 0 (KO) or
- *    the timer expires (higher Health wins); first to MATCH.winTarget round
- *    wins takes it. ONLINE the HOST (side 0) runs this and echoes `state`; the
- *    GUEST applies the echoes. This path is unchanged.
+ *    the timer expires (higher Health wins); first to winTargetFor() round wins
+ *    takes it, which is best of THREE out of the quick-match queue and best of
+ *    FIVE for ranked and private (see MATCH.winTargetQuick). ONLINE the HOST
+ *    (side 0) runs this and echoes `state`; the GUEST applies the echoes.
  *  - the ARCADE brawls (2v2 / FFA) — a team survival rule: a round ends when
  *    only one team has anyone left standing (or the timer expires, top team
  *    health wins), that team banks the round, first team to winTarget wins.
@@ -186,7 +187,7 @@ export class GameStateSystem extends createSystem({
     } else if (match.phase === 'roundOver') {
       match.resultTimer -= delta;
       if (match.resultTimer <= 0) {
-        if (teams.some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade))) this.toMatchOverArcade(teams);
+        if (teams.some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade, app.quickDuel))) this.toMatchOverArcade(teams);
         else {
           match.round += 1;
           this.beginCountdownArcade(actives, MATCH.roundCountdown);
@@ -224,7 +225,7 @@ export class GameStateSystem extends createSystem({
   private endRoundArcade(winnerTeam: number | undefined, result: RoundResult): void {
     match.roundWinnerTeam = winnerTeam ?? -1;
     if (winnerTeam !== undefined) match.teamScores[winnerTeam] = (match.teamScores[winnerTeam] ?? 0) + 1;
-    if (modeTeams(app.arcade).some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade))) {
+    if (modeTeams(app.arcade).some((t) => (match.teamScores[t] ?? 0) >= winTargetFor(app.arcade, app.quickDuel))) {
       this.toMatchOverArcade(modeTeams(app.arcade));
       return;
     }
@@ -354,7 +355,8 @@ export class GameStateSystem extends createSystem({
       match.resultTimer -= delta;
       if (match.resultTimer <= 0) {
         if (match.phase === 'roundOver') {
-          if (match.myScore >= MATCH.winTarget || match.oppScore >= MATCH.winTarget) {
+          const target = winTargetFor(app.arcade, app.quickDuel);
+          if (match.myScore >= target || match.oppScore >= target) {
             this.toMatchOver();
           } else {
             match.round += 1;
@@ -380,7 +382,8 @@ export class GameStateSystem extends createSystem({
   private endRound(outcome: RoundOutcome, result: RoundResult): void {
     if (outcome === 'win') match.myScore += 1;
     else if (outcome === 'loss') match.oppScore += 1;
-    if (match.myScore >= MATCH.winTarget || match.oppScore >= MATCH.winTarget) {
+    const target = winTargetFor(app.arcade, app.quickDuel);
+    if (match.myScore >= target || match.oppScore >= target) {
       this.toMatchOver();
       return;
     }

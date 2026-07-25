@@ -670,23 +670,36 @@ export const BOSS_STUN = { hits: 5, decayPerSec: 1.2, duration: 2.6 };
 export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round
   roundTime: 60, // seconds per round
-  // BEST OF THREE: first to 2 round wins. This was first-to-3 (best of five),
-  // which is up to five minutes of round time for one quick match.
-  //
-  // NB this is the format for EVERY duel, quick match and ranked alike — they
-  // are the same 1v1 code path and ArcadeMode can't tell them apart, so there
-  // is no way to shorten one without the other short of a new synced flag.
-  // Both peers must agree on the target or the match never ends for one side.
-  winTarget: 2, // first to N round wins takes the match
+  winTarget: 3, // first to N round wins — RANKED, private and 2v2 stay best of five
+  /**
+   * QUICK MATCH only: best of three. Five rounds is up to five minutes of round
+   * time for a drop-in bout, so the casual queue runs short while ranked keeps
+   * the long format.
+   *
+   * Both peers evaluate this independently (see GameStateSystem.endRound), so
+   * they MUST agree — a mismatch leaves the match unfinished for one side. What
+   * makes that safe is that the two queues never meet: quick match pools on
+   * `lobbies` / the WS relay via net.queue(), ranked on its own `rankedRooms`
+   * collection via hostRanked/joinRanked, and a ranked host never crosses over
+   * into the public queue (startRankedHeartbeat deliberately runs no cross-over
+   * scan). So `app.quickDuel`, set from those entry points, is identical on both
+   * sides of any given bout without needing to be sent over the wire.
+   */
+  winTargetQuick: 2,
   winTargetFfa: 2, // FFA only: a four-way scramble at first-to-3 drags — 2 crowns it
   roundOverDelay: 5, // breather between rounds before the next round's countdown
   roundCountdown: 3, // the 3-2-1 that opens every round AFTER the first
   matchOverDelay: 6, // pause after the match before returning to the lobby
 };
 
-/** Round wins that take the match in `mode` — FFA runs shorter (see above). */
-export function winTargetFor(mode: ArcadeMode): number {
-  return mode === 'ffa' ? MATCH.winTargetFfa : MATCH.winTarget;
+/**
+ * Round wins that take the match in `mode` — FFA runs shorter (see above), and
+ * a QUICK MATCH duel is best of three where ranked/private stay best of five.
+ * Pass `app.quickDuel` for `quick`.
+ */
+export function winTargetFor(mode: ArcadeMode, quick = false): number {
+  if (mode === 'ffa') return MATCH.winTargetFfa;
+  return mode === '1v1' && quick ? MATCH.winTargetQuick : MATCH.winTarget;
 }
 
 /** The visible platform slab under each boxer. */

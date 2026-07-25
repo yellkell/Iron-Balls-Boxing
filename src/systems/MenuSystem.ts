@@ -564,6 +564,7 @@ export class MenuSystem extends createSystem({}) {
         app.arcade = '1v1';
         app.mode = 'bot';
         app.state = 'playing';
+        app.quickDuel = false; // the graduation bout keeps the standard format
         break;
       case 'start-training':
         app.arcade = '1v1';
@@ -700,6 +701,10 @@ export class MenuSystem extends createSystem({}) {
         app.arcade = '1v1';
         app.mode = 'bot';
         app.state = 'playing';
+        // net.queue() sets this too, but ONLY PLAY BOTS never queues — and a
+        // quick match against the bot is still a quick match, so it is still
+        // best of three.
+        app.quickDuel = true;
         if (!app.onlyBots) net.queue();
         break;
       case 'cancel-queue':
