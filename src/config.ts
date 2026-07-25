@@ -251,28 +251,48 @@ export const FIREBALL = {
  * Both gates now close where an ordinary committed hook actually lands. Break
  * at the far plate, by swing:
  *
- *   straight jab    0.03 m -> 0.12    (still straight — the toggle stays honest)
- *   light hook      0.08    -> 0.39
- *   typical hook    0.24    -> 0.75   (round a guard, what the tutorial promises)
- *   good hook       0.61    -> 1.21
- *   hardest throw   1.03    -> 1.29 arriving at 36°, so it stays aimable
+ * Break at the far plate, for punches read by replaying the REAL
+ * VelocityTracker over real hand paths rather than by assuming what a hook
+ * looks like — which is what the first two passes at this got wrong:
  *
- * If it still reads flat, the numbers to check are `raw` and `hand` in the
- * ?perf=1 readout — everything here is calibrated against what a punch really
- * measures, and that is the one part I cannot verify off a headset.
+ *   straight jab    0.00 m   (turn rate 0 — the toggle stays honest)
+ *   lazy sweep      0.32
+ *   wide hook       0.80
+ *   normal hook     1.26
+ *   tight hook      1.52     arriving at 40°, the steepest of them
+ *
+ * The `raw` and `hand` figures in the ?perf=1 readout are the two inputs the
+ * whole band is calibrated against, so they say immediately whether a punch
+ * is landing where these numbers expect.
  */
 export const CURL = {
   min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
   full: 7.0, // rad/s of swing turn that earns the full bend
   max: 2.0, // rad/s — the hardest the ball itself will ever bank
   decay: 2.6, // per second — the arc is spent early and settles late
-  // Curve only really bites on a committed, WIDE swing — small movements are
-  // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
-  // Both ends came down: at the old 2.2→4.0 a 3 m/s hook — a normal, committed
-  // punch — kept only 40% of its bend, and that multiplied against the raw
-  // gate is where the curve went.
-  speedMin: 2.0, // below this swing speed → essentially no curve
-  speedFull: 3.2, // at/above this → full curve
+  /**
+   * Hand-speed ramp (m/s). Its ONLY job is to reject tracking jitter from a
+   * hand that is barely moving; it is not meant to demand a fast punch.
+   *
+   * It had been doing the latter, and that is where the curve went. Replaying
+   * the real VelocityTracker over real hand paths shows a TIGHT hook — pivoted
+   * from the elbow, the natural way to throw a curve without flailing — reads
+   * a turn rate of ~9.8 rad/s on only ~2.4 m/s of hand speed. At the old
+   * 2.0→3.2 ramp that punch kept a third of its bend and broke 0.39 m, while a
+   * wide fast swing broke 1.09 m. So the one punch shaped like a curveball was
+   * the one that didn't curve.
+   *
+   * Speed is already paid for elsewhere — it sets the ball's launch speed — so
+   * charging for it twice only meant a controlled hook bought nothing. The
+   * ramp now clears just above FIREBALL.minPunchSpeed (1.1, below which no
+   * throw happens at all), and `min` above stays the real jitter guard: a
+   * straight punch reads a turn rate of 0 and is untouched by any of this.
+   *
+   * Tight hook 0.39 m -> 1.52 m of break. The wide fast hooks that already
+   * worked are unchanged, because they already cleared the old ramp.
+   */
+  speedMin: 1.2, // below this swing speed → essentially no curve
+  speedFull: 2.0, // at/above this → full curve
   /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
    *  launch sfx, the harder haptic and the corkscrew trail. */
   feelMin: 0.25,
