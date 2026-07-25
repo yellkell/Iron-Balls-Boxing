@@ -94,10 +94,12 @@ export const AVATAR_SKINS: AvatarSkin[] = [
   // line, a throat sac, and a banded belly plate. Pond-green gel-smooth
   // armour with a lily-bright glow.
   { id: 'frog', name: 'LEGS', chassis: 0x1b3a26, trim: 0x0c1d12, accent: 0x86ff70, price: 250 },
-  // The bunny: the biggest head on the roster, buck teeth, a puff tail and
-  // two long LOP EARS folded down past the jaw. Dusty warm-grey steel with
-  // a soft rose glow — looks huggable, hits like a freight train.
-  { id: 'bunny', name: 'LOPPY', chassis: 0x413a36, trim: 0x211c19, accent: 0xff8fb3, price: 250 },
+  // OSWALD, the lucky rabbit in iron: the biggest head on the roster, the
+  // white muzzle mask, big close-set eyes, neon buck teeth, a puff tail, and
+  // two TALL STAND-UP ears breaking back near the tip. Black-and-white by
+  // design — near-black steel under a bone-white glow, the rubber-hose read.
+  // (id stays 'bunny' — it's the save key for owned/worn prefs.)
+  { id: 'bunny', name: 'OSWALD', chassis: 0x1b1a1e, trim: 0x0b0b0d, accent: 0xf4f1e4, price: 250 },
 ];
 
 export const PLATFORM_SKINS: PlatformSkin[] = [

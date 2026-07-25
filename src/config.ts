@@ -212,23 +212,74 @@ export const FIREBALL = {
  * Curveball tuning (the per-fist CURVE loadout toggle) — ONE source shared by
  * the arena (FireballSystem) and the pub fight hall (FightSystem), which used
  * to carry drifting private copies. The raw swing turn-rate (rad/s, read off
- * the punch's curvature) is scaled by `gain` above the `min` dead zone and
- * capped at `max`; in flight the velocity rotates about the curl axis while
- * the rate decays at `decay`/s — bank hard off the fist, straighten downrange.
+ * the punch's curvature) maps across the `min`…`full` band to at most `max`;
+ * in flight the velocity rotates about the curl axis while the rate decays at
+ * `decay`/s — bank hard off the fist, straighten downrange.
+ *
+ * Retuned after the "curve doesn't feel right" reports. The old mapping was
+ * `(raw - min) * 1.6` capped at 5.0 rad/s, and a real hook reads raw 5–18
+ * rad/s — so EVERY hook pinned to the cap and the toggle was effectively
+ * binary: dead straight, or full bend with no touch in between. Worse, 5 rad/s
+ * decaying at only 1.4/s turned the ball ~140° before it had crossed the 3 m
+ * gap — a boomerang, not a curveball, and impossible to aim. The band below
+ * spreads realistic hook rates across the whole range and tops out at a break
+ * of roughly 0.85 m over the gap (a body and a half — enough to come round a
+ * guard, which is what the tutorial promises) arriving on a ~26° heading.
  */
 export const CURL = {
   min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
-  gain: 1.6, // applied to the swing rate ABOVE the dead zone
-  max: 5.0, // rad/s after gain — the hardest hook the ball will bite into
-  decay: 1.4, // per second — lower = the bend carries further downrange
+  full: 10.0, // rad/s of swing turn that earns the full bend
+  max: 2.0, // rad/s — the hardest the ball itself will ever bank
+  decay: 3.0, // per second — high, so the arc is spent early and settles late
   // Curve only really bites on a committed, WIDE swing — small movements are
   // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
   speedMin: 2.2, // below this swing speed → essentially no curve
   speedFull: 4.0, // at/above this → full curve
   /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
    *  launch sfx, the harder haptic and the corkscrew trail. */
-  feelMin: 0.5,
+  feelMin: 0.25,
+  /**
+   * The window (s) the velocity trackers average a punch over. What they
+   * return is the CHORD across that window — the hand's heading at its
+   * midpoint, not at release. On a straight jab those are the same thing; on
+   * a hook turning 10 rad/s they are ~30° apart, so a curve throw launched
+   * off the raw average leaves the fist aimed well wide of where the player
+   * was pointing. `curlLead` rotates it forward to recover the release
+   * tangent. Keep in step with VelocityTracker.velocity().
+   */
+  window: 0.11,
+  /** Cap (rad) on that correction, so one jittery frame can't fling a throw. */
+  leadMax: 0.6,
 };
+
+/** Smoothstep 0..1 — flat at both ends, so a throw sitting near a gate's edge
+ *  doesn't swing wildly on a few cm/s of tracking noise. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * The curl rate (rad/s) a throw earns: the swing's raw turn rate mapped across
+ * the dead zone → `full` band, gated by how committed the swing was. Linear in
+ * the band, so a lazy hook really does bend less than a vicious one.
+ */
+export function curlRateFor(raw: number, handSpeed: number): number {
+  if (raw <= CURL.min) return 0;
+  const bite = Math.min(1, (raw - CURL.min) / (CURL.full - CURL.min));
+  return CURL.max * bite * smoothstep(CURL.speedMin, CURL.speedFull, handSpeed);
+}
+
+/**
+ * How far (rad) to rotate a launch direction FORWARD about the curl axis to
+ * recover the release tangent from the tracker's window-average heading — see
+ * CURL.window. Zero for anything inside the dead zone, so straight throws are
+ * untouched.
+ */
+export function curlLead(raw: number): number {
+  if (raw <= CURL.min) return 0;
+  return Math.min(CURL.leadMax, raw * CURL.window * 0.5);
+}
 
 /**
  * Per-ball attachments (the BALL LOADOUT panel). Each of your two balls can

@@ -45,7 +45,19 @@ import {
   Vector3,
 } from 'three';
 import type { XROrigin } from '@iwsdk/xr-input';
-import { ATTACH, BODY_IK, BOUNDARY, CURL, FIREBALL, NET, OCTAGON_VERTICES, PALETTE, teamColor } from '../../config.js';
+import {
+  ATTACH,
+  BODY_IK,
+  BOUNDARY,
+  CURL,
+  curlLead,
+  curlRateFor,
+  FIREBALL,
+  NET,
+  OCTAGON_VERTICES,
+  PALETTE,
+  teamColor,
+} from '../../config.js';
 import { buildBoxer, solveTorso, type BoxerRig } from '../../avatar/boxer.js';
 import { applyAvatarSkin, platformSkin } from '../../avatar/skins.js';
 import { customization, myAvatarSkin } from '../../menu/customization.js';
@@ -103,12 +115,7 @@ const FIST_LOCAL_HAND_SPEED = 1.2;
 // arena and this pub port, which used to carry a drifting private copy),
 // aliased to the names this file always used. Only applied when the fist's
 // "Curve" loadout toggle is on (ff-ballarc), exactly like the arena.
-const CURL_MIN = CURL.min;
-const CURL_GAIN = CURL.gain;
-const CURL_MAX = CURL.max;
 const CURL_DECAY = CURL.decay;
-const CURL_SPEED_MIN = CURL.speedMin;
-const CURL_SPEED_FULL = CURL.speedFull;
 
 /** Ring buffer of recent hand positions → smoothed punch velocity. */
 class VelocityTracker {
@@ -1419,13 +1426,17 @@ export class FightSystem extends createSystem({}) {
     );
     ball.vel.copy(_dir).multiplyScalar(speed);
     // Curve: read the swing's turn-rate, gate it on a committed (fast) swing,
-    // and store axis × rate as the in-flight curl. Same maths as the arena.
+    // and store axis × rate as the in-flight curl. Same maths as the arena —
+    // literally, now: both call curlRateFor/curlLead from config.js.
     let curlRate = 0;
     if (this.ballArc[hand]) {
       const raw = this.trackers[hand].curl(_curl, this.time);
-      const speedK = Math.max(0, Math.min(1, (handSpeed - CURL_SPEED_MIN) / (CURL_SPEED_FULL - CURL_SPEED_MIN)));
-      curlRate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
+      curlRate = curlRateFor(raw, handSpeed);
       ball.curl.copy(_curl).multiplyScalar(curlRate);
+      // Launch on the RELEASE tangent, not the tracker's window-average
+      // heading — on a hook they're tens of degrees apart (see CURL.window).
+      const lead = curlLead(raw);
+      if (lead > 0) ball.vel.applyAxisAngle(_curl, lead);
     } else {
       ball.curl.set(0, 0, 0);
     }

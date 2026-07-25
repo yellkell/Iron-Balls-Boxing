@@ -28,7 +28,28 @@ const http = createServer((req, res) => {
   res.end(JSON.stringify({ game: 'fire-fight', queue: queue.length, rooms: rooms.size }));
 });
 
-const wss = new WebSocketServer({ server: http });
+/**
+ * Frames are small JSON envelopes (a pose is ~150 bytes). `ws` defaults to a
+ * 100 MiB cap, which lets one client park a huge allocation on the relay for
+ * everybody else's bout; 64 KiB is miles above anything the game sends.
+ */
+const MAX_PAYLOAD = 64 * 1024;
+/**
+ * Stop relaying to a peer whose socket is backed up this far. A realtime game
+ * wants the NEWEST state, not a faithful replay of a stalled minute — without
+ * this, `send` queues without limit and a peer on bad Wi-Fi grows the relay's
+ * memory until it dies.
+ */
+const MAX_BUFFERED = 512 * 1024;
+
+const wss = new WebSocketServer({ server: http, maxPayload: MAX_PAYLOAD });
+
+// An 'error' event on a socket with no listener is re-thrown as an uncaught
+// exception — a single ECONNRESET (a headset dropping off Wi-Fi mid-bout) took
+// the whole relay down with it, and every live match with it. Same for the
+// server itself.
+wss.on('error', (err) => console.error('[fire-fight] server error', err));
+http.on('clientError', (_err, socket) => socket.destroy());
 
 /** Sockets waiting for an opponent, oldest first. */
 let queue = [];
@@ -37,7 +58,14 @@ const rooms = new Map();
 let nextRoomId = 1;
 
 function send(ws, obj) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+  if (!ws || ws.readyState !== ws.OPEN) return;
+  // Drop rather than queue for a backed-up peer (see MAX_BUFFERED). Match
+  // control messages are cheap and rare, so let those through regardless —
+  // it's the pose firehose that must yield.
+  if (ws.bufferedAmount > MAX_BUFFERED && obj.t === 'msg') return;
+  ws.send(JSON.stringify(obj), (err) => {
+    if (err) ws.terminate();
+  });
 }
 
 function leaveQueue(ws) {
@@ -75,6 +103,8 @@ function tryMatch() {
 
 wss.on('connection', (ws) => {
   ws.isAlive = true;
+  // Required: an unhandled socket 'error' crashes the process (see above).
+  ws.on('error', () => ws.terminate());
   ws.on('pong', () => {
     ws.isAlive = true;
   });
@@ -88,7 +118,12 @@ wss.on('connection', (ws) => {
     }
     switch (msg.t) {
       case 'queue':
-        if (!rooms.has(ws) && !queue.includes(ws)) {
+        // Re-queueing from inside a room means this client left the bout
+        // without telling us (a reload, say). Close the old room first, so the
+        // stale peer is notified instead of talking to a socket that has
+        // already moved on.
+        if (rooms.has(ws)) endRoom(ws);
+        if (!queue.includes(ws)) {
           queue.push(ws);
           send(ws, { t: 'waiting' });
           tryMatch();

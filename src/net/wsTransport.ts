@@ -29,10 +29,11 @@ export class WsTransport implements Transport {
         resolve();
       };
       ws.onerror = () => reject(new Error(`can't reach relay ${this.url}`));
+      // Any close we didn't ask for ends the bout — matched or still queueing.
+      // (This used to read `this.matched || true`, which is just `true` with
+      // extra steps; spelling it out so the intent isn't mistaken for a bug.)
       ws.onclose = () => {
-        if (!this.closed && (this.matched || true)) {
-          this.teardown('connection lost');
-        }
+        if (!this.closed) this.teardown('connection lost');
       };
       ws.onmessage = (ev) => this.onMessage(ev);
     });

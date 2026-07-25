@@ -117,36 +117,43 @@ function drawFrog(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
   ctx.restore();
 }
 
-/** Bunny head-on: a big round face with two LOP EARS drooping down past the
- *  cheeks, and the buck teeth knocked out dark under the nose. */
+/** OSWALD head-on: a big round face under two tall STAND-UP ears, with the
+ *  close-set eyes, nose and buck teeth knocked out dark. */
 function drawBunny(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  // The ears first (behind the face): long drops curving out then down.
+  // OSWALD, head-on: the ears first (behind the face) — tall STAND-UP blades
+  // leaning out off the crown with a soft break back near the tip.
   for (const s of [-1, 1]) {
     ctx.beginPath();
-    ctx.moveTo(cx + s * r * 0.22, cy - r * 0.72);
-    ctx.quadraticCurveTo(cx + s * r * 0.95, cy - r * 0.6, cx + s * r * 0.82, cy + r * 0.25);
-    ctx.quadraticCurveTo(cx + s * r * 0.76, cy + r * 0.62, cx + s * r * 0.56, cy + r * 0.6);
-    ctx.quadraticCurveTo(cx + s * r * 0.44, cy + r * 0.1, cx + s * r * 0.1, cy - r * 0.55);
+    ctx.moveTo(cx + s * r * 0.36, cy - r * 0.04);
+    ctx.quadraticCurveTo(cx + s * r * 0.58, cy - r * 0.56, cx + s * r * 0.5, cy - r * 0.98); // outer edge
+    ctx.quadraticCurveTo(cx + s * r * 0.42, cy - r * 1.16, cx + s * r * 0.24, cy - r * 1.0); // round tip
+    ctx.quadraticCurveTo(cx + s * r * 0.3, cy - r * 0.5, cx + s * r * 0.1, cy - r * 0.02); // inner edge
     ctx.closePath();
     ctx.fill();
   }
-  // The big round face.
+  // The big round face — Oswald is drawn from circles.
   ctx.beginPath();
-  ctx.ellipse(cx, cy, r * 0.62, r * 0.7, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy + r * 0.28, r * 0.6, r * 0.62, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#06070b';
-  // Nose + buck teeth knock-outs.
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + r * 0.18, r * 0.09, r * 0.07, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(cx - r * 0.1, cy + r * 0.34, r * 0.09, r * 0.2);
-  ctx.fillRect(cx + r * 0.01, cy + r * 0.34, r * 0.09, r * 0.2);
-  // Ear inner shadows.
+  // The big CLOSE-SET eyes — the whole likeness lives here.
   for (const s of [-1, 1]) {
     ctx.beginPath();
-    ctx.ellipse(cx + s * r * 0.72, cy + r * 0.1, r * 0.07, r * 0.28, s * 0.25, 0, Math.PI * 2);
+    ctx.ellipse(cx + s * r * 0.17, cy + r * 0.12, r * 0.14, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Nose + the buck teeth we kept.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.46, r * 0.09, r * 0.075, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - r * 0.1, cy + r * 0.58, r * 0.09, r * 0.2);
+  ctx.fillRect(cx + r * 0.01, cy + r * 0.58, r * 0.09, r * 0.2);
+  // Ear inner channels.
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + s * r * 0.32, cy - r * 0.52, r * 0.075, r * 0.32, s * 0.08, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

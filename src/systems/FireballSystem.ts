@@ -31,7 +31,7 @@ import { mesh } from '../net/mesh.js';
 import type { PeerMessage } from '../net/protocol.js';
 import { pulseHand } from '../input/haptics.js';
 import * as sfx from '../audio/sfx.js';
-import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, FIREBALL, NET } from '../config.js';
+import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, curlLead, curlRateFor, FIREBALL, NET } from '../config.js';
 
 const HANDS = ['left', 'right'] as const;
 type Hand = 0 | 1;
@@ -108,13 +108,9 @@ class VelocityTracker {
 }
 
 // Curveball tuning — the shared CURL block in config.ts (one source for the
-// arena and the pub fight hall), aliased to the names this file always used.
-const CURL_MIN = CURL.min;
-const CURL_GAIN = CURL.gain;
-const CURL_MAX = CURL.max;
+// arena and the pub fight hall). The raw-swing → curl-rate mapping lives there
+// too (curlRateFor/curlLead) so the two systems can't drift apart again.
 const CURL_DECAY = CURL.decay;
-const CURL_SPEED_MIN = CURL.speedMin;
-const CURL_SPEED_FULL = CURL.speedFull;
 
 const _grip = new Vector3();
 const _gripQ = new Quaternion();
@@ -495,15 +491,24 @@ export class FireballSystem extends createSystem({
     let curlRate = 0;
     if (app.ballArc[hand]) {
       // Dead zone: a near-straight punch (low swing curvature) throws straight;
-      // only a deliberate hook past CURL_MIN bends the ball. And ramp the whole
-      // thing in with swing speed, so small/jittery movements stay controllable
-      // and only wide committed swipes curve.
+      // only a deliberate hook past CURL.min bends the ball, and how HARD it
+      // bends scales with the hook — see curlRateFor in config.ts.
       const raw = this.trackers[hand].curl(_curl, this.time);
-      const speedK = Math.max(0, Math.min(1, (handSpeed - CURL_SPEED_MIN) / (CURL_SPEED_FULL - CURL_SPEED_MIN)));
-      curlRate = (raw <= CURL_MIN ? 0 : Math.min(CURL_MAX, (raw - CURL_MIN) * CURL_GAIN)) * speedK;
+      curlRate = curlRateFor(raw, handSpeed);
       c[0] = _curl.x * curlRate;
       c[1] = _curl.y * curlRate;
       c[2] = _curl.z * curlRate;
+      // Aim the throw where the hand was pointing AT RELEASE, not at the
+      // middle of the tracker's window. On a hook those differ by tens of
+      // degrees, and since ARC throws get no aim assist there was nothing to
+      // mask it: the ball simply left the fist wide of where you swung.
+      const lead = curlLead(raw);
+      if (lead > 0) {
+        _dir.applyAxisAngle(_curl, lead).normalize();
+        v[0] = _dir.x * speed;
+        v[1] = _dir.y * speed;
+        v[2] = _dir.z * speed;
+      }
     } else {
       c[0] = 0;
       c[1] = 0;

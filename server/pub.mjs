@@ -656,10 +656,19 @@ const http = createServer((req, res) => {
   );
 });
 
-const wss = new WebSocketServer({ server: http });
+// Frames here are small JSON envelopes; `ws` would otherwise accept 100 MiB
+// each, letting one punter park a huge allocation on the shared pub server.
+const wss = new WebSocketServer({ server: http, maxPayload: 64 * 1024 });
+
+// An 'error' event with no listener is re-thrown as an uncaught exception, so
+// one ECONNRESET (a headset dropping off Wi-Fi) would take the whole pub down
+// and everyone in it. Every socket needs a handler, and so does the server.
+wss.on('error', (err) => console.error('[pub] server error', err));
+http.on('clientError', (_err, socket) => socket.destroy());
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  ws.on('error', () => ws.terminate());
   ws.on('pong', () => {
     ws.isAlive = true;
   });

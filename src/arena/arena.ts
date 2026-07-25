@@ -16,11 +16,14 @@
 import {
   AdditiveBlending,
   BoxGeometry,
+  BufferGeometry,
   CanvasTexture,
+  CatmullRomCurve3,
   CircleGeometry,
   Color,
   CylinderGeometry,
   DoubleSide,
+  Float32BufferAttribute,
   Group,
   HemisphereLight,
   LinearFilter,
@@ -34,6 +37,8 @@ import {
   SphereGeometry,
   SRGBColorSpace,
   TorusGeometry,
+  TubeGeometry,
+  Vector3,
   type Object3D,
 } from 'three';
 import type { World } from '@iwsdk/core';
@@ -50,9 +55,73 @@ import { createTitleBanner } from './banner.js';
 let plateMaps: DiamondPlateMaps | undefined;
 
 /**
- * Neon rim piping: a bright white-hot core bar along every rim edge wrapped
+ * Set dressing that is IDENTICAL on every pedestal — the hazard stripes and
+ * the corner studs are never recoloured by a skin (applyPlatformSkin only
+ * touches the 'slab'/'neon-core'/'neon-halo' roles), so one texture, one
+ * material and one geometry can serve all seven pads instead of each pad
+ * minting its own. hazardTexture() builds a fresh canvas + GPU upload on every
+ * call, so this is the difference between one stripe texture and dozens.
+ */
+let hazardMat: MeshBasicMaterial | undefined;
+let boltGeo: CylinderGeometry | undefined;
+let boltMat: MeshStandardMaterial | undefined;
+
+/**
+ * Just proud of the slab's bevelled top face. The extrude BEVEL overhangs, so
+ * the real deck surface is at +0.015, NOT y=0 — anything laid on the deck has
+ * to clear that or it renders inside the steel and is never seen.
+ */
+const DECK_TOP = 0.02;
+
+/**
+ * The rim path: the octagon outline with every corner eased into a short arc,
+ * so a tube swept along it reads as ONE piece of bent glass. Real neon IS bent
+ * tubing — it has no mitred corners — which is why the rim used to give itself
+ * away: eight straight bars butt-jointed at 45° leave a visible notch at every
+ * vertex, and square bars leave eight of them.
+ */
+function rimPath(corner = 0.045): Vector3[] {
+  const pts: Vector3[] = [];
+  const n = OCTAGON_VERTICES.length;
+  const at = (i: number): Vector3 => {
+    const [x, z] = OCTAGON_VERTICES[((i % n) + n) % n];
+    return new Vector3(x, PLATFORM.rimLift, z);
+  };
+  for (let i = 0; i < n; i++) {
+    const cur = at(i);
+    const prev = at(i - 1);
+    const next = at(i + 1);
+    // Never eat more than half of either adjoining edge.
+    const r = Math.min(corner, cur.distanceTo(prev) / 2, cur.distanceTo(next) / 2);
+    const a = cur.clone().lerp(prev, r / cur.distanceTo(prev)); // arc start
+    const b = cur.clone().lerp(next, r / cur.distanceTo(next)); // arc end
+    pts.push(a);
+    // Quadratic Bézier a → cur → b: the bend itself.
+    for (const t of [0.35, 0.65]) {
+      const u = 1 - t;
+      pts.push(
+        new Vector3(
+          u * u * a.x + 2 * u * t * cur.x + t * t * b.x,
+          PLATFORM.rimLift,
+          u * u * a.z + 2 * u * t * cur.z + t * t * b.z,
+        ),
+      );
+    }
+    pts.push(b);
+  }
+  return pts;
+}
+
+/** Shared rim tube geometry — every pad wears the same octagon, so the two
+ *  sweeps are built once and only the MATERIALS differ per platform. */
+let rimCoreGeo: TubeGeometry | undefined;
+let rimHaloGeo: TubeGeometry | undefined;
+
+/**
+ * Neon rim piping: a bright white-hot core tube running the whole rim, wrapped
  * in a fatter additive halo of the team colour — proper neon tubing, not a
- * one-pixel line.
+ * one-pixel line. Two swept meshes for the entire ring, where this used to be
+ * sixteen boxes per pedestal (112 across the seven).
  */
 function makeNeonRim(color: number): Group {
   const rim = new Group();
@@ -69,57 +138,116 @@ function makeNeonRim(color: number): Group {
     depthWrite: false,
   });
   halo.userData.role = 'neon-halo';
-  const n = OCTAGON_VERTICES.length;
-  for (let i = 0; i < n; i++) {
-    const [ax, az] = OCTAGON_VERTICES[i];
-    const [bx, bz] = OCTAGON_VERTICES[(i + 1) % n];
-    const len = Math.hypot(bx - ax, bz - az) + 0.012; // overlap the corners
-    const midx = (ax + bx) / 2;
-    const midz = (az + bz) / 2;
-    const yaw = -Math.atan2(bz - az, bx - ax);
-    const bar = new Mesh(new BoxGeometry(len, 0.014, 0.014), core);
-    bar.position.set(midx, PLATFORM.rimLift, midz);
-    bar.rotation.y = yaw;
-    rim.add(bar);
-    const glow = new Mesh(new BoxGeometry(len, 0.04, 0.04), halo);
-    glow.position.copy(bar.position);
-    glow.rotation.y = yaw;
-    rim.add(glow);
+  if (!rimCoreGeo || !rimHaloGeo) {
+    // 'centripetal' keeps the spline from overshooting at the bends — with the
+    // default parameterisation the corners bulge outside the platform.
+    const curve = new CatmullRomCurve3(rimPath(), true, 'centripetal');
+    // 96 × 6 keeps the bends smooth at arm's length while trading ~15k extra
+    // triangles across the seven pads for 98 fewer draw calls — the right way
+    // round for a tile-based mobile GPU.
+    rimCoreGeo = new TubeGeometry(curve, 96, 0.008, 6, true);
+    rimHaloGeo = new TubeGeometry(curve, 96, 0.022, 6, true);
   }
+  rim.add(new Mesh(rimCoreGeo, core));
+  rim.add(new Mesh(rimHaloGeo, halo));
   return rim;
 }
 
-/** Flat hazard-striped warning band laid along each rim edge. */
-function makeHazardBand(): Group {
+/**
+ * The hazard-striped kick-band: an amber warning ring painted round the inside
+ * of the rim, marking the edge the boundary drains you for crossing.
+ *
+ * Built as ONE mitred ring rather than eight separate quads. Eight quads can't
+ * meet cleanly at an octagon's corners — butted they leave a wedge of bare
+ * steel at every vertex, overlapped they hang off the rim — so the ring is
+ * offset properly instead: each corner vertex is the intersection of its two
+ * inward-offset edge lines, which is a true mitre and keeps the band a constant
+ * width the whole way round.
+ *
+ * Stripe density is baked into the UVs rather than into a per-edge
+ * `texture.clone()` with its own `repeat`. That matters twice over: a clone
+ * shares the image but is a separate GPU upload, so the old code pushed eight
+ * copies of the same stripe texture per platform — 56 across the seven pads —
+ * and `repeat` lives on the texture, so it could not follow a platform that was
+ * SCALED. The raid pit is built at 2.4×, which stretched its stripes to two and
+ * a half times everyone else's. UVs scale with the mesh; textures don't, so
+ * `uvScale` compensates a known group scale and every pad stripes at one pitch.
+ */
+function makeHazardBand(uvScale = 1): Group {
   const band = new Group();
   band.name = 'hazard-band';
-  const tex = hazardTexture();
-  const width = 0.1;
+  // ONE shared texture + material for every pad.
+  hazardMat ??= new MeshBasicMaterial({
+    map: hazardTexture(),
+    transparent: true,
+    opacity: 0.85,
+    side: DoubleSide,
+  });
+  const width = 0.075;
+  const inset = 0.016; // hold the band clear of the neon tube's halo
   const n = OCTAGON_VERTICES.length;
+
+  // Inward unit normal of every edge (edge i runs vertex i → i+1).
+  const normals: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     const [ax, az] = OCTAGON_VERTICES[i];
     const [bx, bz] = OCTAGON_VERTICES[(i + 1) % n];
-    const dx = bx - ax;
-    const dz = bz - az;
-    const len = Math.hypot(dx, dz);
-    // Inward normal: shift the band just inside the rim line.
-    let nx = -dz / len;
-    let nz = dx / len;
-    const midx = (ax + bx) / 2;
-    const midz = (az + bz) / 2;
-    if (nx * midx + nz * midz > 0) {
+    const L = Math.hypot(bx - ax, bz - az);
+    let nx = -(bz - az) / L;
+    let nz = (bx - ax) / L;
+    if (nx * ((ax + bx) / 2) + nz * ((az + bz) / 2) > 0) {
       nx = -nx;
       nz = -nz;
     }
-    const geo = new PlaneGeometry(len, width);
-    geo.rotateX(-Math.PI / 2); // lie flat in XZ, +X along the edge
-    const mat = new MeshBasicMaterial({ map: tex.clone(), transparent: true, opacity: 0.85 });
-    mat.map!.repeat.set(Math.max(1, Math.round(len * 6)), 1);
-    const strip = new Mesh(geo, mat);
-    strip.position.set(midx + nx * (width / 2 + 0.01), PLATFORM.rimLift, midz + nz * (width / 2 + 0.01));
-    strip.rotation.y = -Math.atan2(dz, dx);
-    band.add(strip);
+    normals.push([nx, nz]);
   }
+  /** Vertex `i` pushed `d` inward — where its two offset edge lines cross. */
+  const mitre = (i: number, d: number): [number, number] => {
+    const [px, pz] = normals[(i - 1 + n) % n]; // edge arriving at this vertex
+    const [qx, qz] = normals[i]; // edge leaving it
+    const [vx, vz] = OCTAGON_VERTICES[i];
+    const det = px * qz - pz * qx;
+    if (Math.abs(det) < 1e-6) return [vx + d * px, vz + d * pz]; // straight run
+    const a = vx * px + vz * pz + d;
+    const b = vx * qx + vz * qz + d;
+    return [(a * qz - b * pz) / det, (px * b - qx * a) / det];
+  };
+
+  const outer = OCTAGON_VERTICES.map((_, i) => mitre(i, inset));
+  const inner = OCTAGON_VERTICES.map((_, i) => mitre(i, inset + width));
+
+  // u runs the perimeter, v across the width. Rounding the total tile count to
+  // a whole number is what lets the stripes meet seamlessly at the wrap.
+  let perim = 0;
+  const run: number[] = [0];
+  for (let i = 0; i < n; i++) {
+    perim += Math.hypot(outer[(i + 1) % n][0] - outer[i][0], outer[(i + 1) % n][1] - outer[i][1]);
+    run.push(perim);
+  }
+  const tiles = Math.max(1, Math.round(perim * uvScale * 6));
+
+  const pos: number[] = [];
+  const uvs: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const j = i % n;
+    const u = (run[i] / perim) * tiles;
+    pos.push(outer[j][0], DECK_TOP, outer[j][1]);
+    uvs.push(u, 0);
+    pos.push(inner[j][0], DECK_TOP, inner[j][1]);
+    uvs.push(u, 1);
+  }
+  // Duplicate the seam ring (i === n) so the wrap gets u = tiles, not u = 0.
+  for (let i = 0; i < n; i++) {
+    const o = i * 2;
+    idx.push(o, o + 2, o + 3, o, o + 3, o + 1);
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  band.add(new Mesh(geo, hazardMat));
   return band;
 }
 
@@ -127,14 +255,10 @@ function makeHazardBand(): Group {
 function makeCornerBolts(): Group {
   const bolts = new Group();
   bolts.name = 'corner-bolts';
-  const geo = new CylinderGeometry(0.028, 0.035, 0.035, 8);
-  const mat = new MeshStandardMaterial({
-    color: 0x202329,
-    metalness: 0.96,
-    roughness: 0.22,
-  });
+  boltGeo ??= new CylinderGeometry(0.028, 0.035, 0.035, 8);
+  boltMat ??= new MeshStandardMaterial({ color: 0x202329, metalness: 0.96, roughness: 0.22 });
   for (const [x, z] of OCTAGON_VERTICES) {
-    const bolt = new Mesh(geo, mat);
+    const bolt = new Mesh(boltGeo, boltMat);
     bolt.position.set(x * 0.97, 0.018, z * 0.97);
     bolts.add(bolt);
   }
@@ -146,7 +270,7 @@ function makeCornerBolts(): Group {
  * at floor level (your real floor IS the platform top), hazard banding and
  * corner bolts around the rim, and a thin team-colour glow line on the edge.
  */
-export function makePlatform(color: number): Group {
+export function makePlatform(color: number, groupScale = 1): Group {
   const group = new Group();
 
   plateMaps ??= diamondPlateTextures();
@@ -170,9 +294,12 @@ export function makePlatform(color: number): Group {
   // — anything painted on the deck must clear that, not y=0.
   slab.position.y = -PLATFORM.thickness;
   group.add(slab);
-  const DECK_TOP = 0.02; // just proud of the bevelled top face
 
-  group.add(makeHazardBand());
+  // `groupScale` is the scale the CALLER will put on this group (the raid pit
+  // stands at 2.4×). Stripe pitch is baked into UVs, which scale with the mesh,
+  // so it has to be compensated here or the boss pad stripes 2.4× coarser than
+  // every boxer's pad — which is exactly what it used to do.
+  group.add(makeHazardBand(groupScale));
   group.add(makeCornerBolts());
   group.add(makeNeonRim(color));
 
@@ -569,7 +696,7 @@ export function buildArena(world: World): Object3D {
   // danger red. Hidden outside raids (applyArenaLayout owns its visibility).
   // Stretched wide: every raid titan is GOLIATH-sized or bigger, so a
   // boxer-sized pad would read like a coaster under it.
-  const pit = makePlatform(PALETTE.danger);
+  const pit = makePlatform(PALETTE.danger, 2.4);
   pit.name = 'raid-boss-platform';
   pit.position.set(0, 0, -RAID_RING_RADIUS);
   pit.scale.set(2.4, 1, 2.4);

@@ -60,6 +60,12 @@ const HOST_TICK_MS = 2_500;
 const PRIVATE_FRESH_MS = 10 * 60 * 1000;
 /** Give P2P this long to come up before declaring failure. */
 const CONNECT_TIMEOUT_MS = 15_000;
+/** How long a host waits for a claimer's ANSWER before re-opening its lobby.
+ *  Claiming flips `open` to false, so a claimer who never answers (tab closed,
+ *  mic prompt abandoned, headset slept) strands the host: nobody else can claim
+ *  a closed lobby and the host has no timeout of its own — it just waits, for
+ *  ever, while looking busy to everyone else. */
+const CLAIM_ANSWER_MS = 20_000;
 
 /** Back-compat window for a lobby from an OLDER client that has no `seen` field
  *  yet — fall back to createdAt so a mid-rollout peer can still be matched. */
@@ -100,6 +106,19 @@ export class WebRtcTransport implements Transport {
   /** Quick one-off cross-over scans fired just after we become a host. */
   private earlyScans: ReturnType<typeof setTimeout>[] = [];
   private micStream: MediaStream | null = null;
+  /**
+   * ICE candidates that arrived BEFORE the remote description was set. Adding
+   * one early throws, and a Firestore snapshot never re-delivers an 'added',
+   * so an unbuffered early candidate is lost for good — costing the pair a
+   * connection path, or the whole connection when the lost one was the only
+   * route that worked. The mesh (net/meshImpl.ts) has always buffered these;
+   * the duel path was still dropping them.
+   */
+  private pendingCandidates: RTCIceCandidateInit[] = [];
+  /** Grace timer for a TRANSIENT 'disconnected' — see watchConnection. */
+  private iceGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Deadline for a claimer to actually answer — see runCallerOn. */
+  private claimWatchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly events: TransportEvents) {}
 
@@ -290,8 +309,12 @@ export class WebRtcTransport implements Transport {
     this.closed = true;
     this.matched = false;
     if (this.connectTimer) clearTimeout(this.connectTimer);
+    this.connectTimer = null;
     if (this.hostTimer) clearInterval(this.hostTimer);
     this.hostTimer = null;
+    this.clearIceGrace();
+    this.clearClaimWatch();
+    this.pendingCandidates.length = 0;
     for (const t of this.earlyScans) clearTimeout(t);
     this.earlyScans = [];
     for (const u of this.unsubs.splice(0)) u();
@@ -456,15 +479,41 @@ export class WebRtcTransport implements Transport {
     // Wait for the answer, then drink the callee's candidates.
     this.unsubs.push(
       onSnapshot(lobbyRef, (snap) => {
-        const answer = snap.data()?.answer as RTCSessionDescriptionInit | undefined;
-        if (answer && !pc.currentRemoteDescription) {
-          this.events.onStatus('opponent found — connecting…');
-          this.armConnectTimeout();
-          void pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(() => {});
+        const data = snap.data();
+        const answer = data?.answer as RTCSessionDescriptionInit | undefined;
+        if (answer) {
+          this.clearClaimWatch();
+          if (!pc.currentRemoteDescription) {
+            this.events.onStatus('opponent found — connecting…');
+            this.armConnectTimeout();
+            void pc
+              .setRemoteDescription(new RTCSessionDescription(answer))
+              .then(() => this.flushCandidates())
+              .catch(() => {});
+          }
+          return;
+        }
+        // Claimed (open flipped false) but not answered yet. Give them a
+        // deadline: if no answer lands, put the lobby back on the market
+        // rather than sitting here closed and unmatchable for ever.
+        if (data?.open === false && !this.claimWatchTimer && !this.matched && !this.closed) {
+          this.claimWatchTimer = setTimeout(() => {
+            this.claimWatchTimer = null;
+            if (this.closed || this.matched || !this.lobbyRef || pc.currentRemoteDescription) return;
+            this.events.onStatus('waiting for an opponent…');
+            void updateDoc(this.lobbyRef, { open: true, seen: serverTimestamp() }).catch(() => {});
+          }, CLAIM_ANSWER_MS);
         }
       }),
     );
     this.drinkCandidates(calleeCandidates);
+  }
+
+  private clearClaimWatch(): void {
+    if (this.claimWatchTimer) {
+      clearTimeout(this.claimWatchTimer);
+      this.claimWatchTimer = null;
+    }
   }
 
   // --- callee (guest, side 1) ---------------------------------------------------
@@ -498,6 +547,7 @@ export class WebRtcTransport implements Transport {
         unsub();
         void (async () => {
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          this.flushCandidates(); // the host's trickle lands during this window
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           await updateDoc(lobbyRef, { answer: { type: answer.type, sdp: answer.sdp } });
@@ -516,12 +566,22 @@ export class WebRtcTransport implements Transport {
       onSnapshot(candidates, (snap) => {
         for (const change of snap.docChanges()) {
           if (change.type !== 'added') continue;
-          void this.pc
-            ?.addIceCandidate(new RTCIceCandidate(change.doc.data() as RTCIceCandidateInit))
-            .catch(() => {});
+          const cand = change.doc.data() as RTCIceCandidateInit;
+          // Trickle-ICE race: until the remote description lands, addIceCandidate
+          // throws and the candidate is gone for good. Buffer early arrivals and
+          // flush them the moment the SDP is set.
+          if (!this.pc?.remoteDescription) this.pendingCandidates.push(cand);
+          else void this.pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
         }
       }),
     );
+  }
+
+  /** Feed the buffered early candidates in, now that the remote SDP is set. */
+  private flushCandidates(): void {
+    for (const cand of this.pendingCandidates.splice(0)) {
+      void this.pc?.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+    }
   }
 
   private adoptChannels(evt: RTCDataChannel, pose: RTCDataChannel | null): void {
@@ -544,6 +604,8 @@ export class WebRtcTransport implements Transport {
     if (this.matched || this.closed) return;
     this.matched = true;
     if (this.connectTimer) clearTimeout(this.connectTimer);
+    this.connectTimer = null;
+    this.clearClaimWatch();
     if (this.hostTimer) {
       clearInterval(this.hostTimer);
       this.hostTimer = null;
@@ -553,13 +615,46 @@ export class WebRtcTransport implements Transport {
     this.events.onMatched(this.isCaller ? 0 : 1);
   }
 
+  /** How long a 'disconnected' peer gets to come back before we call it dead. */
+  private static readonly ICE_GRACE_MS = 6_000;
+
   private watchConnection(): void {
     const pc = this.pc!;
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+      const state = pc.connectionState;
+      // 'disconnected' is TRANSIENT: ICE routinely blips through it on a Wi-Fi
+      // hiccup and recovers on its own a second later — Quest headsets do it
+      // constantly. Tearing down here ended live bouts over nothing, which is
+      // most of what "connection lost mid-fight" was. Only 'failed'/'closed'
+      // are terminal; a disconnect gets a grace window to come back first.
+      // (net/meshImpl.ts learned this already; the duel path hadn't.)
+      if (state === 'connected') {
+        this.clearIceGrace();
+        return;
+      }
+      if (state === 'disconnected') {
+        if (this.iceGraceTimer || this.closed) return;
+        this.iceGraceTimer = setTimeout(() => {
+          this.iceGraceTimer = null;
+          if (this.closed) return;
+          // 'completed' is an iceConnectionState, never a connectionState.
+          if (this.pc?.connectionState === 'connected') return; // it came back
+          this.teardown(this.matched ? 'connection lost' : "couldn't connect peer-to-peer");
+        }, WebRtcTransport.ICE_GRACE_MS);
+        return;
+      }
+      if (state === 'failed' || state === 'closed') {
+        this.clearIceGrace();
         this.teardown(this.matched ? 'connection lost' : "couldn't connect peer-to-peer");
       }
     };
+  }
+
+  private clearIceGrace(): void {
+    if (this.iceGraceTimer) {
+      clearTimeout(this.iceGraceTimer);
+      this.iceGraceTimer = null;
+    }
   }
 
   private armConnectTimeout(): void {
