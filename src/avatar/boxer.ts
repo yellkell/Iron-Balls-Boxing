@@ -765,15 +765,22 @@ function buildBearChest(accent: number): Group {
   const core = new Mesh(
     loftGeometry(
       [
-        { top: [0.24, -0.06], bot: [0.27, 0.14], w: 0.13, n: 2.0 }, // neck ring → hump
-        { top: [0.16, -0.17], bot: [0.18, 0.19], w: 0.28, n: 2.1 }, // shoulder line
-        { top: [0.04, -0.21], bot: [0.05, 0.19], w: 0.265, n: 2.1 }, // the barrel (deepest)
-        { top: [-0.12, -0.18], bot: [-0.12, 0.16], w: 0.225, n: 2.05 }, // ribs
-        // The waist used to pinch to 0.12 against a 0.30 shoulder — a taper
-        // that steep is a TEARDROP, and it read as a balloon on legs. Held
-        // wider it keeps a barrel-chested bear instead.
-        { top: [-0.28, -0.13], bot: [-0.28, 0.13], w: 0.165, n: 2.0 }, // waist
-        { top: [-0.31, -0.125], bot: [-0.31, 0.125], w: 0.16, n: 2.0 }, // hem — flat cut below the band
+        // Scale first, shape second. This hull used to run 0.265 wide by 0.20
+        // deep at the barrel — THREE TIMES the cross-section of the panther's
+        // trunk and every other fighter's. No amount of plating rescues a body
+        // that is three times the size of the ones beside it; it just reads as
+        // chunky. Brought to ~1.35x the panther: still plainly the heaviest
+        // frame on the roster, and now in the same family as the rest of it.
+        // The breadth that says "bear" lives in the SHOULDERS instead, which
+        // still reach as wide as anyone's.
+        { top: [0.24, -0.035], bot: [0.27, 0.115], w: 0.115, n: 2.0 }, // neck ring → hump
+        { top: [0.16, -0.115], bot: [0.18, 0.135], w: 0.185, n: 2.1 }, // shoulder line
+        { top: [0.04, -0.142], bot: [0.05, 0.122], w: 0.18, n: 2.1 }, // the barrel (deepest)
+        { top: [-0.12, -0.128], bot: [-0.12, 0.108], w: 0.16, n: 2.05 }, // ribs
+        // The waist also used to pinch to 0.12 against a 0.30 shoulder — a
+        // taper that steep is a TEARDROP. Held in proportion now.
+        { top: [-0.28, -0.095], bot: [-0.28, 0.095], w: 0.125, n: 2.0 }, // waist
+        { top: [-0.31, -0.092], bot: [-0.31, 0.092], w: 0.12, n: 2.0 }, // hem — flat cut below the band
       ],
       1,
     ),
@@ -781,10 +788,11 @@ function buildBearChest(accent: number): Group {
   );
   g.add(core);
 
-  // The hump proper stays organic muscle behind the neck.
-  const hump = new Mesh(new SphereGeometry(0.1, 16, 12), chassisMat(accent, 0.05));
-  hump.scale.set(1.25, 0.6, 0.9);
-  hump.position.set(0, 0.2, 0.08);
+  // The hump proper stays organic muscle behind the neck (re-fitted to the
+  // slimmer hull — at its old size it stood out past the shoulders).
+  const hump = new Mesh(new SphereGeometry(0.076, 16, 12), chassisMat(accent, 0.05));
+  hump.scale.set(1.2, 0.6, 0.9);
+  hump.position.set(0, 0.2, 0.055);
   g.add(hump);
 
   // Bespoke PAULDRONS: a domed crown shell with two smaller shells lapped
@@ -797,19 +805,26 @@ function buildBearChest(accent: number): Group {
   // lapped shells each ringed in neon gave every shoulder a stack of parallel
   // bright lines — which is precisely how a feathered WING is drawn, and it
   // was the single biggest reason this body read wrong.
+  // These keep their reach — the shoulders are where a bear carries its
+  // breadth, and they still span as wide as any other fighter's pads. It is
+  // the TORSO between them that came down, which is what turns "chunky" into
+  // "shoulder-heavy".
   for (const side of [-1, 1]) {
-    const cop = new Mesh(new SphereGeometry(0.112, 16, 12), chassisMat(accent, 0.05));
-    cop.scale.set(0.98, 0.86, 1.0);
-    cop.position.set(side * 0.235, 0.15, 0);
-    cop.rotation.z = side * -0.06;
+    // Flattened into caps rather than left near-spherical. On this armour
+    // (metalness 0.96, roughness 0.2) a sphere takes one big round specular
+    // and reads as a BALL bolted to the shoulder, whatever size it is.
+    const cop = new Mesh(new SphereGeometry(0.105, 16, 12), chassisMat(accent, 0.05));
+    cop.scale.set(1.16, 0.66, 0.94);
+    cop.position.set(side * 0.2, 0.152, 0);
+    cop.rotation.z = side * -0.09;
     g.add(cop);
-    const skirt = new Mesh(new SphereGeometry(0.094, 16, 12), chassisMat(accent, 0.05));
-    skirt.scale.set(0.98, 0.68, 0.96);
-    skirt.position.set(side * 0.252, 0.082, 0);
-    skirt.rotation.z = side * -0.16;
+    const skirt = new Mesh(new SphereGeometry(0.088, 16, 12), chassisMat(accent, 0.05));
+    skirt.scale.set(1.14, 0.54, 0.92);
+    skirt.position.set(side * 0.218, 0.094, 0);
+    skirt.rotation.z = side * -0.2;
     g.add(skirt);
     const rim = new Mesh(
-      new SphereGeometry(0.096, 16, 8, 0, Math.PI * 2, Math.PI * 0.44, 0.1),
+      new SphereGeometry(0.09, 16, 8, 0, Math.PI * 2, Math.PI * 0.44, 0.1),
       glowMat(accent, 0.32),
     );
     rim.scale.copy(skirt.scale);
@@ -821,21 +836,25 @@ function buildBearChest(accent: number): Group {
   // PEC PLATES: the torso loft is one smooth barrel, which on its own reads
   // as a balloon — the whole reason this body looked unfinished next to the
   // panther's plating. Two angled slabs give the chest a front.
+  // Re-seated onto the new hull: the barrel's front face is at z −0.142 now,
+  // not −0.20, and at the old depth these plates were half BURIED inside it,
+  // which is why the chest still read as one smooth mass with rectangles
+  // faintly showing through.
   for (const side of [-1, 1]) {
-    const pec = new Mesh(new BoxGeometry(0.155, 0.17, 0.07), chassisMat(accent, 0.05));
-    pec.position.set(side * 0.085, 0.02, -0.16);
+    const pec = new Mesh(new BoxGeometry(0.14, 0.16, 0.065), chassisMat(accent, 0.05));
+    pec.position.set(side * 0.078, 0.02, -0.14);
     pec.rotation.set(0.08, side * 0.36, side * 0.14);
     g.add(pec);
   }
   // The sternum seam between them.
-  const sternum = new Mesh(new BoxGeometry(0.022, 0.2, 0.03), glowMat(accent, 0.5));
-  sternum.position.set(0, 0.01, -0.2);
+  const sternum = new Mesh(new BoxGeometry(0.02, 0.19, 0.03), glowMat(accent, 0.5));
+  sternum.position.set(0, 0.01, -0.155);
   g.add(sternum);
 
   // A short fur fringe under the chest — the flanks stay clean.
   for (let i = -1; i <= 1; i++) {
-    const fringe = new Mesh(new BoxGeometry(0.05, 0.1, 0.025), darkMat());
-    fringe.position.set(i * 0.07, -0.12, -0.14);
+    const fringe = new Mesh(new BoxGeometry(0.048, 0.1, 0.025), darkMat());
+    fringe.position.set(i * 0.062, -0.12, -0.122);
     fringe.rotation.set(0.3, i * 0.25, i * 0.15);
     g.add(fringe);
   }
@@ -844,14 +863,14 @@ function buildBearChest(accent: number): Group {
   // plate now, so they read as damage to armour rather than neon stripes
   // drifting on a bare curve.
   for (let i = 0; i < 3; i++) {
-    const claw = new Mesh(new BoxGeometry(0.014, 0.1, 0.012), glowMat(accent, 0.9));
-    claw.position.set(-0.05 - i * 0.036, 0.045 - i * 0.012, -0.195 + i * 0.006);
+    const claw = new Mesh(new BoxGeometry(0.013, 0.095, 0.012), glowMat(accent, 0.9));
+    claw.position.set(-0.046 - i * 0.032, 0.045 - i * 0.012, -0.152 + i * 0.005);
     claw.rotation.set(0.12, -0.36, -0.35);
     g.add(claw);
   }
   for (let i = 0; i < 2; i++) {
-    const claw = new Mesh(new BoxGeometry(0.013, 0.08, 0.011), glowMat(accent, 0.7));
-    claw.position.set(0.12 + i * 0.036, -0.15 - i * 0.01, -0.145 + i * 0.008);
+    const claw = new Mesh(new BoxGeometry(0.012, 0.075, 0.011), glowMat(accent, 0.7));
+    claw.position.set(0.1 + i * 0.03, -0.15 - i * 0.01, -0.118 + i * 0.006);
     claw.rotation.set(0.1, 0.25, 0.4);
     g.add(claw);
   }
@@ -859,14 +878,14 @@ function buildBearChest(accent: number): Group {
   // Neon that wraps instead of floats: a collar band where the neck meets
   // the yoke, a waist band at the taper, and three ember studs glowing out
   // of each shoulder boulder like coals in the fur.
-  g.add(glowBand(accent, 0.228, 0.172, 0.128, 0.042, 0.018, 0.85));
-  // Re-fitted to the wider waist above — at the old 0.122 it floated inside
-  // the hull instead of wrapping it.
-  g.add(glowBand(accent, -0.29, 0.168, 0.134, 0.0, 0.016, 0.85));
+  // Both re-fitted to the slimmer hull — a band sized for the old barrel
+  // hangs in mid-air off a body this size.
+  g.add(glowBand(accent, 0.228, 0.126, 0.086, 0.03, 0.018, 0.85));
+  g.add(glowBand(accent, -0.29, 0.128, 0.098, 0.0, 0.016, 0.85));
   for (const side of [-1, 1]) {
     for (let j = 0; j < 3; j++) {
       const ember = new Mesh(new SphereGeometry(0.009, 8, 6), glowMat(accent, 1.6));
-      ember.position.set(side * (0.24 + j * 0.038), 0.203 - j * 0.02, -0.045 - j * 0.008);
+      ember.position.set(side * (0.215 + j * 0.034), 0.203 - j * 0.02, -0.04 - j * 0.008);
       g.add(ember);
     }
   }
