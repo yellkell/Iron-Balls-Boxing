@@ -192,6 +192,22 @@ const _eyeAccent = new Color();
 const rand = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
+/**
+ * The BLAZING and TIDEBREAKER decks each carry a point light. Worn by a boss
+ * pedestal that is a stage-and-a-half away, its glow buys nothing — and a
+ * light is never just its own shading cost: adding one to the scene changes
+ * every lit material's shader permutation, so the whole arena recompiles as
+ * the bout opens (a hitch exactly on the drop) and then pays for an extra
+ * light per pixel for the rest of the fight. The emissive ornaments carry the
+ * look without it. Handed back at teardown so a pad worn in the lobby or a
+ * duel still lights the way it should.
+ */
+function setDeckLight(pad: Object3D, on: boolean): void {
+  pad.traverse((o) => {
+    if ((o as { isLight?: boolean }).isLight) o.visible = on;
+  });
+}
+
 export class CampaignSystem extends createSystem({
   playerParts: { required: [Hitbox, PlayerBodyPart] },
   combatants: { required: [Combatant, Health] },
@@ -746,6 +762,7 @@ export class CampaignSystem extends createSystem({
       if (pad) {
         const deck = this.def.platform;
         applyPlatformSkin(pad, deck ? platformSkin(deck) : OPPONENT_DEFAULT_PLATFORM);
+        setDeckLight(pad, false);
         // No signature deck? Fall back to the house tint the pit has always
         // worn. (The skin pass above is still what clears a stale ornament.)
         if (!deck) tintPlatform(pad, this.raid() ? PALETTE.danger : teamColor(1));
@@ -890,6 +907,7 @@ export class CampaignSystem extends createSystem({
       const pad = this.scene.getObjectByName(name);
       if (!pad) continue;
       applyPlatformSkin(pad, OPPONENT_DEFAULT_PLATFORM);
+      setDeckLight(pad, true); // hand the lamp back for lobby/duel wear
       tintPlatform(pad, name === 'raid-boss-platform' ? PALETTE.danger : teamColor(1));
     }
   }

@@ -160,6 +160,26 @@ export const OCTAGON_VERTICES: Vector2Tuple[] = [
 ];
 
 /**
+ * FIXED FOVEATED RENDERING, 0..1. The headset renders the edges of your
+ * vision — where your eye has no acuity anyway — at reduced resolution, and
+ * hands the saved fill rate back. On a game this fill-bound (a raymarched gel
+ * boss over passthrough) it is the cheapest GPU there is.
+ *
+ * This was 0 (full resolution everywhere), because at Quest's default of 1.0
+ * the boundary between foveation regions shows as a head-locked dark band on
+ * dark, high-contrast content. But 0 pays for that band at the FULL price of
+ * peripheral pixels, and a frame that misses its deadline costs far more than
+ * a seam: the headset reprojects the last frame to cover the miss, and every
+ * time you turn your head the edges of your vision fall outside what was
+ * rendered — your real room, showing through the sides of the arena.
+ *
+ * A third is the compromise the original note pointed at: most of the saving,
+ * well short of the level that exposes the seam. If the band ever comes back,
+ * this is the one number to turn down.
+ */
+export const FOVEATION = 0.33;
+
+/**
  * Distance between the two pads, centre to centre. Blaston sits around 3.8 m;
  * boxing wants you closer, so the gap is tightened — punches connect faster
  * and dodges get twitchier.

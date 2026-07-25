@@ -12,6 +12,7 @@
 
 import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { installCrashTrap } from './debug/crashTrap.js';
+import { FOVEATION } from './config.js';
 import { initLeaderboard } from './net/leaderboard.js';
 import { initGazette } from './net/gazette.js';
 import { enterMenuMusic } from './audio/menuMusic.js';
@@ -42,6 +43,7 @@ import { PlayerGestureSystem } from './systems/PlayerGestureSystem.js';
 import { FXSystem } from './systems/FXSystem.js';
 import { DesertSystem } from './systems/DesertSystem.js';
 import { PlatformFXSystem } from './systems/PlatformFXSystem.js';
+import { PerfHudSystem } from './systems/PerfHudSystem.js';
 
 installCrashTrap(); // headset playtests have no console — trap + persist crashes
 
@@ -83,12 +85,7 @@ World.create(container, {
     camera: { position: [0, 1.6, 0] },
   },
 }).then(async (world) => {
-  // Quest's default maximum fixed foveation (super-three's WebXRManager ships
-  // foveation = 1.0) renders the display edges at lower resolution, and the
-  // boundary between foveation regions shows up as a head-locked dark band on
-  // dark/high-contrast content. Full resolution kills it outright; raise toward
-  // ~0.2 later if we want some of the perf back without exposing the seam.
-  world.renderer.xr.setFoveation(0);
+  world.renderer.xr.setFoveation(FOVEATION);
 
   initLeaderboard(); // anonymous profile + first board fetch
   initGazette(); // pull the day's Gasket Gazette for the lobby paper button
@@ -128,6 +125,8 @@ World.create(container, {
   world.registerSystem(FXSystem);
   // Earned trophy pads stay alive: BLAZING burns and TIDEBREAKER surges.
   world.registerSystem(PlatformFXSystem);
+  // Frame-time readout; builds nothing unless the page is opened with ?perf=1.
+  world.registerSystem(PerfHudSystem);
   // The optional papercraft desert backdrop (off = bare AR passthrough).
   world.registerSystem(DesertSystem);
 
