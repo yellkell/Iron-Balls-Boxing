@@ -108,3 +108,50 @@ export const GEL_LOOK = {
   wobble: 0.010,
   wobbleAgitated: 0.044,
 };
+
+/**
+ * RAYMARCH — how the gel shader walks a ray to the surface. Pure performance
+ * and robustness; none of it changes what the creature looks like except at
+ * the very edge of the silhouette.
+ *
+ * The numbers come from replaying the shader's marcher on the CPU against a
+ * 900-step ground-truth trace, over every attack silhouette the boss can
+ * strike (jab / cross / uppercut / backfist / clap, telegraph and strike) x
+ * five player vantage points x both step budgets.
+ */
+export const MARCH = {
+  /**
+   * Over-relaxation factor for the sphere trace (1 = plain full-distance
+   * steps). A grazing ray — one skimming the underside of a raised fist —
+   * creeps in ever-smaller steps and used to run its budget dry BEFORE
+   * reaching the torso behind, which the shader then discarded: a hole
+   * straight through the body. Stepping 1.2x the safe distance (backtracking
+   * the one time it overshoots) clears a graze in a handful of steps.
+   */
+  omega: 1.2,
+  /**
+   * How far the surface-hit tolerance opens up by the LAST step of the
+   * budget (metres, creature-native). Ramped cubically, so an early hit keeps
+   * its exact silhouette and only a ray that is about to give up settles for
+   * "close enough".
+   */
+  graze: 0.012,
+  /**
+   * Last-resort: a ray that spends its whole budget without ever leaving the
+   * gel's neighbourhood shades its closest approach if it got within this.
+   * The old shader applied a flat 0.09 to any ray that merely ran out of
+   * steps, which fattened the whole silhouette by ~15%; gating it on "never
+   * left the gel" lets this be tighter AND catch more.
+   */
+  mercy: 0.06,
+  /**
+   * How far each blob sphere is inflated for the march's bounding interval.
+   * It has to contain everything the raw spheres don't: the chained
+   * smooth-min bulges the isosurface outward wherever blobs fuse (measured at
+   * up to 0.5x the blend width across the boss's poses) and the wobble adds
+   * its full amplitude on top. Anything under-sized slices the webbing
+   * between limbs clean off, so this keeps ~20% headroom over the worst
+   * measured reach.
+   */
+  pad: (blend: number): number => blend * 0.55 + GEL_LOOK.wobbleAgitated + 0.02,
+};

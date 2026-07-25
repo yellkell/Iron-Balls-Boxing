@@ -445,8 +445,8 @@ export class GelCreature {
       _m,
     );
     // Strike-time blend widening (see sim.blendScale) — shader stays in
-    // lock-step with the CPU field.
-    this.gel.material.uniforms.uBlend.value = CREATURE.blend * this.sim.blendScale;
+    // lock-step with the CPU field, and the march's bounds widen with it.
+    this.gel.setBlend(CREATURE.blend * this.sim.blendScale);
 
     // Shadow hugs the current mass footprint.
     const spread = Math.max(_v2.x, _v2.z) * 2.4;
