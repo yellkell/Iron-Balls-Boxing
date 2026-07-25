@@ -766,11 +766,14 @@ function buildBearChest(accent: number): Group {
     loftGeometry(
       [
         { top: [0.24, -0.06], bot: [0.27, 0.14], w: 0.13, n: 2.0 }, // neck ring → hump
-        { top: [0.16, -0.17], bot: [0.18, 0.19], w: 0.3, n: 2.1 }, // shoulder line
-        { top: [0.04, -0.21], bot: [0.05, 0.19], w: 0.27, n: 2.1 }, // the barrel (deepest)
-        { top: [-0.12, -0.17], bot: [-0.12, 0.15], w: 0.2, n: 2.05 }, // ribs
-        { top: [-0.28, -0.1], bot: [-0.28, 0.1], w: 0.12, n: 2.0 }, // waist
-        { top: [-0.31, -0.095], bot: [-0.31, 0.095], w: 0.115, n: 2.0 }, // hem — flat cut below the band
+        { top: [0.16, -0.17], bot: [0.18, 0.19], w: 0.28, n: 2.1 }, // shoulder line
+        { top: [0.04, -0.21], bot: [0.05, 0.19], w: 0.265, n: 2.1 }, // the barrel (deepest)
+        { top: [-0.12, -0.18], bot: [-0.12, 0.16], w: 0.225, n: 2.05 }, // ribs
+        // The waist used to pinch to 0.12 against a 0.30 shoulder — a taper
+        // that steep is a TEARDROP, and it read as a balloon on legs. Held
+        // wider it keeps a barrel-chested bear instead.
+        { top: [-0.28, -0.13], bot: [-0.28, 0.13], w: 0.165, n: 2.0 }, // waist
+        { top: [-0.31, -0.125], bot: [-0.31, 0.125], w: 0.16, n: 2.0 }, // hem — flat cut below the band
       ],
       1,
     ),
@@ -784,18 +787,50 @@ function buildBearChest(accent: number): Group {
   hump.position.set(0, 0.2, 0.08);
   g.add(hump);
 
-  // Bespoke PAULDRONS: a domed crown shell with two smaller shells
-  // cascading tight beneath it, wrapping the shoulder's curve — heavy
-  // lapped bear armour, each plate mostly tucked under the one above.
+  // Bespoke PAULDRONS: a domed crown shell with two smaller shells lapped
+  // tight beneath it, wrapping the shoulder's curve — heavy bear armour.
+  //
+  // These were flat (y-scale 0.55 and falling) and fanned outward on a rising
+  // tilt, which read as a pair of feathered WINGS rather than shoulder plate.
+  // Domed, pulled in against the shoulder and barely tilted, they lap.
+  // TWO plates, not three, and only the lower one carries a lit edge. Three
+  // lapped shells each ringed in neon gave every shoulder a stack of parallel
+  // bright lines — which is precisely how a feathered WING is drawn, and it
+  // was the single biggest reason this body read wrong.
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      const plate = new Mesh(new SphereGeometry(0.105 - i * 0.02, 16, 12), chassisMat(accent, 0.05));
-      plate.scale.set(1.1, 0.55 - i * 0.06, 1.0);
-      plate.position.set(side * (0.28 + i * 0.012), 0.165 - i * 0.042, 0);
-      plate.rotation.z = side * -(0.15 + i * 0.22);
-      g.add(plate);
-    }
+    const cop = new Mesh(new SphereGeometry(0.112, 16, 12), chassisMat(accent, 0.05));
+    cop.scale.set(0.98, 0.86, 1.0);
+    cop.position.set(side * 0.235, 0.15, 0);
+    cop.rotation.z = side * -0.06;
+    g.add(cop);
+    const skirt = new Mesh(new SphereGeometry(0.094, 16, 12), chassisMat(accent, 0.05));
+    skirt.scale.set(0.98, 0.68, 0.96);
+    skirt.position.set(side * 0.252, 0.082, 0);
+    skirt.rotation.z = side * -0.16;
+    g.add(skirt);
+    const rim = new Mesh(
+      new SphereGeometry(0.096, 16, 8, 0, Math.PI * 2, Math.PI * 0.44, 0.1),
+      glowMat(accent, 0.32),
+    );
+    rim.scale.copy(skirt.scale);
+    rim.position.copy(skirt.position);
+    rim.rotation.copy(skirt.rotation);
+    g.add(rim);
   }
+
+  // PEC PLATES: the torso loft is one smooth barrel, which on its own reads
+  // as a balloon — the whole reason this body looked unfinished next to the
+  // panther's plating. Two angled slabs give the chest a front.
+  for (const side of [-1, 1]) {
+    const pec = new Mesh(new BoxGeometry(0.155, 0.17, 0.07), chassisMat(accent, 0.05));
+    pec.position.set(side * 0.085, 0.02, -0.16);
+    pec.rotation.set(0.08, side * 0.36, side * 0.14);
+    g.add(pec);
+  }
+  // The sternum seam between them.
+  const sternum = new Mesh(new BoxGeometry(0.022, 0.2, 0.03), glowMat(accent, 0.5));
+  sternum.position.set(0, 0.01, -0.2);
+  g.add(sternum);
 
   // A short fur fringe under the chest — the flanks stay clean.
   for (let i = -1; i <= 1; i++) {
@@ -805,12 +840,13 @@ function buildBearChest(accent: number): Group {
     g.add(fringe);
   }
 
-  // The scars: three claw-mark slashes glowing across the left of the chest,
-  // and an older two-slash rake low on the right flank.
+  // The scars: three claw-mark slashes raked across the LEFT pec — on the
+  // plate now, so they read as damage to armour rather than neon stripes
+  // drifting on a bare curve.
   for (let i = 0; i < 3; i++) {
-    const claw = new Mesh(new BoxGeometry(0.016, 0.11, 0.012), glowMat(accent, 0.9));
-    claw.position.set(-0.04 - i * 0.042, 0.04 - i * 0.012, -0.202 + i * 0.006);
-    claw.rotation.set(0.12, 0, -0.35);
+    const claw = new Mesh(new BoxGeometry(0.014, 0.1, 0.012), glowMat(accent, 0.9));
+    claw.position.set(-0.05 - i * 0.036, 0.045 - i * 0.012, -0.195 + i * 0.006);
+    claw.rotation.set(0.12, -0.36, -0.35);
     g.add(claw);
   }
   for (let i = 0; i < 2; i++) {
@@ -824,7 +860,9 @@ function buildBearChest(accent: number): Group {
   // the yoke, a waist band at the taper, and three ember studs glowing out
   // of each shoulder boulder like coals in the fur.
   g.add(glowBand(accent, 0.228, 0.172, 0.128, 0.042, 0.018, 0.85));
-  g.add(glowBand(accent, -0.29, 0.122, 0.104, 0.0, 0.016, 0.85));
+  // Re-fitted to the wider waist above — at the old 0.122 it floated inside
+  // the hull instead of wrapping it.
+  g.add(glowBand(accent, -0.29, 0.168, 0.134, 0.0, 0.016, 0.85));
   for (const side of [-1, 1]) {
     for (let j = 0; j < 3; j++) {
       const ember = new Mesh(new SphereGeometry(0.009, 8, 6), glowMat(accent, 1.6));
@@ -952,8 +990,41 @@ function buildEagleChest(accent: number): Group {
 /** BEAR hips: NONE — the redesigned bodies are a clean V, the torso
  *  tapering to a point with nothing below (the pelvis hitbox sphere is
  *  unchanged; there's just no geometry drawn at it). */
-function buildBearPelvis(_accent: number): Group {
-  return taggedHead('cobalt');
+function buildBearPelvis(accent: number): Group {
+  // This used to return an EMPTY group — the bear was the only skin on the
+  // roster wearing no hips at all, which is most of why its lower half looked
+  // unfinished next to everything else. Built heavy to match the shoulders:
+  // a thick belt on a big buckle, broad slab tassets, and a fur skirt.
+  const g = taggedHead('cobalt');
+  const belt = new Mesh(new BoxGeometry(0.22, 0.062, 0.17), chassisMat(accent, 0.04));
+  belt.position.y = 0.05;
+  g.add(belt);
+  const beltGlow = new Mesh(new BoxGeometry(0.225, 0.014, 0.175), glowMat(accent, 0.45));
+  beltGlow.position.y = 0.078;
+  g.add(beltGlow);
+  // A heavy round buckle — the bear's is a boss stud, not the panther's blade.
+  const buckle = new Mesh(new SphereGeometry(0.036, 14, 10), glowMat(accent, 1.0));
+  buckle.scale.set(1, 0.9, 0.55);
+  buckle.position.set(0, 0.05, -0.09);
+  g.add(buckle);
+  for (const side of [-1, 1]) {
+    const tasset = new Mesh(new BoxGeometry(0.085, 0.185, 0.14), chassisMat(accent, 0.04));
+    tasset.position.set(side * 0.105, -0.055, 0);
+    tasset.rotation.z = side * 0.26;
+    g.add(tasset);
+    const edge = new Mesh(new BoxGeometry(0.09, 0.014, 0.145), glowMat(accent, 0.4));
+    edge.position.set(side * 0.13, -0.14, 0);
+    edge.rotation.z = side * 0.26;
+    g.add(edge);
+  }
+  // Shaggy fur hanging off the back of the belt.
+  for (let i = -1; i <= 1; i++) {
+    const shag = new Mesh(new BoxGeometry(0.06, 0.13, 0.03), darkMat());
+    shag.position.set(i * 0.065, -0.03, 0.085);
+    shag.rotation.set(-0.2, i * 0.2, i * 0.12);
+    g.add(shag);
+  }
+  return g;
 }
 
 /** PANTHER hips: slim belt, a pointed guard, bladed glow-edged tassets —
@@ -1748,13 +1819,22 @@ function buildWolfChest(accent: number): Group {
 
   // Swept shoulder pads with a glow lip, and a raked-back fur spike off each
   // outer edge — leaner than the panther's upright blade.
+  // Swept shoulder pads with a glow lip, and a raked-back fur spike off each
+  // outer edge — leaner than the panther's upright blade. Capped with a dome:
+  // a bare slab reads as a PLANK bolted to the shoulder, and the wolf's stuck
+  // out flatter than anything else on the roster.
   for (const side of [-1, 1]) {
-    const pad = new Mesh(new BoxGeometry(0.19, 0.07, 0.26), chassisMat(accent, 0.05));
-    pad.position.set(side * 0.27, 0.12, 0);
+    const pad = new Mesh(new BoxGeometry(0.185, 0.07, 0.25), chassisMat(accent, 0.05));
+    pad.position.set(side * 0.26, 0.12, 0);
     pad.rotation.z = side * -0.26;
     g.add(pad);
-    const lip = new Mesh(new BoxGeometry(0.195, 0.015, 0.265), glowMat(accent, 0.55));
-    lip.position.set(side * 0.27, 0.165, 0);
+    const cap = new Mesh(new SphereGeometry(0.098, 16, 12), chassisMat(accent, 0.05));
+    cap.scale.set(0.95, 0.52, 1.28);
+    cap.position.set(side * 0.26, 0.128, 0);
+    cap.rotation.z = side * -0.26;
+    g.add(cap);
+    const lip = new Mesh(new BoxGeometry(0.19, 0.015, 0.255), glowMat(accent, 0.55));
+    lip.position.set(side * 0.265, 0.088, 0);
     lip.rotation.z = side * -0.26;
     g.add(lip);
     const spike = new Mesh(new ConeGeometry(0.028, 0.16, 4), darkMat());
@@ -1762,12 +1842,13 @@ function buildWolfChest(accent: number): Group {
     spike.rotation.set(0.6, 0, side * -0.55);
     g.add(spike);
   }
-  // HACKLES: a row of raised fur spikes along the back of the collar, tallest
-  // at the centre — the wolf's back is up.
-  for (let i = -2; i <= 2; i++) {
-    const hackle = new Mesh(new ConeGeometry(0.024, 0.14 - Math.abs(i) * 0.025, 4), darkMat());
-    hackle.position.set(i * 0.07, 0.17, 0.1);
-    hackle.rotation.x = 0.5;
+  // HACKLES: raised fur along the back of the collar, tallest at the centre —
+  // the wolf's back is up. Three, raked hard back and kept low: five upright
+  // spikes across the collar read as a picket fence worn as a necklace.
+  for (let i = -1; i <= 1; i++) {
+    const hackle = new Mesh(new ConeGeometry(0.026, 0.115 - Math.abs(i) * 0.03, 4), darkMat());
+    hackle.position.set(i * 0.085, 0.155, 0.115);
+    hackle.rotation.set(0.95, 0, i * 0.2);
     g.add(hackle);
   }
 
@@ -1790,13 +1871,22 @@ function buildWolfChest(accent: number): Group {
     claw.rotation.set(0.12, 0, 0.35);
     g.add(claw);
   }
-  // …and the pack mark: five moon-embers in a crescent on the left.
-  for (let i = 0; i < 5; i++) {
-    const a = -0.5 + i * 0.35;
-    const ember = new Mesh(new SphereGeometry(0.008, 8, 6), glowMat(accent, 1.5));
-    ember.position.set(-0.1 + Math.sin(a) * 0.045, 0.03 + Math.cos(a) * 0.055, -0.178);
-    g.add(ember);
-  }
+  // …and the pack mark on the left: a moon CRESCENT, cut as a lit disc with a
+  // dark disc bitten out of it. Five loose pinhead spheres just read as
+  // scattered dots, not a mark anybody put there.
+  const moon = new Mesh(new SphereGeometry(0.042, 18, 14), glowMat(accent, 1.1));
+  moon.scale.set(1, 1, 0.16);
+  moon.position.set(-0.098, 0.03, -0.176);
+  g.add(moon);
+  // The bite is cut in the PLATE's own steel, not in black — as a dark disc
+  // it lit up as a glossy 8-ball sitting on the chest instead of reading as
+  // the missing part of a moon.
+  // Flattened hard: any curvature left on it catches its own specular and the
+  // "missing" half starts reading as a second disc laid over the moon.
+  const bite = new Mesh(new SphereGeometry(0.038, 18, 14), chassisMat(accent, 0.02));
+  bite.scale.set(1, 1, 0.05);
+  bite.position.set(-0.126, 0.036, -0.18);
+  g.add(bite);
 
   // Chevron abs with glow seams, hard flanks — the shared sharp underbody.
   for (let i = 0; i < 3; i++) {
@@ -1869,31 +1959,59 @@ function buildFrogHead(accent: number): Group {
   );
   g.add(skull);
 
-  // The eye turrets: big domes on TOP of the skull with forward glow lenses
-  // and the frog's horizontal slit pupils riding proud of the glass.
+  // The eye turrets: big domes on TOP of the skull, each a dark socket cup
+  // with a glowing lens set INTO it and a slit pupil sunk in the glass.
+  //
+  // The lens used to be a bare glow ball with the pupil floating as a bar in
+  // front of it — two headlights with a slot across them, which is where the
+  // "toy" read came from. Ringing the lens in dark and sinking the slit gives
+  // it somewhere to sit.
   for (const side of [-1, 1]) {
     const dome = new Mesh(new SphereGeometry(r * 0.27, 16, 12), chassisMat(accent, 0.05));
     dome.position.set(side * r * 0.38, r * 0.5, -r * 0.32);
     g.add(dome);
-    const lens = new Mesh(new SphereGeometry(r * 0.17, 14, 12), glowMat(accent, 2.0));
-    lens.position.set(side * r * 0.38, r * 0.54, -r * 0.44);
+    const socket = new Mesh(new SphereGeometry(r * 0.21, 16, 12), darkMat());
+    socket.scale.set(1, 1, 0.9);
+    socket.position.set(side * r * 0.38, r * 0.52, -r * 0.4);
+    g.add(socket);
+    const lens = new Mesh(new SphereGeometry(r * 0.165, 14, 12), glowMat(accent, 1.7));
+    lens.position.set(side * r * 0.38, r * 0.53, -r * 0.46);
     g.add(lens);
-    const pupil = new Mesh(new BoxGeometry(r * 0.17, r * 0.05, r * 0.03), darkMat());
-    pupil.position.set(side * r * 0.38, r * 0.54, -r * 0.6);
+    // The slit, sunk into the lens rather than hovering off it.
+    // Sat at -0.56 this was swallowed INSIDE the lens sphere (whose front face
+    // is out at -0.625) and the eye read blank. Bring it to the glass.
+    const pupil = new Mesh(new BoxGeometry(r * 0.2, r * 0.055, r * 0.05), darkMat());
+    pupil.position.set(side * r * 0.38, r * 0.53, -r * 0.61);
     g.add(pupil);
+    // A brow shelf capping the turret — turns a ball into a browed eye.
+    const brow = new Mesh(new BoxGeometry(r * 0.34, r * 0.07, r * 0.2), chassisMat(accent, 0.05));
+    brow.position.set(side * r * 0.38, r * 0.7, -r * 0.34);
+    brow.rotation.set(0.24, 0, side * 0.12);
+    g.add(brow);
+    // TYMPANUM: the big round eardrum disc behind each eye. No frog reads as
+    // a frog without them, and this head had nothing at all on its cheeks.
+    const drum = new Mesh(new SphereGeometry(r * 0.14, 14, 12), darkMat());
+    drum.scale.set(0.5, 1, 1);
+    drum.position.set(side * r * 0.62, r * 0.12, -r * 0.12);
+    g.add(drum);
+    const drumRing = new Mesh(new SphereGeometry(r * 0.155, 14, 12), glowMat(accent, 0.3));
+    drumRing.scale.set(0.42, 1, 1);
+    drumRing.position.set(side * r * 0.6, r * 0.12, -r * 0.12);
+    g.add(drumRing);
   }
 
-  // The smile: a wide mouth line wrapping the snout in three dark segments —
-  // straight across the front, swept back and up into each cheek.
-  const smileMid = new Mesh(new BoxGeometry(r * 0.62, r * 0.035, r * 0.03), darkMat());
-  smileMid.position.set(0, -r * 0.22, -r * 0.9);
+  // The smile: ONE continuous line wrapping the snout, built from overlapping
+  // segments that meet. As three separate bars with gaps at the joins it read
+  // as scratches under the nose rather than a mouth.
+  const smileMid = new Mesh(new BoxGeometry(r * 0.66, r * 0.04, r * 0.035), darkMat());
+  smileMid.position.set(0, -r * 0.22, -r * 0.89);
   g.add(smileMid);
   for (const side of [-1, 1]) {
     // Hugging the snout's curve — any longer/straighter and the ends poked
     // past the cheeks like whiskers.
-    const corner = new Mesh(new BoxGeometry(r * 0.38, r * 0.035, r * 0.03), darkMat());
-    corner.position.set(side * r * 0.4, -r * 0.16, -r * 0.68);
-    corner.rotation.set(0, side * 0.85, side * 0.12);
+    const corner = new Mesh(new BoxGeometry(r * 0.42, r * 0.04, r * 0.035), darkMat());
+    corner.position.set(side * r * 0.36, -r * 0.185, -r * 0.74);
+    corner.rotation.set(0, side * 0.72, side * 0.14);
     g.add(corner);
   }
 
@@ -1903,6 +2021,12 @@ function buildFrogHead(accent: number): Group {
   sac.scale.set(1.25, 0.7, 0.95);
   sac.position.set(0, -r * 0.44, -r * 0.5);
   g.add(sac);
+  // A lit seam where the sac meets the jaw, so it reads as part of the head
+  // instead of a second blob parked underneath it.
+  const sacSeam = new Mesh(new SphereGeometry(r * 0.31, 16, 8, 0, Math.PI * 2, Math.PI * 0.32, 0.12), glowMat(accent, 0.28));
+  sacSeam.scale.set(1.25, 0.7, 0.95);
+  sacSeam.position.copy(sac.position);
+  g.add(sacSeam);
   for (const side of [-1, 1]) {
     const nostril = new Mesh(new SphereGeometry(r * 0.035, 8, 6), darkMat());
     nostril.position.set(side * r * 0.1, r * 0.12, -r * 0.9);
