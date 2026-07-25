@@ -598,6 +598,7 @@ export class MenuSystem extends createSystem({}) {
         // holding lobbies open for squads that wandered off.
         app.lobbyMode = null;
         app.lobbyView = 'browser';
+        app.privateCode = ''; // a coded room is spent the moment you walk out
         mesh.cancel();
         break;
       case 'lobby-host':
@@ -623,6 +624,7 @@ export class MenuSystem extends createSystem({}) {
       case 'lobby-leave':
         mesh.cancel();
         app.lobbyView = 'browser';
+        app.privateCode = '';
         break;
       case 'campaign-speedrun':
       case 'campaign-hardcore':
@@ -709,6 +711,14 @@ export class MenuSystem extends createSystem({}) {
         break;
       case 'cancel-queue':
         net.cancel();
+        // A private BRAWL is being reserved on the MESH, not the duel transport,
+        // so net.cancel() alone would leave the room behind holding a code
+        // nobody is ever going to use. Narrow on purpose: this is only the
+        // private 2v2/FFA hosting face, never a live arcade lobby.
+        if (app.duelView === 'hosting' && app.privateMode !== '1v1') {
+          mesh.cancel();
+          app.privateCode = '';
+        }
         app.state = 'menu';
         app.duelView = 'root';
         app.codeEntry = '';
@@ -716,11 +726,24 @@ export class MenuSystem extends createSystem({}) {
       case 'private-open':
         app.duelView = 'private';
         break;
+      case 'private-mode-1v1':
+        app.privateMode = '1v1';
+        break;
+      case 'private-mode-2v2':
+        app.privateMode = '2v2';
+        break;
+      case 'private-mode-ffa':
+        app.privateMode = 'ffa';
+        break;
       case 'private-create':
         app.duelView = 'hosting';
         app.privateCode = '';
         app.state = 'queueing';
-        net.createPrivate();
+        // 1V1 is the ordinary duel over the 1v1 transport, untouched. 2V2 and
+        // FFA need four seats, which is the arcade MESH's job — so those open a
+        // coded mesh room and hand over to the normal lobby lifecycle.
+        if (app.privateMode === '1v1') net.createPrivate();
+        else this.hostPrivateBrawl(app.privateMode);
         break;
       case 'private-enter':
         app.duelView = 'keypad';
@@ -737,7 +760,7 @@ export class MenuSystem extends createSystem({}) {
       case 'kp-join':
         if (app.codeEntry.length === 5) {
           app.state = 'queueing';
-          net.joinPrivate(app.codeEntry);
+          this.joinByCode(app.codeEntry);
         }
         break;
       case 'toggle-passthrough':
@@ -1320,6 +1343,60 @@ export class MenuSystem extends createSystem({}) {
     app.lobbyView = mesh.joined ? 'lobby' : 'browser';
   }
 
+  /**
+   * PRIVATE 2v2 / FFA: reserve a code, open the room, then hand straight over
+   * to the ordinary arcade lobby lifecycle — seats fill, a full room
+   * auto-launches, FFA can start short-handed, LEAVE tears it down. The room is
+   * identical to a listed one except that it lives in `privateRooms`, so it
+   * never appears in the browser and can only be reached by the code.
+   */
+  private hostPrivateBrawl(mode: ArcadeMode): void {
+    void (async () => {
+      try {
+        const code = await mesh.hostPrivate(mode, myStats().name, (s) => {
+          app.netStatus = s;
+        });
+        app.privateCode = code; // the lobby panel keeps it on screen
+        app.lobbyMode = mode;
+        app.lobbyView = 'lobby';
+        app.state = 'menu';
+        app.duelView = 'root';
+      } catch {
+        app.netStatus = 'could not open a private room';
+        app.state = 'menu';
+        app.duelView = 'private';
+        app.privateCode = '';
+      }
+    })();
+  }
+
+  /**
+   * Join by code without asking which format it is. A code belongs either to a
+   * coded MESH room (2v2 / ffa — the doc carries its own mode) or to a 1v1 duel
+   * room on the other transport, so try the mesh first and fall back to the
+   * duel. That way a friend types five digits and lands in whatever the host
+   * opened, which is the whole point of picking the format up front.
+   */
+  private joinByCode(code: string): void {
+    void (async () => {
+      const mode = await mesh.joinPrivate(code, myStats().name, (s) => {
+        app.netStatus = s;
+      });
+      if (mode && mode !== '1v1') {
+        app.privateCode = code;
+        app.lobbyMode = mode;
+        app.lobbyView = 'lobby';
+        app.state = 'menu';
+        app.duelView = 'root';
+        app.codeEntry = '';
+        return;
+      }
+      // Not a brawl code — let the duel transport try it (and own the error UI
+      // when it isn't a valid code at all).
+      net.joinPrivate(code);
+    })();
+  }
+
   /** VS BOTS / only-bots: drop straight into a bot brawl of `mode`, no mesh. */
   private startBotBrawl(mode: ArcadeMode): void {
     app.lobbyMode = null;
@@ -1338,6 +1415,8 @@ export class MenuSystem extends createSystem({}) {
     const mode = app.lobbyMode ?? 'raid';
     app.lobbyMode = null;
     app.lobbyRooms = [];
+    app.privateCode = ''; // the invite code has done its job
+
     app.arcade = mode;
     app.mySlot = mesh.mySeat;
     if (mode === 'raid') {

@@ -138,6 +138,10 @@ export type MenuAction =
   | 'private-create'
   | 'private-enter'
   | 'private-back'
+  /** Private-match FORMAT, picked before the code is reserved. */
+  | 'private-mode-1v1'
+  | 'private-mode-2v2'
+  | 'private-mode-ffa'
   | 'kp-del'
   | 'kp-join'
   | `kp-${number}`
@@ -423,7 +427,7 @@ function drawDuel(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null)
 function hitDuel(u: number, v: number): MenuAction | null {
   switch (app.duelView) {
     case 'private':
-      return hitPrivateMenu(v);
+      return hitPrivateMenu(u, v);
     case 'hosting':
       return hitHosting(v);
     case 'keypad':
@@ -515,20 +519,70 @@ function hitDuelRoot(v: number): MenuAction | null {
   return null;
 }
 
+/** The private-match format row: pick 1V1 / 2V2 / FFA, then reserve a code. */
+const PRIV_MODES: { mode: ArcadeMode; label: string; action: MenuAction; seats: string }[] = [
+  { mode: '1v1', label: '1V1', action: 'private-mode-1v1', seats: '2' },
+  { mode: '2v2', label: '2V2', action: 'private-mode-2v2', seats: '4' },
+  { mode: 'ffa', label: 'FFA', action: 'private-mode-ffa', seats: '4' },
+];
+const PRIV_CHIP_Y = 100;
+const PRIV_CHIP_H = 52;
+
 function drawPrivateMenu(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   ctx.font = '600 19px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
-  ctx.fillText('create a 5-digit code, or type a friend’s', PW / 2, 92);
-  buttonPlate(ctx, 64, 110, PW - 128, 86, 'CREATE MATCH', UI.cool, hoverAction === 'private-create');
-  buttonPlate(ctx, 64, 212, PW - 128, 86, 'ENTER CODE', UI.amber, hoverAction === 'private-enter');
-  buttonPlate(ctx, 150, 320, PW - 300, 50, 'BACK', UI.steel, hoverAction === 'private-back');
+  // Kept short deliberately: at 19px anything much past ~42 characters runs off
+  // both edges of a 512-wide panel.
+  ctx.fillText('pick a format, then create or enter a code', PW / 2, 84);
+
+  // FORMAT chips. The host chooses before any code exists, because the code is
+  // reserved against a room of that shape; a joiner needs none of this, since
+  // the code carries its own mode.
+  const gap = 10;
+  const chipW = (PW - 128 - gap * 2) / 3;
+  PRIV_MODES.forEach(({ mode, label, action, seats }, i) => {
+    const cx = 64 + i * (chipW + gap);
+    const on = app.privateMode === mode;
+    const hot = hoverAction === action;
+    plate(ctx, cx, PRIV_CHIP_Y, chipW, PRIV_CHIP_H, {
+      cut: 8,
+      fill: on ? hexToRgba(UI.coolBright, 0.28) : 'rgba(150,150,170,0.10)',
+      stroke: on || hot ? UI.coolBright : UI.steelDim,
+      rivets: false,
+    });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 22px system-ui, sans-serif';
+    ctx.fillStyle = on ? UI.coolBright : UI.text;
+    ctx.fillText(label, cx + chipW / 2, PRIV_CHIP_Y + PRIV_CHIP_H / 2 - 8);
+    ctx.font = '600 14px system-ui, sans-serif';
+    ctx.fillStyle = on ? 'rgba(159,226,255,0.85)' : UI.textDim;
+    ctx.fillText(`${seats} players`, cx + chipW / 2, PRIV_CHIP_Y + PRIV_CHIP_H / 2 + 13);
+    ctx.textBaseline = 'alphabetic';
+  });
+
+  buttonPlate(ctx, 64, 170, PW - 128, 72, 'CREATE MATCH', UI.cool, hoverAction === 'private-create');
+  buttonPlate(ctx, 64, 252, PW - 128, 62, 'ENTER CODE', UI.amber, hoverAction === 'private-enter');
+  buttonPlate(ctx, 150, 324, PW - 300, 52, 'BACK', UI.steel, hoverAction === 'private-back');
 }
 
-function hitPrivateMenu(v: number): MenuAction | null {
+function hitPrivateMenu(u: number, v: number): MenuAction | null {
   const y = (1 - v) * DUEL_H;
-  if (y >= 104 && y <= 202) return 'private-create';
-  if (y >= 206 && y <= 304) return 'private-enter';
-  if (y >= 312 && y <= 378) return 'private-back';
+  if (y >= PRIV_CHIP_Y - 4 && y <= PRIV_CHIP_Y + PRIV_CHIP_H + 4) {
+    const x = u * PW;
+    const gap = 10;
+    const chipW = (PW - 128 - gap * 2) / 3;
+    for (let i = 0; i < PRIV_MODES.length; i++) {
+      const cx = 64 + i * (chipW + gap);
+      if (x >= cx && x <= cx + chipW) return PRIV_MODES[i].action;
+    }
+    return null;
+  }
+  // Bands kept strictly disjoint (chips end 156, create 164–248, enter 250–318,
+  // back 322–380) so no row can shadow the next one's top edge.
+  if (y >= 164 && y <= 248) return 'private-create';
+  if (y >= 250 && y <= 318) return 'private-enter';
+  if (y >= 322 && y <= 380) return 'private-back';
   return null;
 }
 
@@ -2975,6 +3029,19 @@ function drawRaidLobby(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
     };
     breaker(RAID_HC_Y, 'HARDCORE', 'no healing between titans', mesh.raidHardcore, 'lobby-hardcore', UI.danger);
     breaker(RAID_GOOP_Y, 'FIGHT GOOPLIATH', 'the tide, not the titans', mesh.raidGoopliath, 'lobby-goopliath', GOOP_GREEN);
+  }
+
+  // A PRIVATE room's code, kept on screen for the whole lobby so the host can
+  // read it out (or re-read it) while seats fill. Only set for a coded room —
+  // a room joined out of the public browser has none.
+  if (app.privateCode) {
+    ctx.textAlign = 'center';
+    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.fillStyle = UI.textDim;
+    ctx.fillText('INVITE CODE', RAID_W / 2, RAID_STATUS_Y - 54);
+    ctx.font = stencilFont(38);
+    ctx.fillStyle = UI.coolBright;
+    ctx.fillText(app.privateCode.split('').join(' '), RAID_W / 2, RAID_STATUS_Y - 20);
   }
 
   // Launch status. 2v2 auto-launches when full; FFA and RAID can also go

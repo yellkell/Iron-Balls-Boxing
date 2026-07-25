@@ -114,6 +114,13 @@ in-your-face boxing feel.
   spatialised onto their avatar's head (HRTF), so their trash talk pans and
   ducks with them. Mic permission is asked when you queue; declining still
   lets you hear them.
+- **PRIVATE MATCH** — invite-only, behind a shareable 5-digit code. Pick the
+  format **before** the code is reserved: **1V1** (two players, the ordinary
+  duel) or **2V2** / **FFA** (four). A coded room never shows in the server
+  browser, and the code carries its own format — your friends just type five
+  digits and land in whatever you opened. 2V2 and FFA drop into the same squad
+  room the arcade lobbies use, with the invite code kept on screen while seats
+  fill: a full room launches itself, and FFA can start short-handed at two.
 
 ## Coins, the shop & the locker
 

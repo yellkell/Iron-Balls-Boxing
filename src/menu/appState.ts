@@ -221,6 +221,13 @@ export const app: {
   quickDuel: boolean;
   /** The 5-digit code shown while hosting a private match. */
   privateCode: string;
+  /**
+   * Format the private-match host has picked, chosen BEFORE the code is
+   * reserved: '1v1' runs the ordinary duel over the 1v1 transport, while '2v2'
+   * and 'ffa' open a coded room on the arcade mesh. A joiner never needs this —
+   * the code itself carries its room's mode (see mesh.joinPrivate).
+   */
+  privateMode: ArcadeMode;
   /** Digits typed on the join keypad (up to 5). */
   codeEntry: string;
   stats: LifetimeStats;
@@ -274,6 +281,7 @@ export const app: {
   fromRanked: false,
   quickDuel: false,
   privateCode: '',
+  privateMode: '1v1',
   codeEntry: '',
   stats: loadStats(),
 };

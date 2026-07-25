@@ -106,6 +106,97 @@ export class MeshImpl {
     this.startBeat();
   }
 
+  /**
+   * Host a PRIVATE room of `mode` behind a shareable 5-digit code, and resolve
+   * with the code.
+   *
+   * The document is the SAME shape as a listed lobby's, so every bit of the
+   * seat/occupancy/signalling machinery below works on it unchanged — the only
+   * differences are that it lives in its own `privateRooms` collection (which
+   * is what keeps it out of the public browser, for free: the room browser only
+   * ever watches `arcadeRooms`) and that its doc id IS the code.
+   */
+  async hostPrivate(mode: ArcadeMode, name: string): Promise<string> {
+    this.state.capacity = CAPACITY[mode];
+    this.state.onStatus('reserving a code…');
+    const coll = collection(db(), 'privateRooms');
+    const seats = Array.from({ length: this.state.capacity }, (_, i) => (i === 0 ? this.clientId : ''));
+    const names = Array.from({ length: this.state.capacity }, (_, i) => (i === 0 ? name : ''));
+    for (let attempt = 0; attempt < 8 && !this.closed; attempt++) {
+      const code = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
+      const ref = doc(coll, code);
+      try {
+        await runTransaction(db(), async (txn) => {
+          // Any existing doc means that code is in use — close() deletes a room
+          // once its last member leaves, so live codes are the only ones held.
+          if ((await txn.get(ref)).exists()) throw new Error('taken');
+          txn.set(ref, {
+            mode,
+            capacity: this.state.capacity,
+            seats,
+            names,
+            hardcore: false,
+            goopliath: false,
+            difficulty: 'normal',
+            started: false,
+            open: true,
+            createdAt: serverTimestamp(),
+          });
+        });
+        this.roomRef = ref;
+        this.state.mySeat = 0;
+        this.state.joined = true;
+        this.state.names[0] = name;
+        this.state.onStatus('share the code — waiting for players…');
+        this.watchRoom();
+        this.startBeat();
+        return code;
+      } catch {
+        /* code collided — try another */
+      }
+    }
+    throw new Error('could not allocate a code');
+  }
+
+  /**
+   * Claim a seat in a private room by CODE. Resolves with the room's own mode,
+   * so a joiner never has to be told which format the code is for — they type
+   * five digits and land in the host's lobby. Null = unknown code, full, or
+   * already launched.
+   */
+  async joinPrivate(code: string, name: string): Promise<ArcadeMode | null> {
+    this.state.onStatus('looking up the code…');
+    const ref = doc(collection(db(), 'privateRooms'), code);
+    try {
+      const claim = await runTransaction(db(), async (txn) => {
+        const fresh = await txn.get(ref);
+        if (!fresh.exists()) throw new Error('no such code');
+        const data = fresh.data();
+        if (data.open !== true || data.started === true) throw new Error('closed');
+        const seats = (data.seats as string[]) ?? [];
+        const names = (data.names as string[]) ?? seats.map(() => '');
+        const free = seats.findIndex((s) => !s);
+        if (free < 0) throw new Error('full');
+        seats[free] = this.clientId;
+        names[free] = name;
+        txn.update(ref, { seats, names, open: !seats.every((s) => s) });
+        return { seat: free, mode: data.mode as ArcadeMode, capacity: seats.length };
+      });
+      if (this.closed) return null;
+      this.roomRef = ref;
+      this.state.capacity = claim.capacity;
+      this.state.mySeat = claim.seat;
+      this.state.joined = true;
+      this.state.names[claim.seat] = name;
+      this.state.onStatus(`joined (seat ${claim.seat})`);
+      this.watchRoom();
+      this.startBeat();
+      return claim.mode;
+    } catch {
+      return null; // the caller decides what to try next / what to say
+    }
+  }
+
   /** Claim a seat in a SPECIFIC listed lobby of `mode`. False = filled/gone. */
   async joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean> {
     this.state.capacity = CAPACITY[mode];

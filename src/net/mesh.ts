@@ -23,6 +23,8 @@ export interface MeshInbox {
 interface MeshImplApi {
   hostLobby(mode: ArcadeMode, name: string): Promise<void>;
   joinLobby(mode: ArcadeMode, roomId: string, name: string): Promise<boolean>;
+  hostPrivate(mode: ArcadeMode, name: string): Promise<string>;
+  joinPrivate(code: string, name: string): Promise<ArcadeMode | null>;
   setRaidHardcore(v: boolean): void;
   setRaidGoopliath(v: boolean): void;
   setRaidDifficulty(v: Difficulty): void;
@@ -108,6 +110,31 @@ class Mesh {
     const { MeshImpl } = await import('./meshImpl.js');
     this.impl = new MeshImpl(this);
     return this.impl.joinLobby(mode, roomId, name);
+  }
+
+  /**
+   * Open a PRIVATE room of `mode` behind a 5-digit code — invite-only, so it
+   * never shows in the room browser. Resolves with the code to share.
+   */
+  async hostPrivate(mode: ArcadeMode, name: string, onStatus?: (s: string) => void): Promise<string> {
+    this.close();
+    if (onStatus) this.onStatus = onStatus;
+    const { MeshImpl } = await import('./meshImpl.js');
+    this.impl = new MeshImpl(this);
+    return this.impl.hostPrivate(mode, name);
+  }
+
+  /**
+   * Claim a seat in a private room by code. Resolves with the room's own mode
+   * (so the joiner lands in the right lobby without being told which format the
+   * code was for), or null if the code is unknown, full or already launched.
+   */
+  async joinPrivate(code: string, name: string, onStatus?: (s: string) => void): Promise<ArcadeMode | null> {
+    this.close();
+    if (onStatus) this.onStatus = onStatus;
+    const { MeshImpl } = await import('./meshImpl.js');
+    this.impl = new MeshImpl(this);
+    return this.impl.joinPrivate(code, name);
   }
 
   /** RAID host: flip the lobby's hardcore breaker (mirrored to everyone). */
