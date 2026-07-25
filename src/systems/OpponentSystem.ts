@@ -44,6 +44,15 @@ const _xPos = new Vector3();
 /** A knocked-out fighter washes out to this grey. */
 const DEAD_GREY = 0x8a8f99;
 
+/**
+ * The pool a bot rolls its bout skin from. Locked entries are filtered out:
+ * applyAvatarSkin refuses to paint a locked skin, so rolling one would leave
+ * the bot in whatever colours its rig happened to be built with rather than
+ * a skin at all. Nothing in the roster is locked today — this keeps the roll
+ * honest the moment something is.
+ */
+const BOT_SKINS = AVATAR_SKINS.filter((s) => !s.locked);
+
 interface OppRig {
   rig: BoxerRig;
   hitboxes: { head?: Entity; chest?: Entity; pelvis?: Entity };
@@ -237,12 +246,21 @@ export class OpponentSystem extends createSystem({
     let av: AvatarSkin;
     if (duel && rival.avatarSkin) av = resolveAvatarSkin(rival.avatarSkin, rival.avColor, rival.avLight);
     else if (peer?.av) av = resolveAvatarSkin(peer.av, peer.avc ?? -1, peer.avl ?? 0.5);
-    else if (!mesh.joined && app.mode !== 'net' && app.arcade !== '1v1') {
-      // Arcade BOTS wear a random head/chassis skin (team-colour accent still
-      // applied above, so teams stay readable). A mesh peer whose `iam`
-      // hasn't landed yet gets the house default instead of a random roll —
-      // that random was exactly the "teammates in random skins" raid bug.
-      r.botSkin ??= AVATAR_SKINS[Math.floor(Math.random() * AVATAR_SKINS.length)];
+    else if (!mesh.joined && app.mode === 'bot') {
+      // BOTS wear a random head/chassis skin for the bout (the team-colour
+      // accent is still applied above, so teams stay readable).
+      //
+      // This used to be gated on `app.arcade !== '1v1'`, which quietly excluded
+      // every bot the game actually serves most often: QUICK MATCH, VS BOT and
+      // the tutorial all run a 1v1 layout, so all of them fell through to the
+      // house team-blue default and every bot bout looked identical. What the
+      // guard was really protecting is a duel RIVAL whose `iam` hasn't landed
+      // yet — and `app.mode === 'bot'` says that directly, without also
+      // catching the bots. Campaign titans (mode 'campaign') keep their
+      // bespoke chassis; a mesh peer mid-handshake still gets the house
+      // default, which is what stopped the "teammates in random skins" raid
+      // bug.
+      r.botSkin ??= BOT_SKINS[Math.floor(Math.random() * BOT_SKINS.length)];
       av = r.botSkin;
     } else av = OPPONENT_DEFAULT_AVATAR;
     // Only the duel rival overrides their platform skin; mesh fighters and

@@ -37,10 +37,55 @@ const VERT = /* glsl */ `
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
 `;
 
+/**
+ * Shared drawing helpers — no uniforms of their own, so any telegraph shader
+ * can pull them in regardless of what it declares.
+ */
+const AA = /* glsl */ `
+  /**
+   * These planes blend ADDITIVELY, so the alpha channel is really a brightness
+   * multiplier on the warning colour — and the layers below stack by +=. Where
+   * two features overlapped (the rim and its ticks, the centre dot and the
+   * charge disc) the sum ran past 1 and the amber/red blew out to flat white,
+   * which is what made a charging telegraph read as a bright smear instead of
+   * a shape. Cap it, and the warning keeps its colour wherever layers meet.
+   */
+  float ink(float a){ return clamp(a, 0.0, 1.0); }
+
+  /**
+   * A soft step whose edge is one pixel wide on screen, whatever the angle.
+   * Deck telegraphs are viewed at very grazing angles in VR, where a hard
+   * step() on a repeating pattern crawls and moirés badly.
+   */
+  float aaStep(float edge, float x){
+    float w = max(fwidth(x), 1e-5);
+    return smoothstep(edge - w, edge + w, x);
+  }
+
+  /**
+   * A repeating stripe: ~1 where fract(x) is past 'duty', antialiased at both
+   * ends of the pulse. Once a whole tile is smaller than a pixel the pattern
+   * dissolves to its own average rather than aliasing into noise.
+   * (No backticks in here — these blocks are JS template literals.)
+   */
+  float aaStripe(float x, float duty){
+    float w = max(fwidth(x), 1e-5);
+    float f = fract(x);
+    float sharp = smoothstep(duty - w, duty + w, f) - smoothstep(1.0 - w, 1.0, f);
+    return mix(sharp, 1.0 - duty, smoothstep(0.25, 0.5, w));
+  }
+
+  /** A ring/band between two soft edges: rises over a→b, falls over c→d. */
+  float band(float x, float a, float b, float c, float d){
+    return smoothstep(a, b, x) * (1.0 - smoothstep(c, d, x));
+  }
+`;
+
 /** Hazard amber → danger red as the charge completes, pulsing faster. */
 const COMMON = /* glsl */ `
   uniform float uFill, uTime;
   varying vec2 vUv;
+  ${AA}
   vec3 warnColor(){
     return mix(vec3(1.0, 0.69, 0.0), vec3(0.91, 0.21, 0.16), smoothstep(0.55, 0.95, uFill));
   }
@@ -57,22 +102,25 @@ const CIRCLE_FRAG = /* glsl */ `
   void main(){
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
-    if (r > 1.0) discard;
     vec3 col = warnColor();
     float a = 0.0;
     // Rim ring.
-    a += smoothstep(0.84, 0.9, r) * (1.0 - smoothstep(0.97, 1.0, r)) * 1.0;
-    // Rotating hazard ticks just inside the rim.
+    a += band(r, 0.84, 0.9, 0.97, 1.0);
+    // Rotating hazard ticks just inside the rim. Antialiased: these are
+    // ANGULAR stripes, so they crowd together as the disc tilts away and used
+    // to break into crawling speckle right where the eye follows the rim.
     float ang = atan(p.y, p.x) + uTime * 1.2;
-    float ticks = step(0.5, fract(ang * 3.8195)); // 24 segments
-    a += ticks * smoothstep(0.72, 0.78, r) * (1.0 - smoothstep(0.82, 0.84, r)) * 0.6;
+    a += aaStripe(ang * 3.8195, 0.5) * band(r, 0.72, 0.78, 0.82, 0.84) * 0.6;
     // Hot centre dot — the exact impact point.
     a += (1.0 - smoothstep(0.05, 0.14, r)) * 0.9;
     // Charge disc growing outward from the centre — solid enough to read
     // against a bright passthrough room.
-    a += (1.0 - smoothstep(uFill * 0.85, uFill * 0.9, r)) * 0.6;
+    a += (1.0 - smoothstep(uFill * 0.85, uFill * 0.9 + 0.004, r)) * 0.6;
     a *= pulse();
-    gl_FragColor = vec4(col, a);
+    // No discard for the square plane's corners: every term above is already
+    // zero past r = 1, and discard costs a tile-based mobile GPU its early-Z
+    // for the whole draw.
+    gl_FragColor = vec4(col, ink(a));
   }
 `;
 
@@ -85,13 +133,15 @@ const STRIP_FRAG = /* glsl */ `
     // Side rails.
     float edge = min(vUv.x, 1.0 - vUv.x);
     a += (1.0 - smoothstep(0.04, 0.1, edge)) * 0.9;
-    // Chevron dashes marching toward the player while it charges.
-    float dash = step(0.5, fract(vUv.y * 9.0 + uTime * 2.2));
-    a += dash * 0.18;
+    // Chevron dashes marching toward the player while it charges. A beam
+    // strip runs AWAY from you down the deck, so its far end is the most
+    // foreshortened thing on screen — exactly where a hard-stepped dash
+    // pattern turns to shimmer.
+    a += aaStripe(vUv.y * 9.0 + uTime * 2.2, 0.5) * 0.18;
     // The advance front: fills from the far (titan) end toward you.
-    a += step(1.0 - uFill, vUv.y) * 0.34;
+    a += aaStep(1.0 - uFill, vUv.y) * 0.34;
     a *= pulse();
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, ink(a));
   }
 `;
 
@@ -106,22 +156,26 @@ const NOVA_FRAG = /* glsl */ `
   void main(){
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
-    if (r > 1.0) discard;
     // World-space angle: the plane is rotated flat, so uv v runs down −z.
     float ang = atan(p.x, -p.y);
     float d = abs(mod(ang - uAngle + 3.14159, 6.28318) - 3.14159);
-    float inWedge = step(d, uHalf);
+    // Softened: this is the boundary of the ONE piece of safe ground on the
+    // deck, and a hard step() left it a jagged staircase you had to guess at.
+    float inWedge = 1.0 - aaStep(uHalf, d);
     vec3 col = warnColor();
     float a = 0.0;
     // The flood: everything OUTSIDE the wedge fills and pulses.
     a += (1.0 - inWedge) * (0.16 + 0.5 * uFill);
     // Rim ring all the way round, dimmer through the wedge.
-    a += smoothstep(0.9, 0.95, r) * (1.0 - smoothstep(0.98, 1.0, r)) * (1.0 - inWedge * 0.7);
+    a += band(r, 0.9, 0.95, 0.98, 1.0) * (1.0 - inWedge * 0.7);
     // The wedge's edge rays — the doorposts of the safe ground.
-    float edge = smoothstep(0.06, 0.0, abs(d - uHalf));
-    a += edge * 0.9;
+    a += smoothstep(0.06, 0.0, abs(d - uHalf)) * 0.9;
     a *= pulse();
-    gl_FragColor = vec4(col, a);
+    // Cut the square plane to a disc with a soft edge. The flood term has no
+    // r in it, so this replaces the old discard — and antialiases the nova's
+    // outline, which used to be a hard jagged circle.
+    a *= 1.0 - smoothstep(0.985, 1.0, r);
+    gl_FragColor = vec4(col, ink(a));
   }
 `;
 
@@ -145,11 +199,11 @@ const HALF_FRAG = /* glsl */ `
     // authored with u = 0 on the centreline, u = 1 at the outer rim.
     a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.25 + 0.75 * uFill);
     // Bands marching toward the centreline — CROSS HERE, the other half lives.
-    float lane = fract(vUv.x * 5.0 + uTime * 2.4);
-    float band = step(0.72, lane) * step(abs(fract(vUv.y * 3.0) - 0.5), 0.32);
-    a += band * (0.1 + 0.25 * uFill);
+    float lanes = aaStripe(vUv.x * 5.0 + uTime * 2.4, 0.72);
+    float rungs = 1.0 - aaStep(0.32, abs(fract(vUv.y * 3.0) - 0.5));
+    a += lanes * rungs * (0.1 + 0.25 * uFill);
     a *= pulse();
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, ink(a));
   }
 `;
 
@@ -163,6 +217,7 @@ const HALF_FRAG = /* glsl */ `
 const GO_FRAG = /* glsl */ `
   uniform float uFill, uTime;
   varying vec2 vUv;
+  ${AA}
   void main(){
     vec3 col = vec3(0.34, 0.88, 0.54);
     float a = 0.0;
@@ -171,13 +226,13 @@ const GO_FRAG = /* glsl */ `
     // The centreline rail — the honest border to get across (u = 0 there).
     a += (1.0 - smoothstep(0.0, 0.06, vUv.x)) * (0.3 + 0.7 * uFill);
     // Bands marching INTO the safe half — follow them.
-    float lane = fract(vUv.x * 5.0 - uTime * 2.4);
-    float band = step(0.72, lane) * step(abs(fract(vUv.y * 3.0) - 0.5), 0.32);
-    a += band * (0.12 + 0.25 * uFill);
+    float lanes = aaStripe(vUv.x * 5.0 - uTime * 2.4, 0.72);
+    float rungs = 1.0 - aaStep(0.32, abs(fract(vUv.y * 3.0) - 0.5));
+    a += lanes * rungs * (0.12 + 0.25 * uFill);
     // A soft glow at the outer rim, so the zone reads as a destination.
     a += smoothstep(0.92, 1.0, vUv.x) * 0.25;
     a *= 0.85 + 0.15 * sin(uTime * mix(2.5, 10.0, uFill));
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
   }
 `;
 
@@ -188,10 +243,12 @@ const BLADE_FRAG = /* glsl */ `
     vec3 col = warnColor();
     float mid = 1.0 - abs(vUv.y * 2.0 - 1.0); // 1 at the slice centre line
     float a = pow(mid, 3.0) * 0.75 + mid * 0.12;
-    // Fill sweeps across the width as the swing charges.
-    a *= 0.35 + 0.65 * step(vUv.x, uFill);
+    // Fill sweeps across the width as the swing charges. Softened: a hard
+    // step drew the sweeping front as a ragged vertical staircase along the
+    // blade, which is the one edge the player is actually tracking.
+    a *= 0.35 + 0.65 * (1.0 - aaStep(uFill, vUv.x));
     a *= pulse();
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, ink(a));
   }
 `;
 
