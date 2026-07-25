@@ -180,9 +180,9 @@ export class BartenderSystem extends createSystem({}) {
       }),
     );
     this.pourStream.visible = false;
-    this.scene.add(this.pourStream);
+    pub.refs!.root.add(this.pourStream);
 
-    this.scene.add(this.root);
+    pub.refs!.root.add(this.root);
   }
 
   update(delta: number): void {

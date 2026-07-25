@@ -33,6 +33,7 @@ import { octagonSlab } from '../../arena/octagon.js';
 import { uiClick } from '../../audio/sfx.js';
 import { EXIT_ZONE, PUB, TELEPORT, TELEPORT_AREAS, WALL_SEGMENTS } from '../config.js';
 import { pub } from '../state.js';
+import { requestArenaReturn } from '../../experience/clubNavigation.js';
 
 const _origin = new Vector3();
 const _dir = new Vector3();
@@ -135,6 +136,26 @@ export class TeleportSystem extends createSystem({}) {
   /** Snap turn fires once per flick: armed again only after the stick recentres. */
   private snapArmed = true;
 
+  /** Start a club visit from a clean floor-level pose. */
+  enterClub(): void {
+    this.resetInteraction();
+    this.spawned = true;
+    this.player.position.y = 0;
+    teleportPlayer(this.player, PUB.spawn.x, PUB.spawn.z, 0);
+  }
+
+  /** Drop any half-finished aim before the arena takes input back. */
+  leaveClub(): void {
+    this.resetInteraction();
+  }
+
+  private resetInteraction(): void {
+    this.hide();
+    this.aimingHand = null;
+    this.valid = false;
+    this.snapArmed = true;
+  }
+
   init(): void {
     // Arc line — a fat world-unit ribbon (LineBasicMaterial ignores width).
     this.arcGeo = new LineGeometry();
@@ -150,7 +171,7 @@ export class TeleportSystem extends createSystem({}) {
     this.arc = new Line2(this.arcGeo, this.arcMat);
     this.arc.frustumCulled = false;
     this.arc.visible = false;
-    this.scene.add(this.arc);
+    pub.refs!.root.add(this.arc);
 
     // Octagon landing marker — the platform silhouette, ghosted.
     this.markerMat = new MeshBasicMaterial({
@@ -187,7 +208,7 @@ export class TeleportSystem extends createSystem({}) {
     arrow.position.y = 0.03;
     this.marker.add(arrow);
     this.marker.visible = false;
-    this.scene.add(this.marker);
+    pub.refs!.root.add(this.marker);
   }
 
   update(): void {
@@ -239,10 +260,7 @@ export class TeleportSystem extends createSystem({}) {
           this.landing.z >= EXIT_ZONE.minZ && this.landing.z <= EXIT_ZONE.maxZ
         ) {
           this.hide();
-          const go = (): void => window.location.assign('index.html');
-          const session = this.world.session as XRSession | undefined;
-          if (session) void Promise.resolve(session.end()).then(go, go);
-          else go();
+          requestArenaReturn(this.world);
           return;
         }
         teleportPlayer(this.player, this.landing.x, this.landing.z, this.landingYaw);

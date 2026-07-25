@@ -290,6 +290,12 @@ class ParticlePool {
       this.staticDirty = false;
     }
   }
+
+  clear(): void {
+    this.life.fill(0);
+    this.alive = 0;
+    this.geo.attributes.aLife.needsUpdate = true;
+  }
 }
 
 let emberPool: ParticlePool | undefined;
@@ -311,6 +317,12 @@ export function initFirePools(scene: Scene): void {
 export function updateFirePools(dt: number): void {
   emberPool?.update(dt);
   trailPool?.update(dt);
+}
+
+/** Remove particles when crossing between spatially unrelated experiences. */
+export function clearFirePools(): void {
+  emberPool?.clear();
+  trailPool?.clear();
 }
 
 /** A drifting spark. cool=true gives the opponent's blue fire. */

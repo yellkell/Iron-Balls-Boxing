@@ -255,6 +255,21 @@ export class CoinSystem extends createSystem({}) {
   /** The floor coin currently glowing as a grab target (or null). */
   private litCoin: FloorCoin | null = null;
 
+  /** A page navigation used to discard every loose local coin automatically.
+   *  Reproduce that boundary explicitly for an in-document club exit. */
+  leaveClub(): void {
+    if (this.litCoin) setCoinGlow(this.litCoin.mesh, false);
+    this.litCoin = null;
+    pub.coinHover = null;
+    for (const hand of ['left', 'right'] as const) {
+      const held = this.held[hand];
+      if (held) this.disposeCoinMesh(held.mesh);
+      this.held[hand] = null;
+      this.prevSq[hand] = false;
+    }
+    for (const id of [...this.floor.keys()]) this.removeFloorCoin(id);
+  }
+
   init(): void {
     // Your wallet is your own business — the only coin traffic we listen to is
     // the physical coins others drop and pick up. Nobody broadcasts a balance,
@@ -375,7 +390,7 @@ export class CoinSystem extends createSystem({}) {
   }
 
   private disposeCoinMesh(mesh: Mesh): void {
-    this.scene.remove(mesh);
+    pub.refs!.root.remove(mesh);
     // Coins carry a material TRIO (side + the H/T faces); the face textures
     // are shared module-wide and stay alive.
     for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.dispose();
@@ -389,7 +404,7 @@ export class CoinSystem extends createSystem({}) {
     if (!grips?.left) return;
     if (!this.localTag) {
       this.localTag = makeTag();
-      this.scene.add(this.localTag.panel.mesh);
+      pub.refs!.root.add(this.localTag.panel.mesh);
     }
     const tag = this.localTag;
     grips.left.getWorldPosition(_a); // the wallet rides on the LEFT wrist
@@ -445,7 +460,7 @@ export class CoinSystem extends createSystem({}) {
           if (spendCoins(1)) {
             const mesh = buildCoinMesh();
             mesh.position.copy(_a);
-            this.scene.add(mesh);
+            pub.refs!.root.add(mesh);
             this.held[hand] = { mesh, id: this.newId() };
           }
         } else {
@@ -679,7 +694,7 @@ export class CoinSystem extends createSystem({}) {
     let coin = this.floor.get(id);
     if (!coin) {
       const mesh = buildCoinMesh();
-      this.scene.add(mesh);
+      pub.refs!.root.add(mesh);
       coin = { mesh, id, owner: 'remote', vel: new Vector3(), resting: false };
       this.floor.set(id, coin);
     }
@@ -690,7 +705,7 @@ export class CoinSystem extends createSystem({}) {
     const coin = this.floor.get(id);
     if (!coin) return;
     if (this.litCoin?.id === id) this.litCoin = null;
-    this.scene.remove(coin.mesh);
+    pub.refs!.root.remove(coin.mesh);
     for (const m of Array.isArray(coin.mesh.material) ? coin.mesh.material : [coin.mesh.material]) m.dispose();
     coin.mesh.geometry.dispose();
     this.floor.delete(id);

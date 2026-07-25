@@ -10,6 +10,17 @@ import { bus, normalizeFight, pub } from './state.js';
 
 let ws: WebSocket | null = null;
 
+function resetConnectionState(): void {
+  pub.online = false;
+  pub.myId = '';
+  for (const id of [...pub.punters.keys()]) bus.emit('left', id);
+  pub.props.clear();
+  pub.fight = normalizeFight(null);
+  pub.music = -1;
+  pub.coinHover = null;
+  bus.emit('disconnected', undefined);
+}
+
 /**
  * A stable per-device id, shared with the FIRE FIGHT leaderboard
  * (`ff-player-id`). Sent on join so an admin ban can block this device's
@@ -75,16 +86,35 @@ export function pubConnect(url: string, name: string, av = '', pf = '', avc = -1
     handle(msg);
   };
 
+  const socket = ws;
   ws.onclose = () => {
-    pub.online = false;
+    // Ignore a stale socket closing after a newer club visit has connected.
+    if (ws !== socket) return;
     ws = null;
-    for (const id of [...pub.punters.keys()]) bus.emit('left', id);
-    bus.emit('disconnected', undefined);
+    resetConnectionState();
   };
 
   ws.onerror = () => {
     console.warn('[pub] WebSocket error — is the pub server running? (npm run server:pub)');
   };
+}
+
+/** Explicitly leave the room while keeping the Firebase/WebXR document alive. */
+export function pubDisconnect(): void {
+  const socket = ws;
+  ws = null;
+  if (socket) {
+    socket.onclose = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onopen = null;
+    try {
+      socket.close(1000, 'left club');
+    } catch {
+      /* already closed */
+    }
+  }
+  resetConnectionState();
 }
 
 function handle(msg: PubServerMsg): void {

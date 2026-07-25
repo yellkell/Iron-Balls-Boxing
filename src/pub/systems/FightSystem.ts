@@ -38,11 +38,11 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PlaneGeometry,
   Quaternion,
   RepeatWrapping,
   Vector3,
+  type Object3D,
 } from 'three';
 import type { XROrigin } from '@iwsdk/xr-input';
 import {
@@ -59,7 +59,7 @@ import {
   teamColor,
 } from '../../config.js';
 import { buildBoxer, solveTorso, type BoxerRig } from '../../avatar/boxer.js';
-import { applyAvatarSkin, platformSkin } from '../../avatar/skins.js';
+import { applyAvatarSkin, applyPlatformSkin, platformSkin, type PlatformSkin } from '../../avatar/skins.js';
 import { customization, myAvatarSkin } from '../../menu/customization.js';
 import {
   createFireVisual,
@@ -85,6 +85,7 @@ import { UI, fitStencilText, metalText, solidBar, stencilFont } from '../../ui/i
 import { countdownArt } from '../../ui/countdownArt.js';
 import { verdictArt } from '../../ui/verdictArt.js';
 import { drawContentPlate } from '../../ui/plateArt.js';
+import { animatePlatformFxNode } from '../../systems/PlatformFXSystem.js';
 import { teleportPlayer } from './TeleportSystem.js';
 
 const HANDS = ['left', 'right'] as const;
@@ -407,6 +408,9 @@ export class FightSystem extends createSystem({}) {
   private headOutside = false;
   /** 0.2 s drain-tick accumulator, same cadence as the arena guardian. */
   private drainTick = 0;
+  /** Animated nodes belonging to BLAZING/TIDEBREAKER on the two real arena
+   *  platforms. Cached once so the club adds no per-frame scene traversal. */
+  private platformFxNodes: Object3D[] = [];
 
   init(): void {
     preloadAnnouncer(); // decode 3/2/1/FIGHT so the countdown speaks like the arena
@@ -420,7 +424,12 @@ export class FightSystem extends createSystem({}) {
     this.bodyRig.torso.name = 'pub-fighter-torso';
     this.bodyRig.torso.visible = false;
     applyAvatarSkin(this.bodyRig.torso, mySkin);
-    this.scene.add(this.bodyRig.torso);
+    pub.refs!.root.add(this.bodyRig.torso);
+    for (const platform of pub.refs!.fightPlatforms) {
+      platform.traverse((node) => {
+        if (node.userData?.fxRole) this.platformFxNodes.push(node);
+      });
+    }
 
     this.cleanupFuncs.push(
       bus.on('fight', (f) => this.onFight(f)),
@@ -551,19 +560,16 @@ export class FightSystem extends createSystem({}) {
     this.betSettled = false;
   }
 
-  private rimKey = '';
-  /** Each slab's native deck colour, captured before any skin re-tint. */
-  private slabBase: number[] = [];
+  private platformSkinKey = '';
 
   /**
-   * Dress each platform rim AND slab in its claimant's PLATFORM skin the moment
-   * a corner locks in (back to corner colours when it frees up) — your arena
-   * cosmetics follow you onto the fight-hall floor.
+   * Apply each claimant's complete PLATFORM skin to the same platform object
+   * used by the arena. This carries the real deck, rim, decals, ornaments and
+   * earned-pad effects into the club; an empty corner returns to its team tint.
    */
-  private dressRims(): void {
-    const rims = pub.refs?.fightRims;
-    const slabs = pub.refs?.fightSlabs;
-    if (!rims) return;
+  private dressPlatforms(): void {
+    const platforms = pub.refs?.fightPlatforms;
+    if (!platforms) return;
     const pfFor = (side: 0 | 1): string => {
       const id = pub.fight.sides[side];
       if (!id) return '';
@@ -571,25 +577,27 @@ export class FightSystem extends createSystem({}) {
       return pub.punters.get(id)?.pf ?? '';
     };
     const key = `${pfFor(0)}|${pfFor(1)}`;
-    if (key === this.rimKey) return;
-    this.rimKey = key;
+    if (key === this.platformSkinKey) return;
+    this.platformSkinKey = key;
     ([0, 1] as const).forEach((side) => {
       const pf = pfFor(side);
-      const skin = pf ? platformSkin(pf) : null;
-      const colour = skin ? skin.neon : teamColor(side);
-      const mat = rims[side].material as MeshStandardMaterial;
-      mat.color.setHex(colour);
-      mat.emissive.setHex(colour);
-      if (slabs) {
-        const sm = slabs[side].material as MeshStandardMaterial;
-        if (this.slabBase[side] === undefined) this.slabBase[side] = sm.color.getHex();
-        sm.emissive.setHex(colour);
-        // Premium pads carry an explicit deck tint (gold deck, XD black) — apply
-        // it so the arena's slab look follows the claimant in; otherwise keep the
-        // hall's native gunmetal deck.
-        sm.color.setHex(skin?.slab ?? this.slabBase[side]);
-      }
+      const skin: PlatformSkin = pf
+        ? platformSkin(pf)
+        : { id: '', name: '', neon: teamColor(side) };
+      applyPlatformSkin(platforms[side], skin);
     });
+  }
+
+  /** The arena's PlatformFXSystem is paused while the club is active, so the
+   *  pub fight system drives the exact same lightweight effect function. */
+  private animatePlatforms(): void {
+    for (const node of this.platformFxNodes) {
+      let visible = node.visible;
+      for (let parent = node.parent; visible && parent; parent = parent.parent) {
+        visible = parent.visible;
+      }
+      if (visible) animatePlatformFxNode(node, this.time);
+    }
   }
 
   /** Build the eight octagon-edge barrier walls once (local to a platform-sized
@@ -630,7 +638,7 @@ export class FightSystem extends createSystem({}) {
       group.add(mesh);
       this.rimEdges.push({ ax, az, nx, nz, mat, glow: 0 });
     }
-    this.scene.add(group);
+    pub.refs!.root.add(group);
     this.rimGroup = group;
   }
 
@@ -683,7 +691,8 @@ export class FightSystem extends createSystem({}) {
     this.camera.getWorldQuaternion(_camQ);
 
     this.checkConsoles();
-    this.dressRims();
+    this.dressPlatforms();
+    this.animatePlatforms();
     this.renderConsoles(); // cheap — the key guard skips the redraw unless it changed
     this.updateRimBarrier(delta); // my platform's guardian walls (forfeit warning)
 
@@ -730,7 +739,7 @@ export class FightSystem extends createSystem({}) {
     for (const [id, balls] of this.remoteBalls) {
       if (f.phase === 'idle' || !f.sides.includes(id)) {
         for (const b of balls) b.visual.dispose();
-        for (const b of balls) this.scene.remove(b.visual.group);
+        for (const b of balls) pub.refs!.root.remove(b.visual.group);
         this.remoteBalls.delete(id);
         this.dropRemoteShards(id);
         continue;
@@ -1100,7 +1109,7 @@ export class FightSystem extends createSystem({}) {
     const team = this.teamFor(pub.myId); // a fighter's own fire is always ember
     const mk = (hand: Hand): LocalBall => {
       const visual = createFireVisual(team);
-      this.scene.add(visual.group);
+      pub.refs!.root.add(visual.group);
       this.handPose(hand);
       return {
         state: HOVER,
@@ -1131,7 +1140,7 @@ export class FightSystem extends createSystem({}) {
     this.clearMyShards();
     if (!this.myBalls) return;
     for (const b of this.myBalls) {
-      this.scene.remove(b.visual.group);
+      pub.refs!.root.remove(b.visual.group);
       b.visual.dispose();
     }
     this.myBalls = null;
@@ -1141,7 +1150,7 @@ export class FightSystem extends createSystem({}) {
     const shards = this.remoteShards.get(id);
     if (!shards) return;
     for (const g of shards) {
-      this.scene.remove(g.visual.group);
+      pub.refs!.root.remove(g.visual.group);
       g.visual.dispose();
     }
     this.remoteShards.delete(id);
@@ -1189,7 +1198,7 @@ export class FightSystem extends createSystem({}) {
         const visual = createFireVisual(team);
         visual.group.scale.setScalar(ATTACH.splitSize);
         visual.group.position.copy(ball.pos);
-        this.scene.add(visual.group);
+        pub.refs!.root.add(visual.group);
         this.myShards.push({ visual, pos: ball.pos.clone(), hand, shardIndex: i, heat: 0.8, trailAcc: 0 });
       }
       return;
@@ -1261,7 +1270,7 @@ export class FightSystem extends createSystem({}) {
       this.handPose(s.hand);
       const dist = alive ? this.homeToward(s.pos, _grip, true, s.shardIndex, delta) : 0;
       if (!alive || dist <= FIREBALL.catchRadius) {
-        this.scene.remove(s.visual.group);
+        pub.refs!.root.remove(s.visual.group);
         s.visual.dispose();
         this.myShards.splice(i, 1);
         continue;
@@ -1273,7 +1282,7 @@ export class FightSystem extends createSystem({}) {
 
   private clearMyShards(): void {
     for (const s of this.myShards) {
-      this.scene.remove(s.visual.group);
+      pub.refs!.root.remove(s.visual.group);
       s.visual.dispose();
     }
     this.myShards.length = 0;
@@ -1657,7 +1666,7 @@ export class FightSystem extends createSystem({}) {
       const team = this.teamFor(from);
       const mk = (): RemoteBall => {
         const visual = createFireVisual(team);
-        this.scene.add(visual.group);
+        pub.refs!.root.add(visual.group);
         return {
           visual,
           target: new Vector3(),
@@ -1721,7 +1730,7 @@ export class FightSystem extends createSystem({}) {
     const balls = this.remoteBalls.get(id);
     if (!balls) return;
     for (const b of balls) {
-      this.scene.remove(b.visual.group);
+      pub.refs!.root.remove(b.visual.group);
       b.visual.dispose();
     }
     this.remoteBalls.delete(id);
@@ -1744,12 +1753,12 @@ export class FightSystem extends createSystem({}) {
     while (list.length < shards.length) {
       const visual = createFireVisual(team);
       visual.group.scale.setScalar(ATTACH.splitSize);
-      this.scene.add(visual.group);
+      pub.refs!.root.add(visual.group);
       list.push({ visual, pos: new Vector3(), heat: 0.8, trailAcc: 0, hitCooldown: 0 });
     }
     while (list.length > shards.length) {
       const g = list.pop()!;
-      this.scene.remove(g.visual.group);
+      pub.refs!.root.remove(g.visual.group);
       g.visual.dispose();
     }
     for (let i = 0; i < shards.length; i++) {
@@ -1911,7 +1920,7 @@ export class FightSystem extends createSystem({}) {
       // Wide plate echoing quick match's layout: YOU (left) + clock + RIVAL
       // (right) side by side, hung behind the opponent.
       this.matchBoard = new Panel(3.4, 1.05);
-      this.scene.add(this.matchBoard.mesh);
+      pub.refs!.root.add(this.matchBoard.mesh);
       this.boardSide = -1;
     }
     this.matchBoard.mesh.visible = true;

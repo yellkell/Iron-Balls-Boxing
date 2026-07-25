@@ -107,6 +107,21 @@ export class PubPlayerSystem extends createSystem({}) {
   private voiceStarting = false;
   /** Seconds to wait before re-asking for the mic after a failed attempt. */
   private voiceRetryCooldown = 0;
+  private clubActive = true;
+
+  /** The local club gloves live under the persistent XR grips, not the pub
+   *  root, so they need their own visibility/audio gate. */
+  setClubActive(active: boolean): void {
+    this.clubActive = active;
+    for (const glove of this.localGloves) glove.visible = active;
+    if (!active) {
+      stopVoiceCapture();
+      this.voiceStarted = false;
+      this.voiceStarting = false;
+      this.voiceRetryCooldown = 0;
+      this.hasPrevHands = false;
+    }
+  }
 
   init(): void {
     onSpawn((p) => this.spawn(p));
@@ -158,7 +173,11 @@ export class PubPlayerSystem extends createSystem({}) {
     });
     this.cleanupFuncs.push(
       bus.on('left', (id) => this.despawn(id)),
-      bus.on('disconnected', () => stopVoiceCapture()),
+      bus.on('disconnected', () => {
+        stopVoiceCapture();
+        this.voiceStarted = false;
+        this.voiceStarting = false;
+      }),
       // The server hands out our accent on welcome — restyle our fists to it.
       bus.on('connected', () => {
         for (const glove of this.localGloves) retintLocal(glove, pub.myAccent);
@@ -167,6 +186,7 @@ export class PubPlayerSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
+    if (!this.clubActive) return;
     this.attachLocalGloves();
     this.voiceRetryCooldown = Math.max(0, this.voiceRetryCooldown - delta);
     // A press is a fresh user gesture — use it to unlock audio playback and to
@@ -298,13 +318,13 @@ export class PubPlayerSystem extends createSystem({}) {
     retintRig(rig.all, p.accent);
     // Their arena skin rides over the accent tint (LEDs keep the accent).
     for (const part of rig.all) applyAvatarSkin(part, skin);
-    for (const part of rig.all) this.scene.add(part);
+    for (const part of rig.all) pub.refs!.root.add(part);
     rig.head.position.set(p.head[0], p.head[1] || 1.6, p.head[2]);
 
     // Floating name: plate-free, white, futuristic HUD type, riding high.
     const nameTag = new Panel(0.8, 0.2, 512);
     nameTag.setLabel(p.name.slice(0, 14).toUpperCase(), '#ffffff', 80);
-    this.scene.add(nameTag.mesh);
+    pub.refs!.root.add(nameTag.mesh);
 
     const punter: RemotePunter = {
       id: p.id,
@@ -336,13 +356,15 @@ export class PubPlayerSystem extends createSystem({}) {
    * pose socket and `relayVoice` fans them out.
    */
   private ensureVoice(): void {
+    if (!this.clubActive) return;
     if (this.voiceStarted || this.voiceStarting) return;
     if (this.voiceRetryCooldown > 0) return;
     if (!pub.online || !pub.myId) return;
     this.voiceStarting = true;
     void startVoiceCapture(pubSendVoice).then((ok) => {
       this.voiceStarting = false;
-      this.voiceStarted = ok; // only a real success locks it in
+      this.voiceStarted = ok && this.clubActive; // only a live visit locks it in
+      if (ok && !this.clubActive) stopVoiceCapture();
       if (!ok) this.voiceRetryCooldown = 1.5; // retry shortly / on the next press
     });
   }
@@ -351,8 +373,8 @@ export class PubPlayerSystem extends createSystem({}) {
     const punter = pub.punters.get(id);
     if (!punter) return;
     removeVoiceSpeaker(id);
-    for (const part of punter.rig.all) this.scene.remove(part);
-    this.scene.remove(punter.nameTag.mesh);
+    for (const part of punter.rig.all) pub.refs!.root.remove(part);
+    pub.refs!.root.remove(punter.nameTag.mesh);
     punter.nameTag.dispose();
     pub.punters.delete(id);
   }
