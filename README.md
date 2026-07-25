@@ -107,7 +107,7 @@ in-your-face boxing feel.
 - **VS BOT** — spar an iron boxer that strafes, ducks, reactively dodges your
   throws and hurls fire back on a cadence.
 - **1V1 QUICK MATCH** — competitive online duels through the bundled relay
-  server. Best of 5 rounds, 60 s each, knockout or higher health at the bell.
+  server. Best of 3 rounds, 60 s each, knockout or higher health at the bell.
   P2P matches carry **directional voice chat**: your rival's mic is
   spatialised onto their avatar's head (HRTF), so their trash talk pans and
   ducks with them. Mic permission is asked when you queue; declining still

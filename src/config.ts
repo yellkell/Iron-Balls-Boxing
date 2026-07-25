@@ -670,7 +670,14 @@ export const BOSS_STUN = { hits: 5, decayPerSec: 1.2, duration: 2.6 };
 export const MATCH = {
   startDelay: 7, // quick-match pre-fight hold before the first live round
   roundTime: 60, // seconds per round
-  winTarget: 3, // first to N round wins takes the match
+  // BEST OF THREE: first to 2 round wins. This was first-to-3 (best of five),
+  // which is up to five minutes of round time for one quick match.
+  //
+  // NB this is the format for EVERY duel, quick match and ranked alike — they
+  // are the same 1v1 code path and ArcadeMode can't tell them apart, so there
+  // is no way to shorten one without the other short of a new synced flag.
+  // Both peers must agree on the target or the match never ends for one side.
+  winTarget: 2, // first to N round wins takes the match
   winTargetFfa: 2, // FFA only: a four-way scramble at first-to-3 drags — 2 crowns it
   roundOverDelay: 5, // breather between rounds before the next round's countdown
   roundCountdown: 3, // the 3-2-1 that opens every round AFTER the first

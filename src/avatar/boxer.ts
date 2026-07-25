@@ -810,27 +810,46 @@ function buildBearChest(accent: number): Group {
   // the TORSO between them that came down, which is what turns "chunky" into
   // "shoulder-heavy".
   for (const side of [-1, 1]) {
-    // Flattened into caps rather than left near-spherical. On this armour
-    // (metalness 0.96, roughness 0.2) a sphere takes one big round specular
-    // and reads as a BALL bolted to the shoulder, whatever size it is.
-    const cop = new Mesh(new SphereGeometry(0.105, 16, 12), chassisMat(accent, 0.05));
-    cop.scale.set(1.16, 0.66, 0.94);
-    cop.position.set(side * 0.2, 0.152, 0);
-    cop.rotation.z = side * -0.09;
-    g.add(cop);
-    const skirt = new Mesh(new SphereGeometry(0.088, 16, 12), chassisMat(accent, 0.05));
-    skirt.scale.set(1.14, 0.54, 0.92);
-    skirt.position.set(side * 0.218, 0.094, 0);
-    skirt.rotation.z = side * -0.2;
-    g.add(skirt);
-    const rim = new Mesh(
-      new SphereGeometry(0.09, 16, 8, 0, Math.PI * 2, Math.PI * 0.44, 0.1),
-      glowMat(accent, 0.32),
+    // Sized to reach the KNIGHT's shoulder line (its dome pauldrons sit at
+    // ±0.26 with a 0.15 radius, so its widest point is x ≈ 0.41, and measured
+    // on screen it is the broadest body on the roster at 265 px against the
+    // bear's 209). The bear matches it here rather than in the torso: the
+    // knight carries its width on a slim 0.16 trunk too, and that is what a
+    // shoulder-heavy silhouette is — broad up top, not barrel all the way
+    // down.
+    //
+    // A true half-DOME cut, the same construction the knight's pauldrons use —
+    // not a sphere stretched sideways to reach the width. Stretching is what
+    // turned these into elongated pods with a bright line down them, i.e.
+    // wings again: the reach has to come from where the shell SITS, not from
+    // scaling it flat.
+    const sh = new Group();
+    sh.position.set(side * 0.256, 0.13, 0);
+    sh.rotation.z = side * -0.16; // tilt the shell over the arm
+    g.add(sh);
+    const dome = new Mesh(
+      new SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
+      chassisMat(accent, 0.05),
     );
-    rim.scale.copy(skirt.scale);
-    rim.position.copy(skirt.position);
-    rim.rotation.copy(skirt.rotation);
-    g.add(rim);
+    dome.scale.set(1, 0.8, 1.05);
+    sh.add(dome);
+    // A dark under-fill, so the open dome never reads hollow from below.
+    const fill = new Mesh(new SphereGeometry(0.138, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), darkMat());
+    fill.scale.set(1, 0.7, 1.05);
+    fill.position.y = -0.006;
+    sh.add(fill);
+    // A lit lip at the dome's cut edge.
+    const rim = new Mesh(new CylinderGeometry(0.148, 0.152, 0.014, 20), glowMat(accent, 0.34));
+    rim.scale.z = 1.05;
+    rim.position.y = -0.012;
+    sh.add(rim);
+    // Two lames stepping down under it — lapped bear plate.
+    for (let j = 0; j < 2; j++) {
+      const lame = new Mesh(new BoxGeometry(0.2 - j * 0.03, 0.048, 0.19 - j * 0.02), chassisMat(accent, 0.04));
+      lame.position.set(side * 0.012, -0.052 - j * 0.05, 0);
+      lame.rotation.z = side * 0.12;
+      sh.add(lame);
+    }
   }
 
   // PEC PLATES: the torso loft is one smooth barrel, which on its own reads
@@ -885,7 +904,7 @@ function buildBearChest(accent: number): Group {
   for (const side of [-1, 1]) {
     for (let j = 0; j < 3; j++) {
       const ember = new Mesh(new SphereGeometry(0.009, 8, 6), glowMat(accent, 1.6));
-      ember.position.set(side * (0.215 + j * 0.034), 0.203 - j * 0.02, -0.04 - j * 0.008);
+      ember.position.set(side * (0.25 + j * 0.042), 0.2 - j * 0.022, -0.04 - j * 0.008);
       g.add(ember);
     }
   }
