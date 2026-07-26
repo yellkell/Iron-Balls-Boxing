@@ -50,7 +50,6 @@ import {
   BODY_IK,
   BOUNDARY,
   CURL,
-  curlLead,
   curlRateFor,
   FIREBALL,
   NET,
@@ -1436,16 +1435,12 @@ export class FightSystem extends createSystem({}) {
     ball.vel.copy(_dir).multiplyScalar(speed);
     // Curve: read the swing's turn-rate, gate it on a committed (fast) swing,
     // and store axis × rate as the in-flight curl. Same maths as the arena —
-    // literally, now: both call curlRateFor/curlLead from config.js.
+    // literally, now: both call curlRateFor from config.js.
     let curlRate = 0;
     if (this.ballArc[hand]) {
       const raw = this.trackers[hand].curl(_curl, this.time);
       curlRate = curlRateFor(raw, handSpeed);
       ball.curl.copy(_curl).multiplyScalar(curlRate);
-      // Launch on the RELEASE tangent, not the tracker's window-average
-      // heading — on a hook they're tens of degrees apart (see CURL.window).
-      const lead = curlLead(raw);
-      if (lead > 0) ball.vel.applyAxisAngle(_curl, lead);
     } else {
       ball.curl.set(0, 0, 0);
     }

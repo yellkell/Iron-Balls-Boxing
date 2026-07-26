@@ -232,111 +232,44 @@ export const FIREBALL = {
  * Curveball tuning (the per-fist CURVE loadout toggle) — ONE source shared by
  * the arena (FireballSystem) and the pub fight hall (FightSystem), which used
  * to carry drifting private copies. The raw swing turn-rate (rad/s, read off
- * the punch's curvature) maps across the `min`…`full` band to at most `max`;
- * in flight the velocity rotates about the curl axis while the rate decays at
- * `decay`/s — bank hard off the fist, straighten downrange.
+ * the punch's curvature) is scaled by `gain` above the `min` dead zone and
+ * capped at `max`; in flight the velocity rotates about the curl axis while
+ * the rate decays at `decay`/s — bank hard off the fist, straighten downrange.
  *
- * Tuned by replaying the flight integrator and reading the answer in METRES of
- * sideways break at the far plate (a fighter is ~0.45 m across, so half a
- * metre is the width of a guard).
+ * These are the numbers the curve had before the 25 Jul retune, restored on
+ * request. That retune traded reach for aimability and the trade was not
+ * wanted: it cut the ceiling from 5.0 rad/s to 2.0 and more than doubled the
+ * decay, which together took roughly four fifths of the bend out. What comes
+ * back with them is a curve that keeps turning the whole way down the gap —
+ * a hard hook can bend most of the way round rather than arriving on a
+ * readable heading. That is the shape of the throw as it was.
  *
- * The first pass, `(raw - min) * 1.6` capped at 5 rad/s decaying at 1.4/s, was
- * a boomerang: every hook pinned the cap and turned ~156°, never reaching the
- * far plate at all. The correction over-shot the other way. Two gates —
- * `raw`→`full` and the hand-speed ramp — MULTIPLY, and both were set where a
- * real punch only partly satisfies them, so a typical deliberate hook earned
- * about a fifth of an already modest ceiling and broke 0.24 m: less than half
- * a guard, which reads as no curve at all.
- *
- * Both gates now close where an ordinary committed hook actually lands. Break
- * at the far plate, by swing:
- *
- * Break at the far plate, for punches read by replaying the REAL
- * VelocityTracker over real hand paths rather than by assuming what a hook
- * looks like — which is what the first two passes at this got wrong:
- *
- *   straight jab    0.00 m   (turn rate 0 — the toggle stays honest)
- *   lazy sweep      0.32
- *   wide hook       0.80
- *   normal hook     1.26
- *   tight hook      1.52     arriving at 40°, the steepest of them
- *
- * The `raw` and `hand` figures in the ?perf=1 readout are the two inputs the
- * whole band is calibrated against, so they say immediately whether a punch
- * is landing where these numbers expect.
+ * The one thing NOT restored is the duplication: the mapping lives here, in
+ * curlRateFor, instead of being reimplemented on both sides, which is how the
+ * arena and the pub drifted apart in the first place.
  */
 export const CURL = {
   min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
-  full: 7.0, // rad/s of swing turn that earns the full bend
-  max: 2.0, // rad/s — the hardest the ball itself will ever bank
-  decay: 2.6, // per second — the arc is spent early and settles late
-  /**
-   * Hand-speed ramp (m/s). Its ONLY job is to reject tracking jitter from a
-   * hand that is barely moving; it is not meant to demand a fast punch.
-   *
-   * It had been doing the latter, and that is where the curve went. Replaying
-   * the real VelocityTracker over real hand paths shows a TIGHT hook — pivoted
-   * from the elbow, the natural way to throw a curve without flailing — reads
-   * a turn rate of ~9.8 rad/s on only ~2.4 m/s of hand speed. At the old
-   * 2.0→3.2 ramp that punch kept a third of its bend and broke 0.39 m, while a
-   * wide fast swing broke 1.09 m. So the one punch shaped like a curveball was
-   * the one that didn't curve.
-   *
-   * Speed is already paid for elsewhere — it sets the ball's launch speed — so
-   * charging for it twice only meant a controlled hook bought nothing. The
-   * ramp now clears just above FIREBALL.minPunchSpeed (1.1, below which no
-   * throw happens at all), and `min` above stays the real jitter guard: a
-   * straight punch reads a turn rate of 0 and is untouched by any of this.
-   *
-   * Tight hook 0.39 m -> 1.52 m of break. The wide fast hooks that already
-   * worked are unchanged, because they already cleared the old ramp.
-   */
-  speedMin: 1.2, // below this swing speed → essentially no curve
-  speedFull: 2.0, // at/above this → full curve
+  gain: 1.6, // applied to the swing rate ABOVE the dead zone
+  max: 5.0, // rad/s after gain — the hardest hook the ball will bite into
+  decay: 1.4, // per second — lower = the bend carries further downrange
+  // Curve only really bites on a committed, WIDE swing — small movements are
+  // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
+  speedMin: 2.2, // below this swing speed → essentially no curve
+  speedFull: 4.0, // at/above this → full curve
   /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
    *  launch sfx, the harder haptic and the corkscrew trail. */
-  feelMin: 0.25,
-  /**
-   * The window (s) the velocity trackers average a punch over. What they
-   * return is the CHORD across that window — the hand's heading at its
-   * midpoint, not at release. On a straight jab those are the same thing; on
-   * a hook turning 10 rad/s they are ~30° apart, so a curve throw launched
-   * off the raw average leaves the fist aimed well wide of where the player
-   * was pointing. `curlLead` rotates it forward to recover the release
-   * tangent. Keep in step with VelocityTracker.velocity().
-   */
-  window: 0.11,
-  /** Cap (rad) on that correction, so one jittery frame can't fling a throw. */
-  leadMax: 0.6,
+  feelMin: 0.5,
 };
 
-/** Smoothstep 0..1 — flat at both ends, so a throw sitting near a gate's edge
- *  doesn't swing wildly on a few cm/s of tracking noise. */
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 /**
- * The curl rate (rad/s) a throw earns: the swing's raw turn rate mapped across
- * the dead zone → `full` band, gated by how committed the swing was. Linear in
- * the band, so a lazy hook really does bend less than a vicious one.
+ * The curl rate (rad/s) a throw earns: the swing's raw turn rate above the
+ * dead zone, scaled by `gain`, capped at `max`, and ramped in linearly with
+ * how committed the swing was.
  */
 export function curlRateFor(raw: number, handSpeed: number): number {
-  if (raw <= CURL.min) return 0;
-  const bite = Math.min(1, (raw - CURL.min) / (CURL.full - CURL.min));
-  return CURL.max * bite * smoothstep(CURL.speedMin, CURL.speedFull, handSpeed);
-}
-
-/**
- * How far (rad) to rotate a launch direction FORWARD about the curl axis to
- * recover the release tangent from the tracker's window-average heading — see
- * CURL.window. Zero for anything inside the dead zone, so straight throws are
- * untouched.
- */
-export function curlLead(raw: number): number {
-  if (raw <= CURL.min) return 0;
-  return Math.min(CURL.leadMax, raw * CURL.window * 0.5);
+  const speedK = Math.max(0, Math.min(1, (handSpeed - CURL.speedMin) / (CURL.speedFull - CURL.speedMin)));
+  return (raw <= CURL.min ? 0 : Math.min(CURL.max, (raw - CURL.min) * CURL.gain)) * speedK;
 }
 
 /**
