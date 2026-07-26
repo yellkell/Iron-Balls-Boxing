@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Leaderboard — one doc per anonymous player.
+    match /players/{player} {
+      allow read, create, update: if true;
+    }
+    // OCTA HUNT (pub arcade cabinet) all-time board — a single doc
+    // `pub/octaHunt` the pub relay restores on boot and writes through on each
+    // new record, so scores survive the server's ephemeral-disk restarts.
+    match /pub/{doc} {
+      allow read, create, update: if true;
+    }
+    // 1v1 quick-match lobbies + WebRTC ICE-candidate subcollections.
+    match /lobbies/{lobby} {
+      allow read, create, update, delete: if true;
+      match /{document=**} { allow read, write: if true; }
+    }
+    // 1v1 private-match lobbies (5-digit codes) + candidates.
+    // NOTE: 1v1 ONLY — src/net/webrtcTransport.ts. A private 2v2/FFA/raid code
+    // is a mesh room and lives in privateRooms below, not here.
+    match /privateLobbies/{lobby} {
+      allow read, create, update, delete: if true;
+      match /{document=**} { allow read, write: if true; }
+    }
+    // 1v1 RANKED public rooms (server browser) + candidates.
+    match /rankedRooms/{room} {
+      allow read, create, update, delete: if true;
+      match /{document=**} { allow read, write: if true; }
+    }
+    // Arcade 2v2 / FFA mesh rooms + per-pair signalling + candidates.
+    // (Raid lobbies also live here, mode 'raid'.)
+    match /arcadeRooms/{room} {
+      allow read, create, update, delete: if true;
+      match /{document=**} { allow read, write: if true; }
+    }
+    // PRIVATE 2v2 / FFA / raid mesh rooms behind a shareable 5-digit code —
+    // the doc id IS the code (src/net/meshImpl.ts hostPrivate/joinPrivate).
+    // Same document shape as an arcadeRooms lobby, in a separate collection so
+    // it stays out of the public room browser (which only watches arcadeRooms).
+    // Needs the same verbs: hostPrivate probes codes for collisions inside a
+    // transaction (read), claims one (create), seats fill and the bout starts
+    // (update), and close() removes the room (delete). The `sig` per-pair
+    // signalling docs and their ICE candidates sit underneath.
+    match /privateRooms/{room} {
+      allow read, create, update, delete: if true;
+      match /{document=**} { allow read, write: if true; }
+    }
+    // PvE run-time leaderboards — one immutable doc per completed run
+    // (a squad + a fight-time clock). Append-only: read + create, never
+    // updated or deleted, so posted times can't be overwritten.
+    // Only runGauntlet and runRaid are still written (see net/leaderboard.ts);
+    // the two hardcore boards are retired but kept readable for old rows.
+    match /runGauntlet/{run}     { allow read, create: if true; }
+    match /runHardcore/{run}     { allow read, create: if true; }
+    match /runRaid/{run}         { allow read, create: if true; }
+    match /runRaidHardcore/{run} { allow read, create: if true; }
+    // The Gasket Gazette — `latest` (the live edition the lobby reads) and
+    // `_snapshot` (the generator's ladder state). The game reads; the
+    // scheduled task reads + writes.
+    match /newspaper/{doc} {
+      allow read, write: if true;
+    }
+    // SAFETY REPORTS — the settings-menu report box. Players may only FILE
+    // them (shape-checked, capped at 200 chars); nobody can read, edit or
+    // delete from the client, so reports stay private to the console.
+    match /reports/{report} {
+      allow create: if request.resource.data.text is string
+                    && request.resource.data.text.size() <= 200
+                    && request.resource.data.from is string
+                    && request.resource.data.uid is string;
+      allow read, update, delete: if false;
+    }
+  }
+}
