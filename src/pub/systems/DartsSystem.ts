@@ -71,7 +71,7 @@ export class DartsSystem extends createSystem({}) {
       p.mesh.quaternion.copy(this._camQ); // billboard — always readable
       p.mat.opacity = Math.min(1, p.life * 1.5); // fade out at the end
       if (p.life <= 0) {
-        this.scene.remove(p.mesh);
+        pub.refs!.root.remove(p.mesh);
         p.mat.map?.dispose();
         p.mat.dispose();
         p.mesh.geometry.dispose();
@@ -160,7 +160,7 @@ export class DartsSystem extends createSystem({}) {
     mesh.position.copy(refs.dartboard.position);
     mesh.position.z += 0.18; // proud of the board, toward the throwers
     mesh.position.y += 0.12;
-    this.scene.add(mesh);
+    pub.refs!.root.add(mesh);
     this.popups.push({ mesh, mat, life: 1.6 });
   }
 

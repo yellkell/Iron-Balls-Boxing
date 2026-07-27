@@ -31,22 +31,17 @@ import {
   TorusGeometry,
   Vector2,
 } from 'three';
-import { IBLGradient, type World } from '@iwsdk/core';
+import type { World } from '@iwsdk/core';
+import { makePlatform } from '../arena/arena.js';
 import { collapseStatic } from '../arena/merge.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { OCTAGON_VERTICES, PALETTE, teamColor } from '../config.js';
+import { PALETTE, teamColor } from '../config.js';
 import { diamondPlateTextures } from '../materials/diamondPlate.js';
-import { octagonSlab } from '../arena/octagon.js';
 import { BOOTH_CENTRES, FIGHT, JUKEBOX, PUB } from './config.js';
 import { Panel } from './panel.js';
 import { buildGraffiti, buildPoster, buildSign, ironSharpensFallback, IRON_SHARPENS_SIGN } from './signs.js';
 import type { PubRefs } from './state.js';
 import { corkTexture, dartboardTexture, fabricTexture, steelWallTexture, woodTexture } from './textures.js';
-
-function rgba(hex: number, a = 1): [number, number, number, number] {
-  const c = new Color(hex);
-  return [c.r, c.g, c.b, a];
-}
 
 const gunmetal = (rough = 0.35): MeshStandardMaterial =>
   new MeshStandardMaterial({ color: PALETTE.gunmetal, metalness: 0.85, roughness: rough });
@@ -92,6 +87,7 @@ function roundedPuck(radius: number, height: number, fillet = 0.025): LatheGeome
 export function buildPub(world: World): PubRefs {
   const root = new Group();
   root.name = 'iron-balls-pub';
+  const rootEntity = world.createTransformEntity(root, { persistent: true });
 
   const W = PUB.halfWidth;
   const D = PUB.halfDepth;
@@ -99,13 +95,6 @@ export function buildPub(world: World): PubRefs {
 
   // Warm dim base light: amber from the lamps below, cold steel from above.
   world.scene.background = new Color(0x0c0d11);
-  const env = world.createTransformEntity(undefined, { persistent: true });
-  env.addComponent(IBLGradient, {
-    sky: rgba(0x4a5160),
-    equator: rgba(0x8a7a60),
-    ground: rgba(0x6e4a26),
-    intensity: 0.55,
-  });
 
   // --- shell: floor, ceiling, walls -----------------------------------------
   const plate = diamondPlateTextures();
@@ -690,10 +679,11 @@ export function buildPub(world: World): PubRefs {
   placeGraffiti('posters/blaston-graffiti.png', WEST, 1.5, 2.7, RY_W, -0.02, 1.15, 0.77);
 
   // --- the fight hall through the west door ---------------------------------
-  const { consolePanels, fightDisplay, fightDisplay2, fightRims, fightSlabs, discoball } = buildFightHall(root);
+  const { consolePanels, fightDisplay, fightDisplay2, fightPlatforms, discoball } = buildFightHall(root);
 
   const refs: PubRefs = {
     root,
+    rootEntity,
     dartboard,
     corkSurround,
     dartCatchers: [northWall],
@@ -711,8 +701,7 @@ export function buildPub(world: World): PubRefs {
     consolePanels,
     fightDisplay,
     fightDisplay2,
-    fightRims,
-    fightSlabs,
+    fightPlatforms,
     jukebox,
     jukeboxPanel,
     discoball,
@@ -745,7 +734,6 @@ export function buildPub(world: World): PubRefs {
   }
   collapseStatic(root, (o) => keep.has(o));
 
-  world.scene.add(root);
   return refs;
 }
 
@@ -854,8 +842,7 @@ function buildFightHall(root: Group): {
   consolePanels: [Panel, Panel];
   fightDisplay: Panel;
   fightDisplay2: Panel;
-  fightRims: [Mesh, Mesh];
-  fightSlabs: [Mesh, Mesh];
+  fightPlatforms: [Group, Group];
   discoball: Group;
 } {
   const hall = FIGHT.hall;
@@ -995,48 +982,23 @@ function buildFightHall(root: Group): {
     root.add(light);
   }
 
-  // The two octagonal platforms — the arena's own footprint and colours.
+  // The two octagonal platforms are the arena's REAL platform objects, not a
+  // fight-hall approximation. FightSystem applies each claimant's complete
+  // platform skin to these groups, including geometry/decal ornaments.
   const consolePanels: Panel[] = [];
-  const fightRims: Mesh[] = [];
-  const fightSlabs: Mesh[] = [];
+  const fightPlatforms: Group[] = [];
   for (const side of [0, 1] as const) {
     const z = side === 0 ? FIGHT.platformZ : -FIGHT.platformZ;
     const accent = teamColor(side);
-    // Platforms live INSIDE the pit, standing proud of the (lower) pit floor —
-    // fighters stand a level below the crowd, stadium-style. The slab is tall
-    // enough to rise from the dug floor up to the standing top (-pitDepth). It
-    // carries a low corner-coloured underglow that FightSystem re-tints to
-    // whichever platform skin the claimant picked in customisation (dressRims).
-    const slabH = FIGHT.platformThickness + FIGHT.standProud;
-    const slabMat = gunmetal(0.3);
-    slabMat.emissive.setHex(accent);
-    slabMat.emissiveIntensity = 0.22;
-    const slab = new Mesh(
-      octagonSlab(OCTAGON_VERTICES as [number, number][], slabH),
-      slabMat,
-    );
-    slab.position.set(FIGHT.centerX, -FIGHT.pitDepth - slabH, z);
-    // The octagon's straight front edge faces −z; side 0 (south) must face north.
-    if (side === 0) slab.rotation.y = 0;
-    else slab.rotation.y = Math.PI;
-    root.add(slab);
-    fightSlabs.push(slab);
-    // Glowing rim outline at pit-floor level in the corner colour.
-    const rim = new Mesh(
-      octagonSlab(OCTAGON_VERTICES as [number, number][], 0.02),
-      new MeshStandardMaterial({
-        color: accent,
-        emissive: accent,
-        emissiveIntensity: 1.1,
-        metalness: 0.2,
-        roughness: 0.4,
-      }),
-    );
-    rim.scale.set(1.06, 1, 1.06);
-    rim.position.set(FIGHT.centerX, -FIGHT.pitDepth + 0.005, z);
-    rim.rotation.y = slab.rotation.y;
-    root.add(rim);
-    fightRims.push(rim);
+    // The platform group's local floor line is its deck top, just as it is in
+    // the main arena. Drop that line to the sunken fight level and face each
+    // claimant toward the opposing pad.
+    const platform = makePlatform(accent);
+    platform.name = `pub-fight-platform-${side}`;
+    platform.position.set(FIGHT.centerX, -FIGHT.pitDepth, z);
+    platform.rotation.y = side === 0 ? 0 : Math.PI;
+    root.add(platform);
+    fightPlatforms.push(platform);
 
     // Claim + betting tablet: a steel kiosk between the platform and the door —
     // claim your corner here, then it takes the crowd's round-one bets on the
@@ -1185,8 +1147,7 @@ function buildFightHall(root: Group): {
     consolePanels: [consolePanels[0], consolePanels[1]],
     fightDisplay,
     fightDisplay2,
-    fightRims: [fightRims[0], fightRims[1]],
-    fightSlabs: [fightSlabs[0], fightSlabs[1]],
+    fightPlatforms: [fightPlatforms[0], fightPlatforms[1]],
     discoball: disco,
   };
 }

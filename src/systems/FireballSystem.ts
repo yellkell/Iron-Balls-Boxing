@@ -31,7 +31,8 @@ import { mesh } from '../net/mesh.js';
 import type { PeerMessage } from '../net/protocol.js';
 import { pulseHand } from '../input/haptics.js';
 import * as sfx from '../audio/sfx.js';
-import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, curlLead, curlRateFor, FIREBALL, NET } from '../config.js';
+import { ARENA_BOUNDS, ARENA_GAP, ATTACH, CURL, curlRateFor, FIREBALL, NET } from '../config.js';
+import { recordThrow } from '../debug/throwProbe.js';
 
 const HANDS = ['left', 'right'] as const;
 type Hand = 0 | 1;
@@ -109,7 +110,7 @@ class VelocityTracker {
 
 // Curveball tuning — the shared CURL block in config.ts (one source for the
 // arena and the pub fight hall). The raw-swing → curl-rate mapping lives there
-// too (curlRateFor/curlLead) so the two systems can't drift apart again.
+// too (curlRateFor) so the two systems can't drift apart again.
 const CURL_DECAY = CURL.decay;
 
 const _grip = new Vector3();
@@ -495,20 +496,12 @@ export class FireballSystem extends createSystem({
       // bends scales with the hook — see curlRateFor in config.ts.
       const raw = this.trackers[hand].curl(_curl, this.time);
       curlRate = curlRateFor(raw, handSpeed);
+      // What the swing measured, for the ?perf=1 readout — CURL is tuned
+      // against these two numbers and nothing else reports them.
+      recordThrow(raw, handSpeed, curlRate, this.time);
       c[0] = _curl.x * curlRate;
       c[1] = _curl.y * curlRate;
       c[2] = _curl.z * curlRate;
-      // Aim the throw where the hand was pointing AT RELEASE, not at the
-      // middle of the tracker's window. On a hook those differ by tens of
-      // degrees, and since ARC throws get no aim assist there was nothing to
-      // mask it: the ball simply left the fist wide of where you swung.
-      const lead = curlLead(raw);
-      if (lead > 0) {
-        _dir.applyAxisAngle(_curl, lead).normalize();
-        v[0] = _dir.x * speed;
-        v[1] = _dir.y * speed;
-        v[2] = _dir.z * speed;
-      }
     } else {
       c[0] = 0;
       c[1] = 0;

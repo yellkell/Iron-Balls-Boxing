@@ -5,6 +5,7 @@
  */
 
 import type { Group, Mesh, MeshStandardMaterial, Object3D } from 'three';
+import type { Entity } from '@iwsdk/core';
 import type { BoxerRig } from '../avatar/boxer.js';
 import type { BoardRow, DiscordMsg, FightNet, PoseTuple, PropNet, PubEvent, SnakeHi, SnakeScore } from './protocol.js';
 import type { Panel } from './panel.js';
@@ -37,6 +38,9 @@ export interface RemotePunter {
 /** Scene references built by environment.ts, consumed by the systems. */
 export interface PubRefs {
   root: Group;
+  /** ECS owner for the entire club subtree, allowing one visibility switch to
+   *  hide every club object without touching the persistent XR rig. */
+  rootEntity: Entity;
   dartboard: Mesh;
   corkSurround: Mesh;
   /** Extra dart-stick targets (walls/cabinet) so strays embed somewhere. */
@@ -59,11 +63,9 @@ export interface PubRefs {
   snakeStick: Group;
   /** The Octa Hunt all-time high-score poster on the wall beside the cabinet. */
   octaBoard: Panel;
-  /** Fight hall: each platform's glowing rim — re-skinned per claimant. */
-  fightRims: [Mesh, Mesh];
-  /** Fight hall: each platform's slab — its underglow follows the claimant's
-   *  chosen platform skin (alongside the rim). */
-  fightSlabs: [Mesh, Mesh];
+  /** Fight hall: the main arena's complete platform objects, fully re-skinned
+   *  per claimant (deck ornaments and earned-platform effects included). */
+  fightPlatforms: [Group, Group];
   /** Fight hall: claim console panels (side 0, side 1) + the big display. */
   consolePanels: [Panel, Panel];
   fightDisplay: Panel;

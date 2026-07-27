@@ -12,6 +12,8 @@
 
 import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { installCrashTrap } from './debug/crashTrap.js';
+import { installClubExperienceManager } from './experience/ClubExperienceManager.js';
+import { requestArenaReturn, requestClubEntry } from './experience/clubNavigation.js';
 import { initLeaderboard } from './net/leaderboard.js';
 import { initGazette } from './net/gazette.js';
 import { enterMenuMusic } from './audio/menuMusic.js';
@@ -42,6 +44,8 @@ import { PlayerGestureSystem } from './systems/PlayerGestureSystem.js';
 import { FXSystem } from './systems/FXSystem.js';
 import { DesertSystem } from './systems/DesertSystem.js';
 import { PlatformFXSystem } from './systems/PlatformFXSystem.js';
+import { PerfHudSystem } from './systems/PerfHudSystem.js';
+import { FOVEATION, pubUrl } from './config.js';
 
 installCrashTrap(); // headset playtests have no console — trap + persist crashes
 
@@ -56,6 +60,7 @@ function hideLanding(): void {
 
 function showLanding(): void {
   document.body.classList.remove('app-entered');
+  if (enterVrButton) enterVrButton.textContent = app.environment === 'ar' ? 'Enter AR' : 'Enter VR';
   enterVrButton?.removeAttribute('disabled');
 }
 
@@ -63,13 +68,15 @@ World.create(container, {
   // The landing button calls IWSDK's explicit WebXR launcher from the user's
   // tap. Quest Browser needs that direct requestSession gesture path.
   xr: {
-    sessionMode: SessionMode.ImmersiveAR,
+    sessionMode: SessionMode.ImmersiveVR,
     offer: 'none',
   },
-  // A stationary dodge game: no locomotion (you stay on your platform), no
-  // grab system (the fireballs are bonded to your fists, not grabbed).
+  // A stationary dodge game: no locomotion (you stay on your platform).
+  // Grabbing stays registered for the lazily loaded club.
   features: {
-    grabbing: false,
+    // Registered once for the shared app shell. The arena has no grabbable
+    // entities, while the lazily mounted club uses it for pints and darts.
+    grabbing: true,
     locomotion: false,
     spatialUI: false,
   },
@@ -83,12 +90,13 @@ World.create(container, {
     camera: { position: [0, 1.6, 0] },
   },
 }).then(async (world) => {
-  // Quest's default maximum fixed foveation (super-three's WebXRManager ships
-  // foveation = 1.0) renders the display edges at lower resolution, and the
-  // boundary between foveation regions shows up as a head-locked dark band on
-  // dark/high-contrast content. Full resolution kills it outright; raise toward
-  // ~0.2 later if we want some of the perf back without exposing the seam.
-  world.renderer.xr.setFoveation(0);
+  // IWSDK infrastructure already present before either experience is built.
+  // The transition manager uses these baselines to hide arena-owned nodes
+  // without ever hiding the camera, XR origin or controller spaces.
+  const sceneBaseline = new Set(world.scene.children);
+  const levelBaseline = new Set(world.getActiveRoot().children);
+
+  world.renderer.xr.setFoveation(FOVEATION);
 
   initLeaderboard(); // anonymous profile + first board fetch
   initGazette(); // pull the day's Gasket Gazette for the lobby paper button
@@ -128,20 +136,71 @@ World.create(container, {
   world.registerSystem(FXSystem);
   // Earned trophy pads stay alive: BLAZING burns and TIDEBREAKER surges.
   world.registerSystem(PlatformFXSystem);
+  // Frame-time readout; builds nothing unless the page is opened with ?perf=1.
+  world.registerSystem(PerfHudSystem);
   // The optional papercraft desert backdrop (off = bare AR passthrough).
   world.registerSystem(DesertSystem);
 
-  // Passthrough AR when the device offers it; otherwise fall back to plain
-  // immersive VR — the desert backdrop paints the world in, so nothing is
-  // lost but the passthrough novelty. Without this fallback a VR-only
-  // context (some packaged-app webviews, older headsets) left the button
-  // dead on "XR unavailable" — a player stuck at the landing page forever
-  // (Meta review VRC.Quest.Functional.3, 2026-07).
+  const arenaSystems = [
+    world.getSystem(PlayerBodySystem)!,
+    world.getSystem(BotSystem)!,
+    world.getSystem(NetworkSystem)!,
+    world.getSystem(MeshSystem)!,
+    world.getSystem(OpponentSystem)!,
+    world.getSystem(TrainingSystem)!,
+    world.getSystem(CampaignSystem)!,
+    world.getSystem(TutorialSystem)!,
+    world.getSystem(FireballSystem)!,
+    world.getSystem(CollisionSystem)!,
+    world.getSystem(BoundarySystem)!,
+    world.getSystem(GameStateSystem)!,
+    world.getSystem(CountdownSystem)!,
+    world.getSystem(MenuSystem)!,
+    world.getSystem(PromotionSystem)!,
+    world.getSystem(PlayerFeedbackSystem)!,
+    world.getSystem(PlayerGloveSystem)!,
+    world.getSystem(PlayerGestureSystem)!,
+    world.getSystem(PlatformFXSystem)!,
+    world.getSystem(DesertSystem)!,
+  ];
+  installClubExperienceManager(world, arenaSystems, {
+    scene: sceneBaseline,
+    level: levelBaseline,
+  });
+
+  // Desktop-only transition harness for repeatable production-build smoke
+  // tests. It is absent from normal URLs and never changes the headset UI.
+  if (new URLSearchParams(location.search).get('clubtest') === '1') {
+    const controls = document.createElement('aside');
+    controls.setAttribute('aria-label', 'Club transition test');
+    controls.style.cssText =
+      'position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;gap:8px;' +
+      'padding:10px;background:#090b10;color:white;font:700 14px system-ui;border:1px solid #ff7a18';
+    const status = document.createElement('output');
+    status.textContent = 'arena';
+    const enter = document.createElement('button');
+    enter.textContent = 'Test Enter Club';
+    enter.addEventListener('click', () => {
+      document.body.classList.add('app-entered');
+      requestClubEntry(world, pubUrl());
+    });
+    const leave = document.createElement('button');
+    leave.textContent = 'Test Return Arena';
+    leave.addEventListener('click', () => requestArenaReturn(world));
+    window.addEventListener('ibb:location', ((event: CustomEvent<string>) => {
+      status.textContent = event.detail;
+    }) as EventListener);
+    controls.append(enter, leave, status);
+    document.body.append(controls);
+  }
+
+  // Opaque arenas launch in immersive VR. Running a painted-in world through
+  // Quest's AR compositor exposes grey reprojection strips at the eye edges
+  // during quick head turns. Immersive AR is reserved for the one setting
+  // that actually needs it: real-room passthrough.
   const arSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
-  const vrSupported =
-    arSupported || (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
-  const sessionMode = arSupported ? SessionMode.ImmersiveAR : SessionMode.ImmersiveVR;
-  const xrSupported = vrSupported;
+  const vrSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
+  const xrSupported = arSupported || vrSupported;
 
   const startXR = () => {
     enterVrButton?.setAttribute('disabled', '');
@@ -153,9 +212,15 @@ World.create(container, {
       ensureAudio();
       preloadTutorVoice();
     }
-    // No passthrough in a plain-VR session: a saved 'ar' backdrop would
-    // render as a black void, so promote it to the desert.
-    if (!arSupported && app.environment === 'ar') app.environment = 'desert';
+    const sessionMode =
+      app.environment === 'ar' && arSupported
+        ? SessionMode.ImmersiveAR
+        : vrSupported
+          ? SessionMode.ImmersiveVR
+          : SessionMode.ImmersiveAR;
+    // No passthrough in a plain-VR fallback: a saved AR backdrop would render
+    // as a black void, so promote it to the desert.
+    if (sessionMode === SessionMode.ImmersiveVR && app.environment === 'ar') app.environment = 'desert';
     launchXR(world, { sessionMode });
 
     const watchForSession = () => {
@@ -177,6 +242,7 @@ World.create(container, {
   };
 
   if (enterVrButton && xrSupported) {
+    enterVrButton.textContent = app.environment === 'ar' ? 'Enter AR' : 'Enter VR';
     enterVrButton.removeAttribute('disabled');
     enterVrButton.addEventListener('click', startXR);
   } else if (enterVrButton) {

@@ -284,7 +284,11 @@ export class GoopSim {
     for (const b of this.core) scan(b);
     for (const l of this.lumps) scan(l);
     for (const d of this.drips) scan(d);
-    const margin = CREATURE.blend * 0.8 + 0.05;
+    // The smooth-min bulges the surface out past the raw spheres, so the box
+    // has to stand off by more than the blend width — and by MORE again while
+    // a strike widens the blend (the old fixed margin was sized for
+    // blendScale 1 and only happened to still clear a mid-swing body).
+    const margin = CREATURE.blend * this.blendScale * 0.8 + 0.05;
     outCenter.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
     outHalf.set(
       (maxX - minX) / 2 + margin,

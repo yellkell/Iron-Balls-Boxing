@@ -114,6 +114,7 @@ import {
 import { gazette, markGazetteRead, refreshGazette } from '../net/gazette.js';
 import { hueToColor, pubUrl, teamColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
+import { requestClubEntry } from '../experience/clubNavigation.js';
 
 const _origin = new Vector3();
 const _dir = new Vector3();
@@ -557,6 +558,7 @@ export class MenuSystem extends createSystem({}) {
         // with pop-ups and a half-health bot. No callsign needed first.
         app.tutorial = true;
         app.arcade = '1v1';
+        app.quickDuel = false; // ranked / private keep best of five
         app.mode = 'bot';
         app.state = 'playing';
         app.quickDuel = false; // the graduation bout keeps the standard format
@@ -666,6 +668,7 @@ export class MenuSystem extends createSystem({}) {
         // RANKED now opens the server browser: host your own room or join a
         // listed one. applyState() starts the room-list watch.
         app.arcade = '1v1';
+        app.quickDuel = false; // ranked / private keep best of five
         app.duelView = 'browser';
         app.fromRanked = false;
         break;
@@ -674,6 +677,7 @@ export class MenuSystem extends createSystem({}) {
         // Open a public room named after you and wait — you STAY on the server
         // list, with your own room shown in it (unclickable).
         app.arcade = '1v1';
+        app.quickDuel = false; // ranked / private keep best of five
         app.duelView = 'browser';
         app.rankedHost = true;
         app.fromRanked = true;
@@ -696,6 +700,7 @@ export class MenuSystem extends createSystem({}) {
         // background (swap to the live bout if one turns up) — but ONLY PLAY BOTS
         // skips that, so it stays a pure bot bout.
         app.arcade = '1v1';
+        app.quickDuel = true; // quick match runs best of three
         app.mode = 'bot';
         app.state = 'playing';
         // net.queue() sets this too, but ONLY PLAY BOTS never queues — and a
@@ -719,6 +724,7 @@ export class MenuSystem extends createSystem({}) {
         app.codeEntry = '';
         break;
       case 'private-open':
+        app.quickDuel = false; // ranked / private keep best of five
         app.duelView = 'private';
         break;
       case 'private-mode-1v1':
@@ -761,18 +767,22 @@ export class MenuSystem extends createSystem({}) {
       case 'env-ar':
         app.environment = 'ar';
         saveEnvironment();
+        this.restartForEnvironmentMode();
         break;
       case 'env-desert':
         app.environment = 'desert';
         saveEnvironment();
+        this.restartForEnvironmentMode();
         break;
       case 'env-saltflats':
         app.environment = 'saltflats';
         saveEnvironment();
+        this.restartForEnvironmentMode();
         break;
       case 'env-factory':
         app.environment = 'factory';
         saveEnvironment();
+        this.restartForEnvironmentMode();
         break;
       case 'lb-battle':
         // The BATTLE tab opens onto 1V1 unless a brawl board is already showing.
@@ -1005,6 +1015,7 @@ export class MenuSystem extends createSystem({}) {
           // Join a listed ranked room by its doc id (stay on the list, showing
           // a brief "joining…" while we connect).
           app.arcade = '1v1';
+          app.quickDuel = false; // ranked / private keep best of five
           app.duelView = 'browser';
           app.rankedHost = false;
           app.fromRanked = true;
@@ -1054,16 +1065,21 @@ export class MenuSystem extends createSystem({}) {
     setAvatarSkin(id); // applyOwnSkins repaints the rig + mirror next frame
   }
 
-  /** Leave for the pub page. Navigating WHILE an immersive session is live
-   *  hangs the browser, so end the XR session first, then hop pages. */
+  /** Walk into the club without leaving the active XR document. The navigation
+   *  bridge falls back to the standalone pub page when no shared shell exists. */
   private gotoPub(): void {
-    const go = (): void => window.location.assign(pubUrl());
+    requestClubEntry(this.world, pubUrl());
+  }
+
+  /** Passthrough and opaque rendering need different Quest compositor modes.
+   *  End only when the player explicitly crosses that boundary; the landing
+   *  button immediately offers the matching AR/VR re-entry. */
+  private restartForEnvironmentMode(): void {
     const session = this.world.session as XRSession | undefined;
-    if (session) {
-      void Promise.resolve(session.end()).then(go, go);
-    } else {
-      go();
-    }
+    if (!session) return;
+    const wantsOpaque = app.environment !== 'ar';
+    const isOpaque = session.environmentBlendMode === 'opaque';
+    if (wantsOpaque !== isOpaque) void session.end();
   }
 
   // --- customisation: the avatar mirror + live skin application ---------------

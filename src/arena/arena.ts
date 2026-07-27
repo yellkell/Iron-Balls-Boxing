@@ -475,7 +475,7 @@ export function makePlatform(color: number, groupScale = 1): Group {
   group.add(bullion);
 
   // BLAZING: not merely a flame decal. The earned pad carries a white-hot
-  // deck brand, a burning outer rail, eight animated flame crowns and sparks
+  // deck brand, a burning outer rail and an animated flame crown at every
   // lifting off the steel. The low effects stay outside the standing area, so
   // the silhouette reads as a trophy without filling the player's play space.
   const flameTongue = (h: number): Shape => {
@@ -559,25 +559,15 @@ export function makePlatform(color: number, groupScale = 1): Group {
     flame.add(jet);
   });
 
-  const emberGeo = new SphereGeometry(0.014, 6, 4);
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const radius = 0.54 + (i % 2) * 0.1;
-    const ember = new Mesh(emberGeo, i % 2 ? coreMat : outerMat);
-    ember.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
-    ember.userData.fxRole = 'blazing-ember';
-    ember.userData.fxPhase = i / 6;
-    ember.userData.fxBaseY = ember.position.y;
-    flame.add(ember);
-  }
-  const fireLight = new PointLight(0xff5a24, 1.8, 2.4, 2);
-  fireLight.position.y = 0.14;
-  fireLight.userData.fxRole = 'blazing-light';
-  flame.add(fireLight);
+  // No point light here (nor on TIDEBREAKER). A deck lamp is never just its
+  // own shading cost: adding a light to the scene changes every lit material's
+  // shader permutation, so wearing the pad recompiles the whole arena — a
+  // hitch — and then charges for an extra light per pixel for as long as it is
+  // worn. The emissive jets and embers carry the look on their own.
   flame.visible = false;
   group.add(flame);
 
-  // TIDEBREAKER: a luminous pool, rolling wave crown, bubbles and hanging
+  // TIDEBREAKER: a luminous pool, a rolling crest at every outline point and hanging
   // droplets. It should look as if GOOPLIATH is still alive beneath the slab,
   // not like somebody painted a green raindrop on ordinary diamond plate.
   const D = 0.52;
@@ -639,7 +629,6 @@ export function makePlatform(color: number, groupScale = 1): Group {
   wave.closePath();
   const waveGeo = new ShapeGeometry(wave);
   OCTAGON_VERTICES.forEach(([x, z], i) => {
-    if (i % 2) return; // four crests leave clean steel between the surges
     const crest = new Mesh(waveGeo, gelMat);
     crest.position.set(x * 0.93, DECK_TOP, z * 0.93);
     crest.rotation.y = Math.atan2(x, z);
@@ -647,20 +636,6 @@ export function makePlatform(color: number, groupScale = 1): Group {
     crest.userData.fxPhase = i * 0.73;
     tide.add(crest);
   });
-
-  const bubbleGeo = new SphereGeometry(0.022, 8, 6);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + 0.2;
-    const radius = 0.52 + (i % 2) * 0.16;
-    const bubbleMat = gelMat.clone();
-    bubbleMat.opacity = 0.58;
-    const bubble = new Mesh(bubbleGeo, bubbleMat);
-    bubble.position.set(Math.cos(a) * radius, DECK_TOP + 0.04, Math.sin(a) * radius);
-    bubble.userData.fxRole = 'tide-bubble';
-    bubble.userData.fxPhase = i / 5;
-    bubble.userData.fxBaseY = bubble.position.y;
-    tide.add(bubble);
-  }
 
   // Long luminous drops hang below alternate corners, giving the pad an
   // unmistakable profile even when the deck art is foreshortened.
@@ -675,11 +650,7 @@ export function makePlatform(color: number, groupScale = 1): Group {
     drip.userData.fxBaseY = drip.position.y;
     tide.add(drip);
   });
-  const tideLight = new PointLight(0x35ff9a, 1.55, 2.2, 2);
-  tideLight.position.y = 0.12;
-  tideLight.userData.fxRole = 'tide-light';
-  tide.add(tideLight);
-  tide.visible = false;
+  tide.visible = false; // no point light — see BLAZING above
   group.add(tide);
 
   // EMBER: the classic look — banding + bolts, no extra furniture.

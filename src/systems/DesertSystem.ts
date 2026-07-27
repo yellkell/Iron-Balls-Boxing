@@ -58,6 +58,11 @@ export class DesertSystem extends createSystem({}) {
     else if (app.environment === 'saltflats') this.saltflats?.update(delta, this.time);
   }
 
+  /** Re-assert the selected arena backdrop after an opaque club visit. */
+  restoreEnvironment(): void {
+    this.apply(app.environment);
+  }
+
   /** Swap the backdrop: an opaque desert/saltflats/factory dome vs transparent AR passthrough. */
   private apply(env: AppEnvironment): void {
     this.applied = env;

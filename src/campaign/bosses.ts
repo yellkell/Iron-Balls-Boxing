@@ -111,6 +111,17 @@ export interface BossDef {
   enrageAt: number;
   /** How its weak points open (see WeakPattern) — the blink says where. */
   weakPattern: WeakPattern;
+  /**
+   * Platform skin id worn by the pedestal this boss fights from, for the two
+   * bosses whose ground IS part of their identity: GOLIATH's pit burns
+   * (BLAZING), GOOPLIATH's floods (TIDEBREAKER). The deck is the fight's
+   * calling card, so it is fixed to the boss and never depends on the
+   * difficulty tier, the mode, or which skins the player has earned — those
+   * same two pads are the trophies you win FOR beating them.
+   *
+   * Omitted = the plain house pedestal in danger red, like every other titan.
+   */
+  platform?: string;
 }
 
 export const BOSSES: BossDef[] = [
@@ -222,6 +233,7 @@ export const BOSSES: BossDef[] = [
     beamTracks: true,
     enrageAt: 0.5,
     weakPattern: 'crown',
+    platform: 'blazing',
   },
 ];
 
@@ -291,6 +303,7 @@ export const GOOPLIATH_DEF: BossDef = {
   beamTracks: true,
   enrageAt: 0.35,
   weakPattern: 'body',
+  platform: 'tidebreaker',
 };
 
 /**

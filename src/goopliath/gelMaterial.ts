@@ -19,16 +19,21 @@
  *   - trig-noise surface wobble whose amplitude rides the sim's agitation,
  *     so the surface ROILS for a couple of seconds after you hit it.
  *
- * The march is bounded by the blob AABB (passed as centre+half-extents; the
- * unit-cube geometry is inflated to it in the vertex shader), rendered
- * BackSide so it still works with your face inside the goo, and writes
- * gl_FragDepth from the real hit point so fists and eyeballs sort correctly
- * INTO the gel, not against the bounding box.
+ * The unit-cube geometry is inflated to the blob AABB in the vertex shader and
+ * rendered BackSide so it still works with your face inside the goo, and the
+ * fragment writes gl_FragDepth from the real hit point so fists and eyeballs
+ * sort correctly INTO the gel, not against the bounding box. The MARCH itself
+ * is bounded by the blob spheres, not that box — see blobRange below.
  */
 
 import { BackSide, Color, Matrix4, ShaderMaterial, Vector3 } from 'three';
-import { CREATURE, GEL_LOOK } from './goopConfig.js';
+import { CREATURE, GEL_LOOK, MARCH } from './goopConfig.js';
 import { MAX_BLOBS, MAX_DENTS } from './sim.js';
+
+/** Hard loop bound for the trace. uSteps never exceeds GEL_LOOK.maxSteps, so
+ *  this only has to sit above it — a tighter literal keeps the compiler from
+ *  unrolling a march four times longer than anything we ever run. */
+const STEP_CEILING = Math.max(32, GEL_LOOK.maxSteps);
 
 const VERT = /* glsl */ `
   uniform vec3 uCenter;
@@ -58,6 +63,7 @@ const FRAG = /* glsl */ `
 
   uniform vec3 uCenter;
   uniform vec3 uHalf;
+  uniform float uPad;
   uniform float uTime;
   uniform float uAgitation;
   uniform float uTelegraph;
@@ -87,14 +93,23 @@ const FRAG = /* glsl */ `
   // The march field: smooth-min over the blobs, dents carved out, wobble
   // applied only within reach of the surface (transcendentals are the
   // second-biggest per-step cost after the blob loop itself).
+  //
+  // The reject is done on SQUARED distance: a blob further away than the
+  // running minimum plus the blend width cannot change the result, and
+  // testing it before the sqrt skips the sqrt too. The old test computed
+  // length() for all 20-odd blobs on every step and only saved the smin —
+  // near the surface (where the march spends most of its steps) the running
+  // minimum is tiny, so almost every blob now falls out for a dot product.
   float field(vec3 p) {
     float d = 1e5;
     for (int i = 0; i < ${MAX_BLOBS}; i++) {
       if (i >= uCount) break;
       vec4 b = uBlobs[i];
-      float di = length(p - b.xyz) - b.w;
-      // Far blobs can't affect the blend — plain min is cheaper and identical.
-      d = (di - d > uBlend * 2.0) ? d : smin(d, di, uBlend);
+      vec3 diff = p - b.xyz;
+      float q = dot(diff, diff);
+      float reach = d + b.w + uBlend * 2.0;
+      if (reach > 0.0 && q > reach * reach) continue;
+      d = smin(d, sqrt(q) - b.w, uBlend);
     }
     for (int j = 0; j < ${MAX_DENTS}; j++) {
       if (j >= uDentCount) break;
@@ -113,8 +128,11 @@ const FRAG = /* glsl */ `
     for (int i = 0; i < ${MAX_BLOBS}; i++) {
       if (i >= uCount) break;
       vec4 b = uBlobs[i];
-      float di = length(p - b.xyz) - b.w;
-      d = (di - d > uBlend * 2.0) ? d : smin(d, di, uBlend);
+      vec3 diff = p - b.xyz;
+      float q = dot(diff, diff);
+      float reach = d + b.w + uBlend * 2.0;
+      if (reach > 0.0 && q > reach * reach) continue;
+      d = smin(d, sqrt(q) - b.w, uBlend);
     }
     return d;
   }
@@ -131,9 +149,11 @@ const FRAG = /* glsl */ `
       if (i >= uCount) break;
       vec4 b = uBlobs[i];
       vec3 diff = p - b.xyz;
-      float len = max(length(diff), 1e-5);
+      float q = dot(diff, diff);
+      float reach = d + b.w + uBlend * 2.0;
+      if (reach > 0.0 && q > reach * reach) continue; // same reject, no sqrt
+      float len = max(sqrt(q), 1e-5);
       float di = len - b.w;
-      if (di - d > uBlend * 2.0) continue;
       float h = clamp(0.5 + 0.5 * (d - di) / uBlend, 0.0, 1.0);
       grad = mix(grad, diff / len, h);
       d = mix(d, di, h) - uBlend * h * (1.0 - h);
@@ -155,43 +175,99 @@ const FRAG = /* glsl */ `
     return d;
   }
 
-  // Ray vs the bounding AABB, in creature-local space.
-  vec2 boxRange(vec3 ro, vec3 rd) {
-    vec3 inv = 1.0 / rd;
-    vec3 t0 = (uCenter - uHalf - ro) * inv;
-    vec3 t1 = (uCenter + uHalf - ro) * inv;
-    vec3 tmin = min(t0, t1);
-    vec3 tmax = max(t0, t1);
-    return vec2(max(max(tmin.x, tmin.y), tmin.z), min(min(tmax.x, tmax.y), tmax.z));
+  // Ray vs the BLOB SPHERES, in creature-local space: entry into the first,
+  // exit from the last. Each sphere is inflated by uPad so the smooth-min
+  // bulge between fused blobs and the surface wobble both stay inside the
+  // interval (uPad is measured, not guessed — see setBlend).
+  //
+  // This replaces the AABB the march used to walk. The box circumscribes a
+  // man-shaped thing with its arms out, so well over half of it is empty air
+  // that every ray used to sphere-trace through before it could reach the
+  // gel — and on a boss scaled 2.7x that box covers a lot of Quest. One dot
+  // product per blob now throws those rays out, and the ones that survive
+  // start their march at the gel instead of at a box face.
+  vec2 blobRange(vec3 ro, vec3 rd) {
+    float tn = 1e5;
+    float tf = -1e5;
+    for (int i = 0; i < ${MAX_BLOBS}; i++) {
+      if (i >= uCount) break;
+      vec4 b = uBlobs[i];
+      vec3 oc = b.xyz - ro;
+      float proj = dot(oc, rd);
+      float r = b.w + uPad;
+      float h = r * r - (dot(oc, oc) - proj * proj);
+      if (h <= 0.0) continue;
+      float sq = sqrt(h);
+      tn = min(tn, proj - sq);
+      tf = max(tf, proj + sq);
+    }
+    return vec2(tn, tf);
   }
 
   void main() {
     vec3 ro = (uInvModel * vec4(cameraPosition, 1.0)).xyz;
     vec3 rd = normalize(vLocal - ro);
 
-    vec2 range = boxRange(ro, rd);
+    vec2 range = blobRange(ro, rd);
     float t = max(range.x, 0.0);
     float tEnd = range.y;
     if (tEnd <= t) discard;
 
-    // ---- sphere trace ----
-    float d = 0.0;
+    // ---- sphere trace, over-relaxed ----
+    // Plain full-distance stepping CREEPS along a grazing ray: pixels that
+    // skim the underside of a raised fist take tiny steps for a dozen of
+    // them, run the budget dry short of the torso behind, and get discarded —
+    // a see-through hole punched clean through the body, right where the
+    // player is looking. Over-relaxation (Keinert et al., Enhanced Sphere
+    // Tracing) marches omega-sized steps and backtracks the one time it
+    // overshoots, so a graze costs a handful of steps instead of all of them.
+    float omega = ${MARCH.omega.toFixed(3)};
+    float prevR = 0.0;
+    float stepLen = 0.0;
+    float dMin = 1e5;
+    float tMin = t;
+    float invSteps = 1.0 / float(uSteps);
     bool hit = false;
-    vec3 p = ro;
-    for (int i = 0; i < 96; i++) {
+    bool spent = true; // false once the ray leaves the gel of its own accord
+    vec3 p = ro + rd * t;
+
+    for (int i = 0; i < ${STEP_CEILING}; i++) {
       if (i >= uSteps) break;
       p = ro + rd * t;
-      d = field(p);
-      if (d < max(0.0018, t * 0.004)) { hit = true; break; }
-      t += d; // full-distance steps; the grazing fallback below forgives overshoot
-      if (t > tEnd) break;
+      float d = field(p);
+      float r = abs(d);
+      if (omega > 1.0 && r + prevR < stepLen) {
+        // Overshot — the two unbounding spheres no longer overlap. Undo the
+        // step and finish this ray with plain sphere tracing.
+        stepLen = (1.0 - omega) * stepLen;
+        omega = 1.0;
+      } else {
+        if (r < dMin) { dMin = r; tMin = t; }
+        // The hit tolerance opens up as the budget drains, so a ray about to
+        // run out latches onto the gel rather than leaving a hole. Cubic, so
+        // full-quality hits early in the march keep their tight silhouette.
+        float slack = float(i) * invSteps;
+        if (d < max(0.0018, t * 0.004) + ${MARCH.graze.toFixed(4)} * slack * slack * slack) {
+          hit = true;
+          spent = false;
+          break;
+        }
+        stepLen = d * omega;
+      }
+      prevR = r;
+      t += stepLen;
+      if (t > tEnd) { spent = false; break; }
     }
-    // Step-budget mercy: a ray that spent its steps GRAZING the surface
-    // (thin necks under an extended fist, clefts in a crouched body) is on
-    // the gel for all visual purposes — shading it kills the see-through
-    // holes that a hard discard punches through thin features. Generous
-    // threshold so the arc under a raised fist stays solid.
-    if (!hit && d < 0.09 && t <= tEnd) hit = true;
+    // Last resort: the budget ran out mid-graze and the ray never left the
+    // gel's neighbourhood, so shade its closest approach. Rays that walked
+    // out the far side are honest misses and still discard — that is what
+    // keeps this from fattening the silhouette the way the old blanket
+    // "last distance under 0.09" mercy did.
+    if (!hit && spent && dMin < ${MARCH.mercy.toFixed(4)}) {
+      hit = true;
+      t = tMin;
+      p = ro + rd * tMin;
+    }
     if (!hit) discard;
 
     vec3 n;
@@ -282,6 +358,9 @@ export interface GelUniforms {
     telegraph: number,
     invModel: Matrix4,
   ): void;
+  /** Smooth-min width (the sim widens it mid-strike); also sizes the march's
+   *  blob-sphere padding, which has to contain whatever the blend bulges. */
+  setBlend(k: number): void;
   /** Scale the march-step budget (1 = full quality; drops with distance). */
   setEnrage(v: number): void;
   setQuality(q: number): void;
@@ -301,6 +380,7 @@ export function createGelMaterial(): GelUniforms {
       uDentCount: { value: 0 },
       uCenter: { value: new Vector3(0, 0.6, 0) },
       uHalf: { value: new Vector3(1, 1, 1) },
+      uPad: { value: MARCH.pad(CREATURE.blend) },
       uInvModel: { value: new Matrix4() },
       uTime: { value: 0 },
       uAgitation: { value: 0 },
@@ -331,6 +411,13 @@ export function createGelMaterial(): GelUniforms {
       u.uAgitation.value = agitation;
       u.uTelegraph.value = telegraph;
       (u.uInvModel.value as Matrix4).copy(invModel);
+    },
+    setBlend(k) {
+      material.uniforms.uBlend.value = k;
+      // The march's blob spheres have to swell with the blend, or a widened
+      // smooth-min pushes the isosurface outside the traced interval and the
+      // fused webbing between limbs gets sliced off.
+      material.uniforms.uPad.value = MARCH.pad(k);
     },
     setEnrage(v) {
       material.uniforms.uEnrage.value = v;

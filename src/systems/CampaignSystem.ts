@@ -68,6 +68,7 @@ import { applyRoster, fighterAt } from '../combat/setup.js';
 import { localIndexOf, peerPos, worldToPeer } from '../combat/layout.js';
 import { opponents } from '../combat/opponentBus.js';
 import { applyArenaLayout, platformName, setPlatformHazard, tintPlatform } from '../arena/arena.js';
+import { OPPONENT_DEFAULT_PLATFORM, applyPlatformSkin, platformSkin } from '../avatar/skins.js';
 import { teamColor } from '../config.js';
 import { app, saveStats } from '../menu/appState.js';
 import { ownPlatform, platformOwned, setPlatformSkin } from '../menu/customization.js';
@@ -190,6 +191,7 @@ const _eyeAccent = new Color();
 
 const rand = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+
 
 export class CampaignSystem extends createSystem({
   playerParts: { required: [Hitbox, PlayerBodyPart] },
@@ -733,15 +735,21 @@ export class CampaignSystem extends createSystem({
 
     if (goopStage) this.parkHitboxes(); // no weak points — the SDF is the hitbox
     else this.ensureHitboxes();
-    // GOOPLIATH's ground runs goop-green: the raid pit pedestal, or the far
-    // pedestal his fight looms behind. Titans re-tint their own pads, so a
-    // blazing run flips the pit green for his slot and back to danger red for
-    // GOLIATH after. (Teardown also restores danger red as a backstop.)
+    // The boss dresses his own ground: GOLIATH's pit BURNS and GOOPLIATH's
+    // FLOODS (def.platform), every other titan stands on the plain pedestal in
+    // danger red. Applied as a full platform SKIN, not a re-tint — those two
+    // decks carry ornaments (flame jets, tide wash) that a tint alone can't
+    // raise, and it would leave whatever the lobby last wore showing under the
+    // new colour. Each stage re-applies, so a blazing run walks the pit from
+    // green for GOOPLIATH's slot to fire for GOLIATH's.
     {
       const pad = this.scene.getObjectByName(this.raid() ? 'raid-boss-platform' : platformName(1));
       if (pad) {
-        const back = this.raid() ? PALETTE.danger : teamColor(1); // the pad's non-goop colour
-        tintPlatform(pad, goopStage ? this.def.accent : back);
+        const deck = this.def.platform;
+        applyPlatformSkin(pad, deck ? platformSkin(deck) : OPPONENT_DEFAULT_PLATFORM);
+        // No signature deck? Fall back to the house tint the pit has always
+        // worn. (The skin pass above is still what clears a stale ornament.)
+        if (!deck) tintPlatform(pad, this.raid() ? PALETTE.danger : teamColor(1));
         // This pedestal is a titan's ground for the duration — wear the hazard
         // band. (The raid pit already has it; a campaign titan borrows slot 1's
         // ordinary boxer pad, so it has to be switched on and off.)
@@ -874,10 +882,17 @@ export class CampaignSystem extends createSystem({
     }
     applyRoster();
     applyArenaLayout(this.scene);
-    // A GOOPLIATH bout leaves the pit pedestal green — hand it back to the
-    // titans in danger red (the slot pads re-tint in applyArenaLayout).
-    const pit = this.scene.getObjectByName('raid-boss-platform');
-    if (pit) tintPlatform(pit, PALETTE.danger);
+    // A signature deck (GOLIATH's fire, GOOPLIATH's tide) has to come off with
+    // the boss, ornaments and all: applyArenaLayout re-TINTS the slot pads but
+    // never clears a skin, so without this the lobby's opponent pedestal would
+    // still be alight next bout. Strip both candidate pads back to the house
+    // look — slot 1's borrowed boxer pad and the raid pit.
+    for (const name of ['raid-boss-platform', platformName(1)]) {
+      const pad = this.scene.getObjectByName(name);
+      if (!pad) continue;
+      applyPlatformSkin(pad, OPPONENT_DEFAULT_PLATFORM);
+      tintPlatform(pad, name === 'raid-boss-platform' ? PALETTE.danger : teamColor(1));
+    }
   }
 
   // --- intro ceremony ---------------------------------------------------------

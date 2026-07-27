@@ -348,7 +348,8 @@ export function createScoreboard(scene: Scene): Scoreboard {
     hpFrac: number,
     pips: number,
   ): void => {
-    const key = `s|${name}|${hpFrac}|${pips}`;
+    const target = winTargetFor(app.arcade, app.quickDuel);
+    const key = `s|${name}|${hpFrac}|${pips}|${target}`;
     if (board.key === key) return;
     board.key = key;
     const { ctx, tex } = board;

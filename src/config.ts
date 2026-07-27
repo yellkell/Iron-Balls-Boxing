@@ -160,6 +160,26 @@ export const OCTAGON_VERTICES: Vector2Tuple[] = [
 ];
 
 /**
+ * FIXED FOVEATED RENDERING, 0..1. The headset renders the edges of your
+ * vision — where your eye has no acuity anyway — at reduced resolution, and
+ * hands the saved fill rate back. On a game this fill-bound (a raymarched gel
+ * boss over passthrough) it is the cheapest GPU there is.
+ *
+ * This was 0 (full resolution everywhere), because at Quest's default of 1.0
+ * the boundary between foveation regions shows as a head-locked dark band on
+ * dark, high-contrast content. But 0 pays for that band at the FULL price of
+ * peripheral pixels, and a frame that misses its deadline costs far more than
+ * a seam: the headset reprojects the last frame to cover the miss, and every
+ * time you turn your head the edges of your vision fall outside what was
+ * rendered — your real room, showing through the sides of the arena.
+ *
+ * A third is the compromise the original note pointed at: most of the saving,
+ * well short of the level that exposes the seam. If the band ever comes back,
+ * this is the one number to turn down.
+ */
+export const FOVEATION = 0.33;
+
+/**
  * Distance between the two pads, centre to centre. Blaston sits around 3.8 m;
  * boxing wants you closer, so the gap is tightened — punches connect faster
  * and dodges get twitchier.
@@ -212,73 +232,44 @@ export const FIREBALL = {
  * Curveball tuning (the per-fist CURVE loadout toggle) — ONE source shared by
  * the arena (FireballSystem) and the pub fight hall (FightSystem), which used
  * to carry drifting private copies. The raw swing turn-rate (rad/s, read off
- * the punch's curvature) maps across the `min`…`full` band to at most `max`;
- * in flight the velocity rotates about the curl axis while the rate decays at
- * `decay`/s — bank hard off the fist, straighten downrange.
+ * the punch's curvature) is scaled by `gain` above the `min` dead zone and
+ * capped at `max`; in flight the velocity rotates about the curl axis while
+ * the rate decays at `decay`/s — bank hard off the fist, straighten downrange.
  *
- * Retuned after the "curve doesn't feel right" reports. The old mapping was
- * `(raw - min) * 1.6` capped at 5.0 rad/s, and a real hook reads raw 5–18
- * rad/s — so EVERY hook pinned to the cap and the toggle was effectively
- * binary: dead straight, or full bend with no touch in between. Worse, 5 rad/s
- * decaying at only 1.4/s turned the ball ~140° before it had crossed the 3 m
- * gap — a boomerang, not a curveball, and impossible to aim. The band below
- * spreads realistic hook rates across the whole range and tops out at a break
- * of roughly 0.85 m over the gap (a body and a half — enough to come round a
- * guard, which is what the tutorial promises) arriving on a ~26° heading.
+ * These are the numbers the curve had before the 25 Jul retune, restored on
+ * request. That retune traded reach for aimability and the trade was not
+ * wanted: it cut the ceiling from 5.0 rad/s to 2.0 and more than doubled the
+ * decay, which together took roughly four fifths of the bend out. What comes
+ * back with them is a curve that keeps turning the whole way down the gap —
+ * a hard hook can bend most of the way round rather than arriving on a
+ * readable heading. That is the shape of the throw as it was.
+ *
+ * The one thing NOT restored is the duplication: the mapping lives here, in
+ * curlRateFor, instead of being reimplemented on both sides, which is how the
+ * arena and the pub drifted apart in the first place.
  */
 export const CURL = {
   min: 1.8, // rad/s dead zone: below this the punch is "straight" → no curve
-  full: 10.0, // rad/s of swing turn that earns the full bend
-  max: 2.0, // rad/s — the hardest the ball itself will ever bank
-  decay: 3.0, // per second — high, so the arc is spent early and settles late
+  gain: 1.6, // applied to the swing rate ABOVE the dead zone
+  max: 5.0, // rad/s after gain — the hardest hook the ball will bite into
+  decay: 1.4, // per second — lower = the bend carries further downrange
   // Curve only really bites on a committed, WIDE swing — small movements are
   // too jittery to read a clean arc, so it ramps in with hand speed (m/s).
   speedMin: 2.2, // below this swing speed → essentially no curve
   speedFull: 4.0, // at/above this → full curve
   /** Curl rate (rad/s) above which a throw FEELS curved — gates the whip-crack
    *  launch sfx, the harder haptic and the corkscrew trail. */
-  feelMin: 0.25,
-  /**
-   * The window (s) the velocity trackers average a punch over. What they
-   * return is the CHORD across that window — the hand's heading at its
-   * midpoint, not at release. On a straight jab those are the same thing; on
-   * a hook turning 10 rad/s they are ~30° apart, so a curve throw launched
-   * off the raw average leaves the fist aimed well wide of where the player
-   * was pointing. `curlLead` rotates it forward to recover the release
-   * tangent. Keep in step with VelocityTracker.velocity().
-   */
-  window: 0.11,
-  /** Cap (rad) on that correction, so one jittery frame can't fling a throw. */
-  leadMax: 0.6,
+  feelMin: 0.5,
 };
 
-/** Smoothstep 0..1 — flat at both ends, so a throw sitting near a gate's edge
- *  doesn't swing wildly on a few cm/s of tracking noise. */
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 /**
- * The curl rate (rad/s) a throw earns: the swing's raw turn rate mapped across
- * the dead zone → `full` band, gated by how committed the swing was. Linear in
- * the band, so a lazy hook really does bend less than a vicious one.
+ * The curl rate (rad/s) a throw earns: the swing's raw turn rate above the
+ * dead zone, scaled by `gain`, capped at `max`, and ramped in linearly with
+ * how committed the swing was.
  */
 export function curlRateFor(raw: number, handSpeed: number): number {
-  if (raw <= CURL.min) return 0;
-  const bite = Math.min(1, (raw - CURL.min) / (CURL.full - CURL.min));
-  return CURL.max * bite * smoothstep(CURL.speedMin, CURL.speedFull, handSpeed);
-}
-
-/**
- * How far (rad) to rotate a launch direction FORWARD about the curl axis to
- * recover the release tangent from the tracker's window-average heading — see
- * CURL.window. Zero for anything inside the dead zone, so straight throws are
- * untouched.
- */
-export function curlLead(raw: number): number {
-  if (raw <= CURL.min) return 0;
-  return Math.min(CURL.leadMax, raw * CURL.window * 0.5);
+  const speedK = Math.max(0, Math.min(1, (handSpeed - CURL.speedMin) / (CURL.speedFull - CURL.speedMin)));
+  return (raw <= CURL.min ? 0 : Math.min(CURL.max, (raw - CURL.min) * CURL.gain)) * speedK;
 }
 
 /**
@@ -578,11 +569,20 @@ export const GOOPLIATH = {
   /** Raid fallback PER RAIDER (the dedicated raid always lands on the tier
    *  pools above — this only seeds goopliathBoss's base def). */
   hitsPerRaider: 50,
-  /** Body size in TITAN scale units (duel boxer ≈ 1). Campaign stands at
-   *  solo GOLIATH's size (~4.9 m of gel across the duel gap); the raid cut
-   *  is a third taller again for the wide ring. */
-  scaleCampaign: 2.65,
-  scaleRaid: 3.45,
+  /** Body size in TITAN scale units (duel boxer ≈ 1); world height is this
+   *  times titanHeightPerScale, so campaign is ~4.15 m of gel across the duel
+   *  gap and the raid cut a third taller again for the wide ring.
+   *
+   *  Trimmed back from GOLIATH's 2.65 (~4.9 m): the gel shader is fill-rate
+   *  bound and its cost scales with his PROJECTED AREA, so taking ~15% off
+   *  his height takes ~28% off the frame time he costs — the single biggest
+   *  lever on this fight, worth more than everything in the raymarch put
+   *  together. It costs nothing in danger: the floor zones carry the threat
+   *  and they are platform-relative, and his swings are capped at
+   *  gestureReach BODY-units so they shrink with him and still land where
+   *  they always did. */
+  scaleCampaign: 2.25,
+  scaleRaid: 2.93,
   /** Titan rigs stand ~1.85 m per scale unit; the gel sim is 1.78 m tall at
    *  native size — this converts def.scale into the parent group's scale. */
   titanHeightPerScale: 1.85,
@@ -590,16 +590,21 @@ export const GOOPLIATH = {
    *  jiggling at man-sized frequency reads as a miniature; slowed, the same
    *  dynamics read as tons of gel in motion. (Sounds stay real-time.) */
   timeScale: 0.55,
-  /** Raymarch quality override (1 = the full step budget). The gel shader is
-   *  fill-rate bound and a boss this size covers a LOT of Quest pixels.
-   *  (These overrides only started biting once setQuality's floor dropped
-   *  from 20 steps to 8 — they were silently pinned to 20 before.) */
-  quality: 0.72,
-  /** Step budget while an attack is mid-swing: an extended limb stretches
-   *  the march's bounding box across far more of the view — the exact moment
-   *  frame time spikes — so the budget drops while he's punching and comes
-   *  back the moment the limb snaps home. */
-  attackQuality: 0.5,
+  /** Raymarch quality override (1 = the full step budget) — 13 steps. The gel
+   *  shader is fill-rate bound and a boss this size covers a LOT of Quest
+   *  pixels. Was 0.72/16 steps: the over-relaxed march (see MARCH in
+   *  goopConfig) reaches further per step and no longer punches see-through
+   *  holes when it runs short, so the budget buys surface precision now
+   *  rather than basic correctness. Verified hole-free down to 8. */
+  quality: 0.6,
+  /** Step budget while an attack is mid-swing — 9 steps. The old reason for
+   *  this dip was that an extended limb stretched the march's bounding box
+   *  across far more of the view; the march is bounded by his blob spheres
+   *  now, so a limb only costs its own pixels and this is a plain quality
+   *  trade. Kept (and lowered) because a swing is the busiest the frame ever
+   *  gets — and because it was the swing budget that used to tear the hole
+   *  under his fists, which it no longer can. */
+  attackQuality: 0.4,
   /** How far his gesture swings extend, in body-scale units from his centre.
    *  He never needs to reach the player's platform — the floor zones carry
    *  the danger — and the swing must stay basically WITHIN his silhouette:
