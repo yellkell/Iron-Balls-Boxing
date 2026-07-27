@@ -17,7 +17,11 @@ export class LoadingOverlay {
   private readonly canvas = document.createElement('canvas');
   private readonly texture: CanvasTexture;
   private readonly logo = new Image();
-  private phase = 0;
+  /** 0..1, advanced by update() on real loading milestones. */
+  private progress = 0;
+  /** Where we are going — the card's headline. */
+  private destination = 'THE CLUB';
+  private strap = '';
 
   constructor(camera: PerspectiveCamera) {
     this.canvas.width = 1280;
@@ -59,8 +63,14 @@ export class LoadingOverlay {
     this.draw();
   }
 
-  show(): void {
-    this.phase = 0;
+  /**
+   * `destination` is the headline — this card is shown travelling BOTH ways, so
+   * saying where you are going beats a bare "LOADING" that could mean either.
+   */
+  show(destination: string, strap = ''): void {
+    this.progress = 0;
+    this.destination = destination;
+    this.strap = strap;
     this.draw();
     this.root.visible = true;
   }
@@ -68,7 +78,14 @@ export class LoadingOverlay {
   update(): void {
     // Advance on real loading milestones instead of uploading a large canvas
     // texture every frame; the screen stays lively without taxing Quest.
-    this.phase = (this.phase + 4) % 12;
+    //
+    // Each milestone closes part of the REMAINING gap rather than stepping a
+    // fixed amount, so the bar always moves forward and never overruns however
+    // many milestones a given transition happens to report — and it is honest
+    // progress rather than the old 12-segment chase, which with only two or
+    // three update() calls per transition never read as motion anyway (and
+    // wrapped, leaving a stray lit segment stranded at the far end).
+    this.progress += (1 - this.progress) * 0.45;
     this.draw();
   }
 
@@ -96,52 +113,34 @@ export class LoadingOverlay {
     ctx.closePath();
   }
 
-  private drawLogo(ctx: CanvasRenderingContext2D): void {
-    const x = 72;
-    const y = 120;
-    const width = 330;
-    const height = 300;
-    this.chamferedRect(ctx, x, y, width, height, 20);
-    ctx.save();
-    ctx.clip();
-
+  /** The FIRE FIGHT neon sign, centred as a MARK — not boxed and vignetted
+   *  into a little framed thumbnail, which read as a picture-in-picture. */
+  private drawMark(ctx: CanvasRenderingContext2D, cx: number, cy: number, width: number): void {
     if (this.logo.complete && this.logo.naturalWidth > 0) {
-      // The committed sign includes a large atmospheric border. Crop into the
-      // handmade neon lettering so it reads as a mark, not a picture-in-picture.
+      // Crop into the handmade neon lettering; the committed sign carries a
+      // large atmospheric border around it.
       const sx = this.logo.naturalWidth * 0.25;
       const sy = this.logo.naturalHeight * 0.08;
       const sw = this.logo.naturalWidth * 0.5;
       const sh = this.logo.naturalHeight * 0.72;
-      ctx.drawImage(this.logo, sx, sy, sw, sh, x, y, width, height);
-      const vignette = ctx.createRadialGradient(x + width / 2, y + height / 2, 40, x + width / 2, y + height / 2, 230);
-      vignette.addColorStop(0, 'rgba(3,4,6,0)');
-      vignette.addColorStop(0.72, 'rgba(3,4,6,0.18)');
-      vignette.addColorStop(1, 'rgba(3,4,6,0.82)');
-      ctx.fillStyle = vignette;
-      ctx.fillRect(x, y, width, height);
+      const height = (width * sh) / sw;
+      ctx.drawImage(this.logo, sx, sy, sw, sh, cx - width / 2, cy - height / 2, width, height);
     } else {
-      const glow = ctx.createRadialGradient(x + width / 2, y + height / 2, 10, x + width / 2, y + height / 2, 170);
-      glow.addColorStop(0, 'rgba(255,59,32,0.48)');
-      glow.addColorStop(1, 'rgba(255,59,32,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(x, y, width, height);
-      ctx.fillStyle = '#ffe0b0';
-      ctx.font = "900 118px 'Arial Black', system-ui, sans-serif";
       ctx.textAlign = 'center';
-      ctx.fillText('FF', x + width / 2, y + height * 0.62);
+      ctx.fillStyle = '#ffe0b0';
+      ctx.shadowColor = 'rgba(255,74,24,0.8)';
+      ctx.shadowBlur = 20;
+      ctx.font = "900 62px 'Arial Black', system-ui, sans-serif";
+      ctx.fillText('FIRE FIGHT', cx, cy);
+      ctx.shadowBlur = 0;
     }
-    ctx.restore();
-
-    this.chamferedRect(ctx, x, y, width, height, 20);
-    ctx.strokeStyle = 'rgba(255,122,24,0.44)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
   }
 
   private draw(): void {
     const ctx = this.canvas.getContext('2d');
     if (!ctx) return;
     const { width: w, height: h } = this.canvas;
+    const cx = w / 2;
     ctx.clearRect(0, 0, w, h);
 
     const gradient = ctx.createLinearGradient(0, 0, w, h);
@@ -151,9 +150,11 @@ export class LoadingOverlay {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 
-    const emberWash = ctx.createRadialGradient(250, 270, 10, 250, 270, 430);
-    emberWash.addColorStop(0, 'rgba(255,45,18,0.22)');
-    emberWash.addColorStop(0.55, 'rgba(255,70,20,0.08)');
+    // The ember wash sits under the middle of the card now, with the content —
+    // parked off in the top-left corner it lit an empty quarter of the screen.
+    const emberWash = ctx.createRadialGradient(cx, h * 0.46, 10, cx, h * 0.46, 520);
+    emberWash.addColorStop(0, 'rgba(255,45,18,0.2)');
+    emberWash.addColorStop(0.55, 'rgba(255,70,20,0.07)');
     emberWash.addColorStop(1, 'rgba(255,70,20,0)');
     ctx.fillStyle = emberWash;
     ctx.fillRect(0, 0, w, h);
@@ -163,41 +164,54 @@ export class LoadingOverlay {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    ctx.fillStyle = '#ff7a18';
-    ctx.fillRect(44, 42, 92, 5);
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    this.drawLogo(ctx);
+    // A CENTRED stack that actually fills the card. The old layout crammed a
+    // boxed logo and one word into the top-left and left the bottom half and
+    // right third of a 1280x640 canvas completely empty.
+    this.drawMark(ctx, cx, 148, 300);
 
-    ctx.strokeStyle = 'rgba(153,163,178,0.22)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(438, 112);
-    ctx.lineTo(438, 438);
-    ctx.stroke();
+    ctx.font = "800 26px system-ui, sans-serif";
+    ctx.fillStyle = 'rgba(214,222,232,0.62)';
+    ctx.fillText('N O W   E N T E R I N G', cx, 262);
 
-    ctx.font = "900 72px 'Arial Black', system-ui, sans-serif";
+    ctx.font = "900 76px 'Arial Black', system-ui, sans-serif";
     ctx.fillStyle = '#f4f6fa';
     ctx.shadowColor = 'rgba(255,74,24,0.72)';
     ctx.shadowBlur = 18;
-    ctx.fillText('LOADING', 486, 278);
-
-    const barX = 486;
-    const barY = 350;
-    const segmentWidth = 47;
-    const gap = 9;
-    for (let i = 0; i < 12; i++) {
-      const distance = (i - this.phase + 12) % 12;
-      const hot = distance === 0;
-      const warm = distance === 11 || distance === 1;
-      ctx.fillStyle = hot ? '#ffb000' : warm ? '#ff6a18' : 'rgba(105,116,132,0.24)';
-      ctx.shadowColor = hot ? '#ff4a18' : 'transparent';
-      ctx.shadowBlur = hot ? 14 : 0;
-      this.chamferedRect(ctx, barX + i * (segmentWidth + gap), barY, segmentWidth, 11, 3);
-      ctx.fill();
-    }
+    ctx.fillText(this.destination, cx, 330);
     ctx.shadowBlur = 0;
+
+    if (this.strap) {
+      ctx.font = "700 24px system-ui, sans-serif";
+      ctx.fillStyle = 'rgba(255,176,0,0.78)';
+      ctx.fillText(this.strap, cx, 390);
+    }
+
+    // A single progress rail spanning the card, filled to real progress.
+    const railW = w - 300;
+    const railX = (w - railW) / 2;
+    const railY = 456;
+    const railH = 14;
+    this.chamferedRect(ctx, railX, railY, railW, railH, 4);
+    ctx.fillStyle = 'rgba(105,116,132,0.22)';
+    ctx.fill();
+    const fill = Math.max(0.04, Math.min(1, this.progress)) * railW;
+    this.chamferedRect(ctx, railX, railY, fill, railH, 4);
+    ctx.fillStyle = '#ff7a18';
+    ctx.shadowColor = '#ff4a18';
+    ctx.shadowBlur = 16;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // A hot cap riding the head of the fill.
+    this.chamferedRect(ctx, railX + Math.max(0, fill - 26), railY - 2, 26, railH + 4, 4);
+    ctx.fillStyle = '#ffb000';
+    ctx.fill();
+
+    ctx.font = "800 22px system-ui, sans-serif";
+    ctx.fillStyle = 'rgba(214,222,232,0.5)';
+    ctx.fillText('LOADING', cx, 520);
 
     this.texture.needsUpdate = true;
   }

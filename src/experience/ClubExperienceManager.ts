@@ -135,7 +135,7 @@ export function installClubExperienceManager(
     if (transitioning || location !== 'club') return;
     transitioning = true;
     if (showOverlay) {
-      overlay.show();
+      overlay.show('THE ARENA');
       await nextRenderFrame(world);
     }
 
@@ -162,7 +162,7 @@ export function installClubExperienceManager(
   const enterClub = async (): Promise<void> => {
     if (transitioning || location !== 'arena') return;
     transitioning = true;
-    overlay.show();
+    overlay.show('IRON BALLS', 'BAR & FIGHT CLUB · EST. 2026');
     await nextRenderFrame(world);
 
     captureRenderState();
