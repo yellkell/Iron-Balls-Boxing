@@ -2022,7 +2022,7 @@ const CREDITS: [string, string][] = [
   ['OST', 'IBWildcat1998 & poopoodoodoo698'],
   ['CONSULTING', 'RedWolf9 & JKing123'],
   ['SPECIAL THANKS TO', 'JakeThePro, JFighter, CrystalZach, Xyfume,'],
-  ['', 'fazeway851, GODLY,'],
+  ['', 'fazeway851, GODLY, Yomamaokay,'],
   ['', 'The Blaston community'],
   ['', '& The developers of Blaston'],
 ];
