@@ -144,8 +144,8 @@ export function pubUrl(): string {
  */
 export const OCTAGON_HALF_WIDTH = 0.86; // 1.72 m / 2
 export const OCTAGON_HALF_DEPTH = 0.75; // 1.5 m / 2
-const EDGE_HALF = 0.375; // half of the 0.75 m straight edge
-const CHAMFER = 0.375; // corner inset, giving ~0.6 m diagonal segments
+export const EDGE_HALF = 0.375; // half of the 0.75 m straight edge
+export const CHAMFER = 0.375; // corner inset, giving ~0.6 m diagonal segments
 
 /** Octagon outline (clockwise), centred on the player rig at the origin. */
 export const OCTAGON_VERTICES: Vector2Tuple[] = [

@@ -56,6 +56,20 @@ export interface PlatformSkin {
   /** Stronger deck bloom for rare earned pads; ordinary steel rests at 0.08. */
   slabGlow?: number;
   /**
+   * Deck roughness. Steel sits at DEFAULT_SLAB_ROUGH; a POLISHED pad wants a
+   * little less, because on a metal surface part of the read of "precious" is
+   * specular — gold at steel's roughness is a mustard-coloured floor.
+   */
+  slabRough?: number;
+  /**
+   * Deck metalness. Steel sits at DEFAULT_SLAB_METAL (0.92), where the surface
+   * takes essentially ALL its colour from what it reflects — which in a dim
+   * arena means a gold tint renders as good as black however bright the tint
+   * is. Dropping this lets the tint show diffusely, so the pad reads gold in
+   * the room it is actually standing in rather than only under a studio light.
+   */
+  slabMetal?: number;
+  /**
    * Earned, never sold: how this skin is won (shown on its shop tile in place
    * of a price; tapping it there does nothing until it's yours). The CHAMPION
    * pad carries 'FELL GOLIATH'.
@@ -65,6 +79,10 @@ export interface PlatformSkin {
 
 /** The makePlatform() slab base tint — restored when a non-premium skin is worn. */
 export const DEFAULT_SLAB_TINT = 0x9aa0ab;
+/** The makePlatform() slab roughness — restored when a skin sets none. */
+export const DEFAULT_SLAB_ROUGH = 0.28;
+/** The makePlatform() slab metalness — restored when a skin sets none. */
+export const DEFAULT_SLAB_METAL = 0.92;
 
 /** Platform skins owned from the start (no purchase needed). */
 export const FREE_PLATFORMS = ['azure', 'inferno', 'ember'];
@@ -113,8 +131,26 @@ export const PLATFORM_SKINS: PlatformSkin[] = [
   // Shop: two basic recolours…
   { id: 'toxic', name: 'TOXIC', neon: PALETTE.venom, price: 100 },
   { id: 'plasma', name: 'PLASMA', neon: PALETTE.violet, price: 100 },
-  // …the fancier premium pad — YELLOW-gold piping AND a gold-tinted slab.
-  { id: 'goldrush', name: 'GOLD RUSH', neon: 0xffd84a, slab: 0xb8902c, price: 100 },
+  // …the fancier premium pad. Gold is a SPECULAR read, not a hue: the old
+  // 0xb8902c tint over the diamond-plate map, at steel roughness and washed by
+  // a yellow emissive, came out a flat mustard-olive floor with no glint in it
+  // at all. A bright bullion tint, a deep warm emissive so the deck stops going
+  // olive, and a POLISHED surface so it actually catches the light — plus the
+  // struck medallion and border ring built in arena.ts under this id.
+  // (Roughness kept near steel's: at 0.1 a metalness-0.92 deck becomes a MIRROR
+  // of a mostly dark room and the gold goes black. The read comes from the
+  // bright bullion tint plus a warm self-glow, with just a little extra polish.)
+  {
+    id: 'goldrush',
+    name: 'GOLD RUSH',
+    neon: 0xffd84a,
+    slab: 0xffd071,
+    slabEmissive: 0x6b4400,
+    slabGlow: 0.26,
+    slabRough: 0.26,
+    slabMetal: 0.55,
+    price: 100,
+  },
   // …two more premium repaints. FROSTBITE is FROZEN OVER: glacier piping on a
   // pale rimed deck — the light slab is what keeps it from reading as just
   // AZURE again (both wore blue neon on dark steel and told apart badly).
@@ -255,6 +291,8 @@ export function applyPlatformSkin(root: Object3D, skin: PlatformSkin): void {
         m.emissiveIntensity = skin.slabGlow ?? 0.08;
         // Premium pads repaint the steel; plain recolours restore the default.
         m.color.setHex(skin.slab ?? DEFAULT_SLAB_TINT);
+        m.roughness = skin.slabRough ?? DEFAULT_SLAB_ROUGH;
+        m.metalness = skin.slabMetal ?? DEFAULT_SLAB_METAL;
         break;
       case 'neon-core':
         m.color.copy(new Color(skin.neon).lerp(_white, 0.45));

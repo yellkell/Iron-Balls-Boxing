@@ -120,11 +120,6 @@ const _dir = new Vector3();
 const _end = new Vector3();
 const _head = new Vector3();
 const _fwd = new Vector3();
-// The backdrop the passthrough disc restores when you toggle AR back off —
-// remembered as you pick one in the ARENA tab (or flip passthrough on over a
-// live backdrop). Defaults to the saved env, or DESERT if you booted in AR.
-let lastBackdrop: 'desert' | 'saltflats' | 'factory' =
-  app.environment === 'saltflats' ? 'saltflats' : app.environment === 'factory' ? 'factory' : 'desert';
 const BOARD_SCROLL_DEADZONE = 0.55;
 const BOARD_SCROLL_INITIAL_REPEAT = 0.28;
 const BOARD_SCROLL_REPEAT = 0.12;
@@ -135,7 +130,7 @@ const NEWS_SCROLL_STEP = 76;
  *  flip passthrough, tweak settings. Everything else — every fight, the
  *  loadout, the shop — clanks like sealed armour until the tutorial has been
  *  run once (app.tutorialDone; the tutorial button itself is always live). */
-const PRE_TUTORIAL_PANELS = new Set<string>(['gazette', 'news', 'passthrough', 'gear', 'settings']);
+const PRE_TUTORIAL_PANELS = new Set<string>(['gazette', 'news', 'gear', 'settings']);
 
 interface Pointer {
   line: Line;
@@ -763,35 +758,20 @@ export class MenuSystem extends createSystem({}) {
           this.joinByCode(app.codeEntry);
         }
         break;
-      case 'toggle-passthrough':
-        // The quick "show my real room" disc above BATTLE: flip the backdrop
-        // off to bare AR, or back to whatever you last picked in the LOCKER's
-        // ARENA tab (default DESERT if you've never chosen one).
-        if (app.environment === 'ar') {
-          app.environment = lastBackdrop;
-        } else {
-          lastBackdrop = app.environment;
-          app.environment = 'ar';
-        }
-        saveEnvironment();
-        break;
       case 'env-ar':
         app.environment = 'ar';
         saveEnvironment();
         break;
       case 'env-desert':
         app.environment = 'desert';
-        lastBackdrop = 'desert';
         saveEnvironment();
         break;
       case 'env-saltflats':
         app.environment = 'saltflats';
-        lastBackdrop = 'saltflats';
         saveEnvironment();
         break;
       case 'env-factory':
         app.environment = 'factory';
-        lastBackdrop = 'factory';
         saveEnvironment();
         break;
       case 'lb-battle':

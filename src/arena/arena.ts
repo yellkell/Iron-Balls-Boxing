@@ -42,7 +42,18 @@ import {
   type Object3D,
 } from 'three';
 import type { World } from '@iwsdk/core';
-import { ARENA_GAP, OCTAGON_VERTICES, PALETTE, PLATFORM, RAID_RING_RADIUS, teamColor } from '../config.js';
+import {
+  ARENA_GAP,
+  CHAMFER,
+  EDGE_HALF,
+  OCTAGON_HALF_DEPTH,
+  OCTAGON_HALF_WIDTH,
+  OCTAGON_VERTICES,
+  PALETTE,
+  PLATFORM,
+  RAID_RING_RADIUS,
+  teamColor,
+} from '../config.js';
 import { MAX_OPPONENTS } from '../combat/opponentBus.js';
 import { localLayout } from '../combat/layout.js';
 import { app } from '../menu/appState.js';
@@ -385,24 +396,83 @@ export function makePlatform(color: number, groupScale = 1): Group {
   grid.name = 'deck-grid';
   const gridMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
   gridMat.userData.role = 'neon-core';
-  // Half-extent of the deck at an offset, walking the chamfered corners in.
-  const halfW = (z: number): number =>
-    Math.abs(z) <= 0.375 ? 0.82 : 0.82 - (0.82 - 0.34) * ((Math.abs(z) - 0.375) / (0.75 - 0.375));
-  const halfD = (x: number): number =>
-    Math.abs(x) <= 0.375 ? 0.71 : 0.71 - (0.71 - 0.34) * ((Math.abs(x) - 0.375) / (0.86 - 0.375));
-  for (const z of [-0.5, -0.25, 0, 0.25, 0.5]) {
-    const bar = new Mesh(new BoxGeometry(halfW(z) * 2, 0.008, 0.012), gridMat);
+  /**
+   * The deck's TRUE half-extent, derived from the octagon rather than guessed.
+   *
+   * The old grid ran bars only across z ∈ [−0.5, 0.5] and x ∈ [−0.6, 0.6] on a
+   * deck that reaches ±0.75 and ±0.86, with the run lengths taken from
+   * hand-fitted constants — so it sat as a small patch marooned in the middle
+   * of the pad with bare steel all round it, nowhere near the rim. These walk
+   * the real outline: full width until the chamfer starts, then tapering with
+   * it to the corner.
+   */
+  const inset = 0.03; // hold the ends just inside the rim tube
+  const halfW = (z: number): number => {
+    const a = Math.abs(z);
+    if (a <= CHAMFER) return OCTAGON_HALF_WIDTH - inset;
+    const t = (a - CHAMFER) / (OCTAGON_HALF_DEPTH - CHAMFER);
+    return OCTAGON_HALF_WIDTH - (OCTAGON_HALF_WIDTH - EDGE_HALF) * t - inset;
+  };
+  const halfD = (x: number): number => {
+    const a = Math.abs(x);
+    if (a <= EDGE_HALF) return OCTAGON_HALF_DEPTH - inset;
+    const t = (a - EDGE_HALF) / (OCTAGON_HALF_WIDTH - EDGE_HALF);
+    return OCTAGON_HALF_DEPTH - (OCTAGON_HALF_DEPTH - CHAMFER) * t - inset;
+  };
+  // Even pitch out to the rim in both directions, so the grid actually reads
+  // as a grid laid over the whole deck.
+  const zPitch = 0.25;
+  for (let z = -Math.floor(OCTAGON_HALF_DEPTH / zPitch) * zPitch; z <= OCTAGON_HALF_DEPTH; z += zPitch) {
+    const len = halfW(z) * 2;
+    if (len <= 0.05) continue;
+    const bar = new Mesh(new BoxGeometry(len, 0.008, 0.012), gridMat);
     bar.position.set(0, DECK_TOP, z);
     grid.add(bar);
   }
-  for (const x of [-0.6, -0.3, 0, 0.3, 0.6]) {
-    const bar = new Mesh(new BoxGeometry(0.012, 0.008, halfD(x) * 2), gridMat);
+  const xPitch = 0.28;
+  for (let x = -Math.floor(OCTAGON_HALF_WIDTH / xPitch) * xPitch; x <= OCTAGON_HALF_WIDTH; x += xPitch) {
+    const len = halfD(x) * 2;
+    if (len <= 0.05) continue;
+    const bar = new Mesh(new BoxGeometry(0.012, 0.008, len), gridMat);
     bar.position.set(x, DECK_TOP, 0);
     grid.add(bar);
   }
   grid.userData.skinTag = 'synthwave';
   grid.visible = false;
   group.add(grid);
+
+  // GOLD RUSH: the one premium pad that had nothing struck into it — just a
+  // tint, which is why it read as a painted floor next to VOLT's bolt and
+  // SYNTHWAVE's grid. A minted MEDALLION at the centre of the deck inside a
+  // fine border ring, both in the same unlit neon-core the other ornaments
+  // use, so they team-tint on an opponent's pad too.
+  const bullion = new Group();
+  bullion.name = 'gold-trim';
+  const goldMat = new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.45) });
+  goldMat.userData.role = 'neon-core';
+  const border = new Mesh(new TorusGeometry(0.56, 0.007, 8, 56), goldMat);
+  border.rotation.x = -Math.PI / 2;
+  border.position.y = DECK_TOP;
+  bullion.add(border);
+  // The medallion: a low struck disc with a raised lip round its edge.
+  const medal = new Mesh(new CylinderGeometry(0.17, 0.18, 0.01, 40), goldMat);
+  medal.position.y = DECK_TOP + 0.004;
+  bullion.add(medal);
+  const medalLip = new Mesh(new TorusGeometry(0.17, 0.009, 8, 40), goldMat);
+  medalLip.rotation.x = -Math.PI / 2;
+  medalLip.position.y = DECK_TOP + 0.009;
+  bullion.add(medalLip);
+  // Rays struck out of the medallion toward the border — a minted sunburst.
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const ray = new Mesh(new BoxGeometry(0.012, 0.008, 0.11), goldMat);
+    ray.position.set(Math.sin(a) * 0.4, DECK_TOP, Math.cos(a) * 0.4);
+    ray.rotation.y = a;
+    bullion.add(ray);
+  }
+  bullion.userData.skinTag = 'goldrush';
+  bullion.visible = false;
+  group.add(bullion);
 
   // BLAZING: not merely a flame decal. The earned pad carries a white-hot
   // deck brand, a burning outer rail, eight animated flame crowns and sparks

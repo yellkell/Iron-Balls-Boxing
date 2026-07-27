@@ -361,15 +361,13 @@ function buildBearHead(accent: number): Group {
     socket.scale.set(0.9, 0.95, 0.55);
     socket.position.set(side * r * 0.27, r * 0.19, -r * 0.62);
     g.add(socket);
+    // No pupil: the dark socket ring already gives the eye somewhere to sit,
+    // and a pupil on top of it reads as a googly stuck to the face.
     const iris = new Mesh(new SphereGeometry(r * 0.095, 14, 12), glowMat(accent, 1.9));
     iris.scale.set(0.9, 0.95, 0.6);
     iris.position.set(side * r * 0.27, r * 0.19, -r * 0.66);
     iris.rotation.y = side * -0.2;
     g.add(iris);
-    const pupil = new Mesh(new SphereGeometry(r * 0.045, 10, 8), darkMat());
-    pupil.scale.set(0.9, 1.1, 0.5);
-    pupil.position.set(side * r * 0.28, r * 0.185, -r * 0.71);
-    g.add(pupil);
   }
 
   // JOWLS flanking the muzzle. Head-on, the lofted snout is pure foreshortening
@@ -2021,11 +2019,8 @@ function buildFrogHead(accent: number): Group {
     const pupil = new Mesh(new BoxGeometry(r * 0.2, r * 0.055, r * 0.05), darkMat());
     pupil.position.set(side * r * 0.38, r * 0.53, -r * 0.61);
     g.add(pupil);
-    // A brow shelf capping the turret — turns a ball into a browed eye.
-    const brow = new Mesh(new BoxGeometry(r * 0.34, r * 0.07, r * 0.2), chassisMat(accent, 0.05));
-    brow.position.set(side * r * 0.38, r * 0.7, -r * 0.34);
-    brow.rotation.set(0.24, 0, side * 0.12);
-    g.add(brow);
+    // (No brow shelf over the turret — a frog has no brow, and the bar sitting
+    // on top of each dome read as an eyebrow glued on rather than anatomy.)
     // TYMPANUM: the big round eardrum disc behind each eye. No frog reads as
     // a frog without them, and this head had nothing at all on its cheeks.
     const drum = new Mesh(new SphereGeometry(r * 0.14, 14, 12), darkMat());

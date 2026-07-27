@@ -75,8 +75,6 @@ export type PanelId =
   | 'coins'
   /** The little circular paper button hanging above the right panel. */
   | 'gazette'
-  /** The round passthrough toggle hanging above the BATTLE panel. */
-  | 'passthrough'
   /** The settings gear disc, left of the paper button. */
   | 'gear'
   /** The settings modal (audio sliders + music mute + voice toggle). */
@@ -145,9 +143,6 @@ export type MenuAction =
   | 'kp-del'
   | 'kp-join'
   | `kp-${number}`
-  /** Quick passthrough toggle (BATTLE-panel disc): flip the backdrop off to
-   *  bare AR so you can see your real room, and back. */
-  | 'toggle-passthrough'
   /** Arena-backdrop picker (LOCKER » ARENA tab): bare AR / desert / salt flats. */
   | 'env-ar'
   | 'env-desert'
@@ -1848,60 +1843,6 @@ function hitGazetteButton(u: number, v: number): MenuAction | null {
   return dx * dx + dy * dy <= 0.41 * 0.41 ? 'open-gazette' : null;
 }
 
-/** The round passthrough button (above the BATTLE panel): a steel disc with a
- *  corner-bracket "framing" glyph — a square drawn as four corners only. Lit
- *  when passthrough is live (bare AR, the backdrop off), so you can eyeball
- *  your real room to set up your space. Matches the paper button (NOT glowing). */
-function drawPassthroughButton(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
-  ctx.clearRect(0, 0, GZ, GZ);
-  const hot = hoverAction === 'toggle-passthrough';
-  const on = app.environment === 'ar'; // passthrough live — real room showing
-  const cx = GZ / 2;
-  const cy = GZ / 2;
-  const r = 52;
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = hot ? 'rgba(16,18,24,0.92)' : 'rgba(9,10,14,0.82)';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = hot ? UI.amber : on ? UI.cool : UI.steel;
-  ctx.stroke();
-
-  // Corner-bracket square: four L-shaped corners with open sides — a camera
-  // framing reticle, "set up your space".
-  const s = 30; // half-side of the framed square
-  const leg = 13; // bracket arm length
-  const ink = hot ? UI.amber : on ? UI.coolBright : UI.text;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      const px = cx + sx * s;
-      const py = cy + sy * s;
-      ctx.beginPath();
-      ctx.moveTo(px - sx * leg, py);
-      ctx.lineTo(px, py);
-      ctx.lineTo(px, py - sy * leg);
-      ctx.stroke();
-    }
-  }
-  // A small centre dot — the "you are here" of the framed space.
-  ctx.fillStyle = ink;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3.4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-/** Inside the disc → toggle passthrough. */
-function hitPassthroughButton(u: number, v: number): MenuAction | null {
-  const dx = u - 0.5;
-  const dy = v - 0.5;
-  return dx * dx + dy * dy <= 0.41 * 0.41 ? 'toggle-passthrough' : null;
-}
-
 /** The settings button: a steel disc with a gear cog. Opens the SETTINGS modal
  *  (audio sliders + music mute + voice). Matches the paper button (NOT glowing).
  *  A small red dot sits on the cog while the music is muted, so the mute state
@@ -3482,9 +3423,9 @@ function drawColourTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
 }
 
 /** The LOCKER's ARENA tab — pick the backdrop that hangs behind your bouts:
- *  bare AR (your real room), the papercraft desert, or the salt flats. The
- *  quick passthrough disc above the BATTLE panel flips between AR and whatever
- *  you last chose here. */
+ *  bare AR (your real room), the papercraft desert, or the salt flats. This is
+ *  now the only place the backdrop is chosen; the quick passthrough disc that
+ *  used to hang over the BATTLE panel is gone. */
 const ARENA_OPTS: Array<{ env: AppEnvironment | null; label: string; action: MenuAction | null; soon?: boolean }> = [
   { env: 'ar', label: 'PASSTHROUGH', action: 'env-ar' },
   { env: 'desert', label: 'DESERT', action: 'env-desert' },
@@ -3702,11 +3643,6 @@ export function createMenu(scene: Scene): Menu {
     cw: GZ,
     ch: GZ,
   });
-  // The passthrough toggle — a twin disc hanging above the BATTLE panel.
-  const passthroughBtn = makePanel('passthrough', 0.16, 0.16, drawPassthroughButton, hitPassthroughButton, {
-    cw: GZ,
-    ch: GZ,
-  });
   const news = makePanel('news', 0.86, 0.86 * (NH / NW), drawNews, hitNews, { cw: NW, ch: NH });
   // The ARCADE campaign line-up (the titan gauntlet) — modal over the lobby.
   const campaign = makePanel('campaign', 1.5, 1.5 * (CAMP_H / CAMP_W), drawCampaign, hitCampaign, {
@@ -3764,10 +3700,6 @@ export function createMenu(scene: Scene): Menu {
   // along the same inward-tilted arc (left → a touch further away).
   gearBtn.mesh.position.set(0.66, 1.86, -1.16);
   gearBtn.mesh.rotation.y = -0.48;
-  // The passthrough disc hangs above the BATTLE panel (left arc), sharing its
-  // outward tilt so it faces you the same way.
-  passthroughBtn.mesh.position.set(-0.84, 1.88, -1.05);
-  passthroughBtn.mesh.rotation.y = 0.48;
   // The coin readout sits just to the RIGHT of the paper button, same height +
   // tilt — symbol and balance together, as asked.
   coinHud.mesh.position.set(1.18, 1.86, -0.94);
@@ -3789,7 +3721,7 @@ export function createMenu(scene: Scene): Menu {
   settings.mesh.position.set(0, 1.5, -1.16);
   settings.mesh.visible = false;
 
-  const panels = [train, duel, info, board, custom, balls, gazetteBtn, gearBtn, passthroughBtn, coinHud, shop, news, campaign, lobby, settings];
+  const panels = [train, duel, info, board, custom, balls, gazetteBtn, gearBtn, coinHud, shop, news, campaign, lobby, settings];
   for (const p of panels) {
     p.redraw(null);
     group.add(p.mesh);
