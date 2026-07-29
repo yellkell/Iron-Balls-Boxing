@@ -7,12 +7,14 @@
  * REMEMBERED in localStorage — mute it once and it stays silent on every future
  * visit until you un-mute.
  *
- * Plain HTMLAudioElement (not the WebAudio SFX graph): it's a long looping
- * track that just needs play/pause, nothing spatial. Playback is the AND of
- * three gates — entered VR, in the lobby, not muted — funnelled through sync().
+ * Plays through the Web Audio MusicTrack engine — NOT an HTMLAudioElement.
+ * An audible <audio> element crashes Meta's Oculus Browser outright (see
+ * musicPlayer.ts). Playback is the AND of three gates — entered VR, in the
+ * lobby, not muted — funnelled through sync().
  */
 
 import musicUrl from '../assets/music/smoldering.m4a?url';
+import { MusicTrack } from './musicPlayer.js';
 import { musicVolume, onMusicVolume } from './musicVolume.js';
 
 const MUTE_KEY = 'ibb-music-muted';
@@ -22,7 +24,7 @@ function targetVol(): number {
   return BASE_VOLUME * musicVolume();
 }
 
-let audio: HTMLAudioElement | null = null;
+let track: MusicTrack | null = null;
 let entered = false; // has the player entered VR (the autoplay-unlocking gesture)?
 let lobbyActive = true; // are we in the menu/lobby (vs a bout or training)?
 let fadeTimer: number | null = null;
@@ -50,13 +52,12 @@ function setMuted(muted: boolean): void {
   }
 }
 
-function ensureAudio(): HTMLAudioElement {
-  if (!audio) {
-    audio = new Audio(musicUrl);
-    audio.loop = true;
-    audio.volume = targetVol();
+function ensureTrack(): MusicTrack {
+  if (!track) {
+    track = new MusicTrack(musicUrl, true);
+    track.volume = targetVol();
   }
-  return audio;
+  return track;
 }
 
 /** Play only when we've entered VR, are in the lobby, and aren't muted —
@@ -64,13 +65,11 @@ function ensureAudio(): HTMLAudioElement {
 function sync(): void {
   stopFade();
   if (entered && lobbyActive && !isMusicMuted()) {
-    const a = ensureAudio();
-    a.volume = targetVol();
-    void a.play().catch(() => {
-      /* autoplay blocked or decode failed — stay silent */
-    });
+    const t = ensureTrack();
+    t.volume = targetVol();
+    void t.start(); // resumes from wherever a bout paused it
   } else {
-    audio?.pause();
+    track?.pause();
   }
 }
 
@@ -89,26 +88,24 @@ export function noteInLobby(): void {
 export function fadeInMenuMusic(): void {
   if (!lobbyActive || !(entered && !isMusicMuted())) {
     stopFade();
-    audio?.pause();
+    track?.pause();
     return;
   }
   // Already up (e.g. just navigating menu ↔ queue) — leave it, don't re-fade.
-  if (audio && !audio.paused && fadeTimer === null) return;
+  if (track?.playing && fadeTimer === null) return;
   stopFade();
-  const a = ensureAudio();
+  const t = ensureTrack();
   // Resume from wherever the level already is — a re-trigger mid-fade must
   // continue the climb, never yank the track back to silence and start over.
-  const from = a.paused ? 0 : Math.min(a.volume, targetVol());
-  a.volume = from;
-  void a.play().catch(() => {
-    /* blocked — stay silent */
-  });
+  const from = t.playing ? Math.min(t.volume, targetVol()) : 0;
+  t.volume = from;
+  void t.start();
   const steps = 30; // ~1.5 s at 50 ms
   let i = 0;
   fadeTimer = window.setInterval(() => {
     i += 1;
     const target = targetVol();
-    a.volume = Math.min(target, from + ((target - from) * i) / steps);
+    t.volume = Math.min(target, from + ((target - from) * i) / steps);
     if (i >= steps) stopFade();
   }, 50);
 }
@@ -116,7 +113,7 @@ export function fadeInMenuMusic(): void {
 // Live-scale the lobby track while it's playing steadily (a settings-panel
 // slider scrub) — skip mid-fade, the fade recomputes toward the new target.
 onMusicVolume(() => {
-  if (audio && !audio.paused && fadeTimer === null) audio.volume = targetVol();
+  if (track?.playing && fadeTimer === null) track.volume = targetVol();
 });
 
 /**

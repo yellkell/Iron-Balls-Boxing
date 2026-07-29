@@ -7,10 +7,12 @@
  * return to the lobby, rings out a few more seconds there (if it has more to
  * give), then FADES, a short PAUSE, and only THEN does the lobby music come up —
  * so the sting and the lobby music never overlap. Everything sits well under the
- * lobby music (it's background). Plain HTMLAudioElements.
+ * lobby music (it's background). Plays through the Web Audio MusicTrack engine —
+ * NOT HTMLAudioElements, which crash Meta's Oculus Browser (see musicPlayer.ts).
  */
 
 import { fadeInMenuMusic, isMusicMuted, noteInLobby } from './menuMusic.js';
+import { MusicTrack } from './musicPlayer.js';
 import { musicVolume } from './musicVolume.js';
 import victoryUrl from '../assets/music/victory.mp3?url';
 import brainEaterUrl from '../assets/music/brain-eater.mp3?url';
@@ -42,12 +44,25 @@ const VICTORY_LOBBY_MS = 6500; // extra airtime in the lobby if the sting has mo
 const VICTORY_FADE_MS = 1500; // fade the sting out over this
 const VICTORY_PAUSE_MS = 1000; // silence between the sting and the lobby music
 
-let battle: HTMLAudioElement | null = null;
-let victory: HTMLAudioElement | null = null;
+/** One MusicTrack per battle URL, created on first play (buffers themselves
+ *  live in musicPlayer's small LRU, so this map stays cheap). */
+const battleTracks = new Map<string, MusicTrack>();
+/** The battle track currently scoring the bout (null = none). */
+let battle: MusicTrack | null = null;
+let victory: MusicTrack | null = null;
 /** The bespoke final-section track (raid GOLIATH's second life). */
-let finale: HTMLAudioElement | null = null;
+let finale: MusicTrack | null = null;
 let timers: number[] = [];
 let handoffActive = false;
+
+function battleTrackFor(url: string): MusicTrack {
+  let t = battleTracks.get(url);
+  if (!t) {
+    t = new MusicTrack(url, false);
+    battleTracks.set(url, t);
+  }
+  return t;
+}
 
 /** Cancel any in-flight victory→lobby handoff (timers + the ended listener). */
 function clearHandoff(): void {
@@ -75,35 +90,31 @@ export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
   clearHandoff(); // a new bout abandons any victory handoff
   victory?.pause();
   if (isMusicMuted() || battleUrls.length === 0) return;
-  if (battle && !battle.paused) {
+  if (battle?.playing) {
     battle.volume = volume * musicVolume(); // already scoring — just match the level
     return;
   }
   const url = battleUrls[Math.floor(Math.random() * battleUrls.length)];
-  if (!battle) battle = new Audio();
-  battle.loop = false;
-  battle.onended = () => rollNextTrack(volume);
-  if (battle.src !== url) battle.src = url;
+  if (battle) battle.onended = null;
+  battle = battleTrackFor(url);
   battle.volume = volume * musicVolume();
-  battle.currentTime = 0;
-  void battle.play().catch(() => {
-    /* autoplay blocked or decode failed — stay silent */
-  });
+  battle.onended = () => rollNextTrack(volume);
+  void battle.restart();
 }
 
 /** A battle track ran dry mid-bout: chain a DIFFERENT one from the pool
  *  (same one only when the pool holds a single track). */
 function rollNextTrack(volume: number): void {
   if (!battle || isMusicMuted()) return;
-  const others = battleUrls.filter((u) => u !== battle!.src && !battle!.src.endsWith(u));
+  const current = battle;
+  const others = battleUrls.filter((u) => battleTracks.get(u) !== current);
   const pool = others.length > 0 ? others : battleUrls;
   const url = pool[Math.floor(Math.random() * pool.length)];
-  battle.src = url;
+  current.onended = null;
+  battle = battleTrackFor(url);
   battle.volume = volume * musicVolume();
-  battle.currentTime = 0;
-  void battle.play().catch(() => {
-    /* decode failed — the bout goes unscored from here */
-  });
+  battle.onended = () => rollNextTrack(volume);
+  void battle.restart();
 }
 
 /** Stop ONLY the looping battle track. The victory sting is handed off
@@ -122,15 +133,9 @@ export function stopBattleTrack(): void {
 export function startFinaleTrack(): void {
   battle?.pause();
   if (isMusicMuted()) return;
-  if (!finale) {
-    finale = new Audio(brainEaterUrl);
-    finale.loop = true;
-  }
+  if (!finale) finale = new MusicTrack(brainEaterUrl, true);
   finale.volume = FINALE_VOLUME * musicVolume();
-  finale.currentTime = 0;
-  void finale.play().catch(() => {
-    /* autoplay blocked or decode failed — stay silent */
-  });
+  void finale.restart();
 }
 
 /** Match over: duck the battle track and ring the victory sting once. */
@@ -138,13 +143,10 @@ export function playVictory(): void {
   battle?.pause();
   finale?.pause();
   if (isMusicMuted()) return;
-  if (!victory) victory = new Audio(victoryUrl);
+  if (!victory) victory = new MusicTrack(victoryUrl, false);
   victory.onended = null;
   victory.volume = VICTORY_VOLUME * musicVolume();
-  victory.currentTime = 0;
-  void victory.play().catch(() => {
-    /* blocked or decode failed — no sting */
-  });
+  void victory.restart();
 }
 
 /**
@@ -163,7 +165,7 @@ export function handoffToLobby(): void {
   noteInLobby();
 
   const v = victory;
-  if (!v || v.paused || v.ended) {
+  if (!v || !v.playing) {
     fadeInMenuMusic(); // nothing ringing — bring the lobby music up
     return;
   }
