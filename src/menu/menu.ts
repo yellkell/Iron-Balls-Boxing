@@ -144,7 +144,6 @@ export type MenuAction =
   | 'kp-join'
   | `kp-${number}`
   /** Arena-backdrop picker (LOCKER » ARENA tab): bare AR / desert / salt flats. */
-  | 'env-ar'
   | 'env-desert'
   | 'env-saltflats'
   | 'env-factory'
@@ -3427,7 +3426,7 @@ function drawColourTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | 
  *  now the only place the backdrop is chosen; the quick passthrough disc that
  *  used to hang over the BATTLE panel is gone. */
 const ARENA_OPTS: Array<{ env: AppEnvironment | null; label: string; action: MenuAction | null; soon?: boolean }> = [
-  { env: 'ar', label: 'PASSTHROUGH', action: 'env-ar' },
+  { env: 'ar', label: 'PASSTHROUGH', action: null, soon: true },
   { env: 'desert', label: 'DESERT', action: 'env-desert' },
   { env: 'saltflats', label: 'SALT FLATS', action: 'env-saltflats' },
 ];
@@ -3453,10 +3452,13 @@ function drawArenaTab(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | n
       ctx.font = stencilFont(30);
       ctx.fillStyle = UI.steelDim;
       ctx.fillText(opt.label, r.x + 36, r.y + r.h / 2);
+      ctx.font = '800 15px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('...COMING SOON', r.x + r.w - 24, r.y + r.h / 2);
       return;
     }
     const on = app.environment === opt.env;
-    const hot = hoverAction === opt.action;
+    const hot = opt.action !== null && hoverAction === opt.action;
     plate(ctx, r.x, r.y, r.w, r.h, {
       cut: 16,
       fill: on ? 'rgba(79,183,255,0.16)' : hot ? 'rgba(255,176,0,0.12)' : 'rgba(150,150,170,0.08)',
