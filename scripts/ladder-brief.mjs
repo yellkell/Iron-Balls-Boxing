@@ -16,7 +16,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, where } from 'firebase/firestore';
 
 // Public web config (an identifier, not a secret — same as src/net/firebaseConfig.ts).
 const firebaseConfig = {
@@ -64,9 +64,53 @@ async function readSnapshot() {
   return { byUid, prevRank, capturedAt: data.capturedAt ?? null, edition: data.edition ?? 0 };
 }
 
+/**
+ * RAIDS since the last edition: squads that marched out of town and FELLED the
+ * titans (`runRaid`) or the gel-beast GOOPLIATH (`runGoopliath`). Only
+ * VICTORIOUS runs are ever recorded — the game posts a run when the last boss
+ * falls, so a squad that got beaten leaves no wire at all. The brief therefore
+ * carries triumphs only, which suits the paper's never-punch-down rule.
+ *
+ * Each doc: names[] (the whole squad, 2–5 callsigns), difficulty
+ * (normal|hard|blazing — easy never posts), hardcore (titan raids only: no
+ * healing between bosses), at (server clock when it fell).
+ */
+async function readRaids(sinceMs) {
+  const cutoff = new Date(sinceMs);
+  const pull = async (col, kind) => {
+    try {
+      // Range + orderBy on the SAME field — a single-field query, no composite
+      // index needed on these collections.
+      const snap = await getDocs(
+        query(collection(db, col), where('at', '>', cutoff), orderBy('at', 'desc'), limit(20)),
+      );
+      return snap.docs.map((d) => {
+        const x = d.data();
+        const at = x.at?.toMillis?.() ?? 0;
+        return {
+          kind, // 'titans' — the five-machine gauntlet; 'goopliath' — the gel-beast
+          squad: Array.isArray(x.names) ? x.names.map(String) : [],
+          squadSize: Array.isArray(x.names) ? x.names.length : 0,
+          difficulty: x.difficulty ?? 'normal',
+          hardcore: !!x.hardcore,
+          when: at ? new Date(at).toISOString() : null,
+          hoursAgo: at ? Math.round((Date.now() - at) / 3_600_000) : null,
+        };
+      });
+    } catch {
+      return []; // a missing collection or closed rule starves this feed only
+    }
+  };
+  const [titans, goop] = await Promise.all([pull('runRaid', 'titans'), pull('runGoopliath', 'goopliath')]);
+  return [...titans, ...goop].sort((a, b) => (b.when ?? '').localeCompare(a.when ?? ''));
+}
+
 const players = await readPlayers();
 const prev = await readSnapshot();
 const now = Date.now();
+// Raids since the last edition — or, on day one, the last ~day.
+const raidsSince = prev?.capturedAt?.toMillis?.() ?? now - ACTIVE_WINDOW_MS;
+const raids = await readRaids(raidsSince);
 
 const rows = players.map((p, i) => {
   const before = prev?.byUid[p.uid];
@@ -117,12 +161,19 @@ const brief = {
     duoPoints: '2v2 board POINTS (+11 per win, +1 per game) — not a win count',
     ffaPoints: 'FFA board POINTS (+11 per win, +1 per game) — not a win count',
     gamesApprox: 'ESTIMATED bouts fought since the last edition (round(xpGained / 25)) — THIS is the matches-played figure',
+    raids:
+      'squads that marched OUT of town and FELLED the wild machines since the last edition — kind "titans" is the five-boss raid (RUSTHOOK → GOLIATH), kind "goopliath" is the gel-beast. VICTORIES ONLY: beaten squads are never recorded, so no raid in this list failed. hardcore = no healing between titans; difficulty is normal/hard/blazing. Name the squad callsigns together — a raid is one deed by the whole posse.',
   },
-  // Cole's favourite kind of day: nobody threw a single iron ball.
-  nobodyFought: totalGames === 0 && movers.length === 0,
+  // Cole's favourite kind of day: nobody threw a single iron ball — and no
+  // war party went monster-hunting in the wastes either.
+  nobodyFought: totalGames === 0 && movers.length === 0 && raids.length === 0,
+  // The raid wire: every squad that felled the titans or the tide since the
+  // last edition, newest first.
+  raids,
   summary: {
     activePlayers: movers.length,
     totalGamesApprox: totalGames,
+    raidsCleared: raids.length,
     newcomers: rows.filter((r) => r.isNew).map((r) => r.name),
     topClimber: climbers[0] ?? null,
     busiest: busiest[0] ?? null,

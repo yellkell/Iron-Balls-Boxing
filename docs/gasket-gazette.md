@@ -13,7 +13,9 @@ button wears a **red notification dot** until you've read the latest edition.
  scheduled Claude task (daily)
    └─ /daily-gazette  (.claude/commands/daily-gazette.md)
         1. node scripts/ladder-brief.mjs    → reads Firestore `players`,
-           diffs `newspaper/_snapshot`, prints a JSON "wire report"
+           diffs `newspaper/_snapshot`, pulls the RAID WIRE (`runRaid` +
+           `runGoopliath` clears since the last edition — victories only, the
+           game never records a beaten squad), prints a JSON "wire report"
            (climbers + busiest only — never who fell; the paper won't punch down)
         2. Claude writes the editorial in Sheriff Cole Ironside's voice
         3. node scripts/publish-gazette.mjs → writes `newspaper/latest`
@@ -39,7 +41,7 @@ edition appears the next time a player lands in the lobby — no rebuild/redeplo
 
 ### Required security rules
 
-Two collections must be reachable from the scheduled task:
+These collections must be reachable from the scheduled task:
 
 ```
 // The scheduled task reads the ladder to write the editorial.
@@ -50,6 +52,12 @@ match /players/{doc} {
 match /newspaper/{doc} {
   allow read, write: if true;
 }
+// The raid wire — cleared runs the editorial reports on. Already open for
+// the in-game boards; runGoopliath shipped WITHOUT a rule (see
+// firestore.rules), so deploy the updated rules or the tide's fells stay
+// invisible to the game and the paper alike.
+match /runRaid/{run}      { allow read, create: if true; }
+match /runGoopliath/{run} { allow read, create: if true; }
 ```
 
 (Hackathon-grade, matching the existing `lobbies` / `arcadeRooms` rules —

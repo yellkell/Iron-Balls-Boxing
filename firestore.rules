@@ -49,12 +49,17 @@ service cloud.firestore {
     // PvE run-time leaderboards — one immutable doc per completed run
     // (a squad + a fight-time clock). Append-only: read + create, never
     // updated or deleted, so posted times can't be overwritten.
-    // Only runGauntlet and runRaid are still written (see net/leaderboard.ts);
-    // the two hardcore boards are retired but kept readable for old rows.
+    // runGauntlet, runRaid and runGoopliath are written (net/leaderboard.ts
+    // RUN_COLLECTION); the two hardcore boards are retired but kept readable
+    // for old rows. runGoopliath was MISSING here — the collection shipped
+    // without a rule, so every GOOPLIATH fell was silently refused (create
+    // denied), the in-game GOOPLIATH board read as empty (read denied), and
+    // the Gazette's raid wire couldn't see the tide fall either.
     match /runGauntlet/{run}     { allow read, create: if true; }
     match /runHardcore/{run}     { allow read, create: if true; }
     match /runRaid/{run}         { allow read, create: if true; }
     match /runRaidHardcore/{run} { allow read, create: if true; }
+    match /runGoopliath/{run}    { allow read, create: if true; }
     // The Gasket Gazette — `latest` (the live edition the lobby reads) and
     // `_snapshot` (the generator's ladder state). The game reads; the
     // scheduled task reads + writes.
