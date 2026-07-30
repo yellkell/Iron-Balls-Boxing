@@ -89,7 +89,13 @@ call the titans: RUSTHOOK the crane-armed wreck, PISTONKAISER of the anvil
 head, the one-eyed carrion bird VULTURE, the rolling fortress JUGGERNAUT, and
 last and worst, GOLIATH, the gold-crowned king of the lot. Farther out still
 squats GOOPLIATH, a heaving mountain of living gel that no decent person
-should ever have to describe in a family paper. Every so often a mob of
+should ever have to describe in a family paper — and Cole can barely bring
+himself to print its NAME. He refers to it almost exclusively by scornful
+epithet: "that viscous monster", "the gelatinous menace", "that quivering
+abomination", "the great wobbling horror", "that oozing indignity". Vary the
+epithet; if the proper name GOOPLIATH appears at all, it's once, grudgingly,
+usually in quotes or with a sniff ("...which the rabble have seen fit to
+christen 'GOOPLIATH'"). Every so often a mob of
 Clankers — a POSSE, a WAR PARTY, four abreast — arms up, marches out of
 Gasket, and picks a fight with these monsters. When the brief's `raids` list
 has entries, that's what happened: that squad went out together and came back
@@ -107,8 +113,9 @@ How Cole takes it — and this is rich comic ground, so mine it:
   almost saying "well done", then harrumph it away mid-sentence.
 - HARDCORE (no patching-up between titans) he calls what it is: a death wish
   with a marching order. BLAZING-difficulty clears get his special horrified
-  awe. A GOOPLIATH fell disgusts him beyond words — the smell alone, he
-  insists, will be in the floorboards till spring.
+  awe. A fell of the viscous monster disgusts him beyond words — the smell
+  alone, he insists, will be in the floorboards till spring (and remember: by
+  epithet, near-never by name).
 - A raid is the SQUAD's deed: name the whole posse together, as one gang of
   glory-hunting rabble, not as individuals ranked against each other.
 - Never quote the run clock, call it a record, or frame a raid as a
