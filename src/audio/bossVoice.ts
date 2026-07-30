@@ -13,26 +13,43 @@
  *
  * Playback rides the SFX volume knob (it's diegetic arena noise, not
  * music). CampaignSystem preloads at stage setup so the file has the whole
- * klaxon + rise (1.9–3.8s) to arrive before its cue.
+ * klaxon + rise (1.9–3.8s) to arrive before its cue. Decoded + played
+ * through Web Audio — an audible HTMLAudioElement crashes Meta's Oculus
+ * Browser (see musicPlayer.ts), and a voice line long enough to activate
+ * the media session would take the whole app down with it.
  */
 
-import { sfxVolume } from './sfx.js';
+import { audioContext, sfxVolume } from './sfx.js';
 
 const VOLUME = 0.9; // over the sfx knob — the one voice in the arena, let it carry
 
-type Slot = { audio: HTMLAudioElement; state: 'loading' | 'ready' | 'missing' };
+type Slot = { buffer: AudioBuffer | null; state: 'loading' | 'ready' | 'missing' };
 const slots = new Map<string, Slot>();
 
 function slotFor(name: string): Slot {
   const key = name.toLowerCase();
   let slot = slots.get(key);
   if (!slot) {
-    const audio = new Audio(`voice/${key}.m4a`);
-    audio.preload = 'auto';
-    slot = { audio, state: 'loading' };
-    audio.addEventListener('canplaythrough', () => (slot!.state = 'ready'), { once: true });
-    audio.addEventListener('error', () => (slot!.state = 'missing'), { once: true });
+    slot = { buffer: null, state: 'loading' };
     slots.set(key, slot);
+    const ctx = audioContext();
+    if (!ctx) {
+      slot.state = 'missing';
+      return slot;
+    }
+    fetch(`voice/${key}.m4a`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then((bytes) => ctx.decodeAudioData(bytes))
+      .then((buffer) => {
+        slot!.buffer = buffer;
+        slot!.state = 'ready';
+      })
+      .catch(() => {
+        slot!.state = 'missing';
+      });
   }
   return slot;
 }
@@ -49,11 +66,19 @@ export function preloadBossVoice(name: string): void {
  */
 export function playBossVoice(name: string): boolean {
   const slot = slotFor(name);
-  if (slot.state !== 'ready') return false;
-  slot.audio.volume = Math.min(1, VOLUME * sfxVolume());
-  slot.audio.currentTime = 0;
-  void slot.audio.play().catch(() => {
-    /* autoplay refusal — the roar already ceded its slot, accept the miss */
-  });
+  const ctx = audioContext();
+  if (slot.state !== 'ready' || !slot.buffer || !ctx) return false;
+  if (ctx.state === 'suspended') void ctx.resume();
+  const gain = ctx.createGain();
+  gain.gain.value = Math.min(1, VOLUME * sfxVolume());
+  gain.connect(ctx.destination);
+  const source = ctx.createBufferSource();
+  source.buffer = slot.buffer;
+  source.connect(gain);
+  source.onended = () => {
+    source.disconnect();
+    gain.disconnect();
+  };
+  source.start();
   return true;
 }
