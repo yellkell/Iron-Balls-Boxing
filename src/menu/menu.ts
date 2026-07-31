@@ -875,14 +875,15 @@ function hitPubPicker(v: number): MenuAction | null {
 const BOARD_ROW_Y0 = 164;
 const BOARD_ROW_STEP = 30;
 
-/** Top row: BATTLE / XP / ARCADE / PROFILE. BATTLE fronts the three live-fight
- *  boards (1v1 / 2v2 / ffa); ARCADE fronts AIM plus the four PvE run-time
- *  boards. Each lights for any of its own sub-tabs. */
+/** Top row: PROFILE / BATTLE / XP / ARCADE. PROFILE leads (it's the panel's
+ *  landing face); BATTLE fronts the three live-fight boards (1v1 / 2v2 /
+ *  ffa); ARCADE fronts AIM plus the four PvE run-time boards. Each lights
+ *  for any of its own sub-tabs. */
 const BOARD_TABS: Array<[string, MenuAction, (t: LeaderboardTab) => boolean]> = [
+  ['PROFILE', 'lb-profile', (t) => t === 'profile'],
   ['BATTLE', 'lb-battle', (t) => t === 'ranked' || t === 'duo' || t === 'ffa'],
   ['XP', 'lb-xp', (t) => t === 'xp'],
   ['ARCADE', 'lb-arcade', (t) => ARCADE_SUB_TABS.includes(t as LeaderboardTab)],
-  ['PROFILE', 'lb-profile', (t) => t === 'profile'],
 ];
 const BOARD_TAB_W = (BW - 96 - 48) / 4;
 

@@ -107,7 +107,8 @@ export const LEADERBOARD_VISIBLE_ROWS = 10;
 
 /** Live leaderboard state the lobby panel reads each redraw. */
 export const leaderboard = {
-  tab: 'ranked' as LeaderboardTab,
+  // PROFILE is the panel's landing face — your own card first, boards a tap away.
+  tab: 'profile' as LeaderboardTab,
   ranked: [] as LbRow[],
   xp: [] as LbRow[],
   training: [] as LbRow[],
@@ -223,9 +224,23 @@ export function clampLeaderboardScroll(tab: DataTab | RunTab): void {
   leaderboard.scroll[tab] = Math.max(0, Math.min(max, leaderboard.scroll[tab]));
 }
 
+/** Index of MY first (best) row on a board — −1 when I'm not on it. */
+function myRowIndex(tab: DataTab | RunTab): number {
+  const rows: Array<{ me: boolean }> = leaderboard[tab];
+  return rows.findIndex((r) => r.me);
+}
+
 export function setLeaderboardTab(tab: LeaderboardTab): void {
   leaderboard.tab = tab;
-  if (isDataTab(tab) || isRunTab(tab)) clampLeaderboardScroll(tab);
+  if (isDataTab(tab) || isRunTab(tab)) {
+    // Open WHERE YOU ARE: a board you've scored on lands scrolled to your row
+    // (a few ranks of context above it), not to a top 10 you may not be in.
+    // Inside the top 10 (or off the board) it opens at the top as ever, and
+    // the jump only happens on the SWITCH — scrolling after that is yours.
+    const mine = myRowIndex(tab);
+    leaderboard.scroll[tab] = mine >= 0 ? Math.max(0, mine - 4) : 0;
+    clampLeaderboardScroll(tab);
+  }
 }
 
 /** Open a player's profile face (null = your own). */
