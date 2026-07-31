@@ -20,9 +20,37 @@
 
 import { audioContext } from './sfx.js';
 
-const bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+interface LoadedTrack {
+  buffer: AudioBuffer;
+  /** Seconds of silence at the head of the file. Playback starts here and
+   *  loops back here — "Smoldering" ships with a 2s digital-silence lead-in
+   *  that made every launch cue sound late (and punched a 2s hole into each
+   *  loop), so the silent head is measured once at decode and skipped. */
+  head: number;
+}
 
-function loadBuffer(url: string): Promise<AudioBuffer | null> {
+const bufferCache = new Map<string, Promise<LoadedTrack | null>>();
+
+function firstAudibleSecond(buffer: AudioBuffer): number {
+  // Windowed RMS, not first-sample-over-threshold: real exports carry dither
+  // and stray clicks in their "silent" head (Smoldering has a -66 dB blip in
+  // its first quarter-second, followed by 1.5s of true zeros), so the head
+  // ends at the first WINDOW with sustained energy, not the first hot sample.
+  const data = buffer.getChannelData(0);
+  const win = Math.max(1, Math.floor(buffer.sampleRate * 0.05));
+  const threshold = 0.003; // window RMS ~-50 dBFS — music clears it, dither doesn't
+  for (let s = 0; s < data.length; s += win) {
+    const end = Math.min(s + win, data.length);
+    let sum = 0;
+    for (let i = s; i < end; i++) sum += data[i] * data[i];
+    if (Math.sqrt(sum / (end - s)) > threshold) {
+      return Math.max(0, s / buffer.sampleRate - 0.05); // keep a 50ms pre-roll
+    }
+  }
+  return 0; // all-silent (or empty) — treat as headless
+}
+
+function loadBuffer(url: string): Promise<LoadedTrack | null> {
   let pending = bufferCache.get(url);
   if (!pending) {
     pending = (async () => {
@@ -30,7 +58,8 @@ function loadBuffer(url: string): Promise<AudioBuffer | null> {
       if (!ctx) return null;
       try {
         const res = await fetch(url);
-        return await ctx.decodeAudioData(await res.arrayBuffer());
+        const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+        return { buffer, head: firstAudibleSecond(buffer) };
       } catch {
         return null; // fetch/decode failed — the track just stays silent
       }
@@ -127,12 +156,13 @@ export class MusicTrack {
     if (ctx.state === 'suspended') void ctx.resume();
     this._playing = true;
     const seq = ++this._playSeq;
-    return loadBuffer(this._src).then((buffer) => {
+    return loadBuffer(this._src).then((loaded) => {
       if (seq !== this._playSeq) return; // paused or re-pointed mid-decode
-      if (!buffer) {
+      if (!loaded) {
         this._playing = false;
         throw new Error('MusicTrack: decode failed');
       }
+      const { buffer, head } = loaded;
       this._buffer = buffer;
       if (!this._gain) {
         this._gain = ctx.createGain();
@@ -142,7 +172,14 @@ export class MusicTrack {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = this.loop;
-      const offset = buffer.duration > 0 ? this._offset % buffer.duration : 0;
+      if (this.loop && head > 0) {
+        // Loop the audible span only — wrapping to 0 would replay the silent
+        // head as a hole in the middle of the music.
+        source.loopStart = head;
+        source.loopEnd = buffer.duration;
+      }
+      let offset = buffer.duration > 0 ? this._offset % buffer.duration : 0;
+      if (offset < head) offset = head; // never start inside the silent head
       source.onended = () => {
         // Manual stops detach first (stopSource), so this is a natural end.
         if (this._source !== source) return;
