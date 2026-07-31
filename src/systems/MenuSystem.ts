@@ -764,11 +764,6 @@ export class MenuSystem extends createSystem({}) {
           this.joinByCode(app.codeEntry);
         }
         break;
-      case 'env-ar':
-        app.environment = 'ar';
-        saveEnvironment();
-        this.restartForEnvironmentMode();
-        break;
       case 'env-desert':
         app.environment = 'desert';
         saveEnvironment();
