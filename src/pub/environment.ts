@@ -486,14 +486,15 @@ export function buildPub(world: World): PubRefs {
   const boxZ = darts.ocheZ;
   // Station metrics: the crate shrank to 65% (the old box read oversized in
   // the corner) and the stand dropped from bar height to a low side table.
-  // The crate sits toward the BACK of the top; the face-up PRESS button rides
-  // the front edge, where a palm naturally falls.
   const S = 0.65; // crate scale
   const TOP = 0.92; // table surface height (was 1.15)
-  const CZ = boxZ - 0.04; // crate centre, pushed back to make button room
+  const CZ = boxZ - 0.04; // crate centre on the tabletop
+  // Reach-in volume — deliberately BIGGER than the shrunken crate and biased
+  // upward (hands arrive from above): pulling a dart should be forgiving,
+  // the crate's look is the only thing that shrank.
   const dartBox = {
-    center: [boxX, TOP + 0.08, CZ] as [number, number, number],
-    half: [0.2, 0.14, 0.17] as [number, number, number],
+    center: [boxX, TOP + 0.1, CZ] as [number, number, number],
+    half: [0.24, 0.18, 0.21] as [number, number, number],
   };
   const crateWood = new MeshStandardMaterial({ map: woodTexture('#7a4a24', [2, 1]), roughness: 0.86, metalness: 0.03 });
   // Shared by all four crate walls — PropSystem lifts its emissive to make the
@@ -534,32 +535,9 @@ export function buildPub(world: World): PubRefs {
   const lip = new Mesh(new BoxGeometry(0.54 * S, 0.015, 0.42 * S), amberGlow(0.18));
   lip.position.set(boxX, TOP + 0.115, CZ);
   root.add(lip);
-  // The PRESS button — the darts RESET button's anatomy (gunmetal bezel +
-  // glowing cap) laid face-up on the table's front edge. PropSystem detects a
-  // bare hand landing on it, sinks the cap, and puts a dart in that hand.
-  const btnZ = boxZ + 0.15;
-  const btnBezel = new Mesh(new CylinderGeometry(0.055, 0.06, 0.024, 24), gunmetal(0.4));
-  btnBezel.position.set(boxX, TOP + 0.012, btnZ);
-  root.add(btnBezel);
-  const dartBtnMat = new MeshStandardMaterial({
-    color: 0xff9024,
-    emissive: 0xff9024,
-    emissiveIntensity: 0.4,
-    roughness: 0.35,
-    metalness: 0.1,
-  });
-  const dartButtonCap = new Mesh(new CylinderGeometry(0.042, 0.046, 0.045, 24), dartBtnMat);
-  dartButtonCap.position.set(boxX, TOP + 0.04, btnZ);
-  root.add(dartButtonCap);
-  const dartButton = {
-    center: [boxX, TOP + 0.045, btnZ] as [number, number, number],
-    cap: dartButtonCap,
-    capMat: dartBtnMat,
-    restY: TOP + 0.04,
-  };
-  // "PRESS FOR DARTS" painted across the crate floor, lit amber so it reads
-  // in the gloom. The box never shows darts — PropSystem keeps any dart
-  // resting here hidden — so the label teaches the button: press, don't fish.
+  // "GRAB DARTS" painted across the crate floor, lit amber so it reads in the
+  // gloom. The box no longer shows darts poking out — PropSystem keeps any dart
+  // resting here hidden, so the label IS the prompt: reach in to pull one.
   const labelCanvas = document.createElement('canvas');
   labelCanvas.width = 512;
   labelCanvas.height = 256;
@@ -572,8 +550,8 @@ export function buildPub(world: World): PubRefs {
   lctx.shadowColor = '#ff7a18';
   lctx.shadowBlur = 24;
   for (const [text, y, size] of [
-    ['PRESS', 74, 100],
-    ['FOR DARTS', 182, 76],
+    ['GRAB', 74, 100],
+    ['DARTS', 182, 100],
   ] as const) {
     lctx.font = `900 ${size}px 'Arial Black', 'Arial Narrow', system-ui, sans-serif`;
     lctx.strokeText(text, 256, y);
@@ -622,7 +600,7 @@ export function buildPub(world: World): PubRefs {
   dartLabelDecal(0.17, boxX + 0.175, CZ, Math.PI / 2); // right side (+x)
   dartLabelDecal(0.17, boxX - 0.175, CZ, -Math.PI / 2); // left side (−x)
   // Dart home slots: the six house darts rest here OUT OF SIGHT (PropSystem
-  // hides any dart resting in the box) until the button hands one out.
+  // hides any dart resting in the box) until you reach in and pull one.
   for (let i = 0; i < darts.rackSlots; i++) {
     const col = i % 3;
     const row = Math.floor(i / 3);
@@ -723,7 +701,6 @@ export function buildPub(world: World): PubRefs {
     dartRackSlots: rackSlots,
     dartBox,
     dartBoxMat: crateWood,
-    dartButton,
     glassSlots,
     dartsBoardPanel,
     dartsResetButton,

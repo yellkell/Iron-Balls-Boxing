@@ -21,7 +21,7 @@
 
 import { createSystem, Grabbed, InputComponent, OneHandGrabbable, type Entity, type World } from '@iwsdk/core';
 import { Group, Object3D, Quaternion, Raycaster, Vector3 } from 'three';
-import { dartFloor, dartStick, glassClink, glassTap, throwWhoosh, uiClick } from '../../audio/sfx.js';
+import { dartFloor, dartStick, glassClink, glassTap, throwWhoosh } from '../../audio/sfx.js';
 import { BLOCKERS, GLASS, PROP_PHYS, PUB, SURFACES } from '../config.js';
 import { pubSendRaw } from '../net.js';
 import type { PropKind, QuatT, Vec3T } from '../protocol.js';
@@ -244,11 +244,9 @@ export class PropSystem extends createSystem({
   private offlineRestock = 0;
   /** The prop the empty hand is currently aimed at — it glows until grabbed. */
   private highlighted: PropRec | null = null;
-  /** Physical dart-button state: dispense cooldown, per-hand re-arm (leave
-   *  the cap before it fires again), and the cap's eased visual sink. */
-  private dartBtnCooldown = 0;
-  private dartBtnArmed: Record<Hand, boolean> = { left: true, right: true };
-  private dartBtnPress = 0;
+  /** Per-hand re-arm for the crate pull: one dart per squeeze-visit — release
+   *  or leave the box before the same hand can pull the next. */
+  private dartPullArmed: Record<Hand, boolean> = { left: true, right: true };
 
   /** Eased glow on the dart-crate walls while a hand can pull a dart (0..1). */
   private dartGlow = 0;
@@ -355,8 +353,8 @@ export class PropSystem extends createSystem({
       }
     }
 
-    this.updateRangeGrab();
-    this.tryDartButton(delta);
+    const didRangeGrab = this.updateRangeGrab();
+    if (!didRangeGrab) this.tryDartBoxDispense();
     this.updateDartBoxGlow(delta);
 
     for (const rec of recs) {
@@ -548,44 +546,33 @@ export class PropSystem extends createSystem({
     this.beginManualGrab(rec, hand, grip);
   }
 
-  /** The dart station's PHYSICAL button: no highlight-and-trigger — you put
-   *  your hand ON the cap like a real arcade button. Contact from a bare hand
-   *  sinks the cap and lands a house dart in that hand; the hand must leave
-   *  the button before it presses again (per-hand re-arm + a short cooldown),
-   *  so resting a palm on it doesn't machine-gun the crate empty. */
-  private tryDartButton(delta: number): void {
+  /** Reach into the crate and squeeze — the beloved original, made RELIABLE:
+   *  grip OR trigger both count (players squeeze whichever), and a hold that
+   *  STARTED before the hand got there still pulls (everyone closes their
+   *  fist on the way in; the old edge-triggered check missed exactly that).
+   *  One dart per squeeze-visit: release or leave the box to re-arm. */
+  private tryDartBoxDispense(): void {
     const refs = pub.refs;
     const player = this.player;
     if (!refs || !player) return;
-    const btn = refs.dartButton;
-    this.dartBtnCooldown = Math.max(0, this.dartBtnCooldown - delta);
-    const [bx, by, bz] = btn.center;
-    let pressing = false;
     for (const hand of HANDS) {
+      const gp = this.input.xr.gamepads[hand];
       const grip = player.gripSpaces[hand];
-      if (!grip) continue;
+      if (!gp || !grip) continue;
+      const squeezing =
+        gp.getButtonPressed(InputComponent.Squeeze) || gp.getButtonPressed(InputComponent.Trigger);
       grip.getWorldPosition(_a);
-      const onButton =
-        Math.abs(_a.x - bx) <= 0.08 && Math.abs(_a.z - bz) <= 0.08 && _a.y - by >= -0.05 && _a.y - by <= 0.1;
-      if (!onButton) {
-        this.dartBtnArmed[hand] = true;
+      const inside = this.inDartBox(_a);
+      if (!inside || !squeezing) {
+        this.dartPullArmed[hand] = true;
         continue;
       }
-      if (this.handBusy(hand)) continue; // a full hand can mash — nothing comes
-      pressing = true;
-      if (this.dartBtnArmed[hand] && this.dartBtnCooldown <= 0) {
-        const rec = this.nextBoxDart();
-        if (!rec) continue;
-        this.dartBtnArmed[hand] = false;
-        this.dartBtnCooldown = 0.45;
-        uiClick();
-        this.grabDartFromBox(rec, hand, grip);
-      }
+      if (this.handBusy(hand) || !this.dartPullArmed[hand]) continue;
+      const rec = this.nextBoxDart();
+      if (!rec) continue;
+      this.dartPullArmed[hand] = false;
+      this.grabDartFromBox(rec, hand, grip);
     }
-    // The cap physically sinks under a pressing hand and springs back after.
-    const k = 1 - Math.exp(-18 * delta);
-    this.dartBtnPress += ((pressing || this.dartBtnCooldown > 0.25 ? 1 : 0) - this.dartBtnPress) * k;
-    btn.cap.position.y = btn.restY - 0.018 * this.dartBtnPress;
   }
 
   /** Glow the whole dart crate amber when an empty hand is in reach to pull a
@@ -596,9 +583,6 @@ export class PropSystem extends createSystem({
     const k = 1 - Math.exp(-12 * delta);
     this.dartGlow += ((this.boxActionable() ? 1 : 0) - this.dartGlow) * k;
     mat.emissiveIntensity = this.dartGlow * 0.9;
-    // The button cap brightens with the same approach cue.
-    const btn = pub.refs?.dartButton;
-    if (btn) btn.capMat.emissiveIntensity = 0.4 + this.dartGlow * 0.75;
   }
 
   /** An empty hand is near enough the stocked crate to pull a dart from it. */
@@ -672,7 +656,12 @@ export class PropSystem extends createSystem({
   }
 
   private gripHeld(hand: Hand): boolean {
-    return (this.input.xr.gamepads[hand]?.getButtonPressed(InputComponent.Squeeze) ?? false);
+    // Grip OR trigger — a dart can be PULLED on either, so either sustains
+    // the hold (a trigger-pulled dart must not fall out of a hand that never
+    // touched the grip). The throw fires when the hand fully opens.
+    const gp = this.input.xr.gamepads[hand];
+    if (!gp) return false;
+    return gp.getButtonPressed(InputComponent.Squeeze) || gp.getButtonPressed(InputComponent.Trigger);
   }
 
   private releaseHeld(rec: PropRec): void {

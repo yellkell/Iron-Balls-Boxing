@@ -6,7 +6,7 @@
  * pushes render it); offline you get a local board so practice still counts.
  */
 
-import { createSystem, InputComponent } from '@iwsdk/core';
+import { createSystem } from '@iwsdk/core';
 import { CanvasTexture, LinearFilter, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, SRGBColorSpace, Vector3 } from 'three';
 import { uiClick } from '../../audio/sfx.js';
 import type { BoardRow } from '../protocol.js';
@@ -22,23 +22,23 @@ interface Popup {
 const HANDS = ['left', 'right'] as const;
 const _btn = new Vector3();
 const _o = new Vector3();
-const _dir = new Vector3();
-const _toBtn = new Vector3();
-const _bq = new Quaternion();
-// The RESET button only lights when a hand's aim cone falls on it from CLOSE —
-// you walk up and press it, so the reach is short (it used to light from across
-// the room). Cap glow at rest vs. when aimed.
-const RESET_AIM_MAX = 1.3;
-const RESET_AIM_CONE_COS = Math.cos((22 * Math.PI) / 180);
+// The RESET button is a PHYSICAL push-button: it warms as a bare hand gets
+// near (walk-up affordance) and fires on CONTACT — no aim cone, no trigger.
+const RESET_NEAR = 0.26; // hand within this of the cap = hot glow
 const RESET_GLOW_REST = 0.45;
-const RESET_GLOW_HOT = 2.6; // white-hot pop when aimed at (paired with a near-white emissive)
+const RESET_GLOW_HOT = 2.6; // white-hot pop when a hand is on/near it
 
 export class DartsSystem extends createSystem({}) {
   private popups: Popup[] = [];
   private localBoard = new Map<string, BoardRow>();
   private _camQ = new Quaternion();
-  /** Whether a hand is currently aimed at the RESET button (drives its glow). */
+  /** Whether a hand is on/near the RESET button (drives its glow). */
   private resetHover = false;
+  /** Per-hand re-arm: a hand must come OFF the cap before it can press again. */
+  private resetArmed: Record<'left' | 'right', boolean> = { left: true, right: true };
+  /** Eased 0..1 press — sinks the cap into its bezel under a touching hand. */
+  private resetPress = 0;
+  private resetRestZ: number | null = null;
 
   init(): void {
     this.cleanupFuncs.push(
@@ -62,7 +62,7 @@ export class DartsSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
-    this.updateResetButton();
+    this.updateResetButton(delta);
     if (this.popups.length) this.camera.getWorldQuaternion(this._camQ);
     for (let i = this.popups.length - 1; i >= 0; i--) {
       const p = this.popups[i];
@@ -80,45 +80,53 @@ export class DartsSystem extends createSystem({}) {
     }
   }
 
-  /** Brighten the red button when a hand aims at it from close; a trigger pull
-   *  wipes the board (server-authoritative online, local offline). */
-  private updateResetButton(): void {
+  /** The RESET button is PHYSICAL: put a hand ON the cap. It warms as a hand
+   *  approaches, sinks into its bezel on contact, wipes the board once per
+   *  press (server-authoritative online, local offline), and re-arms only
+   *  when that hand comes off — no aim cone, no trigger. */
+  private updateResetButton(delta: number): void {
     const btn = pub.refs?.dartsResetButton;
     if (!btn || !this.player) return;
+    this.resetRestZ ??= btn.position.z;
     btn.getWorldPosition(_btn);
 
-    const aimed: Record<'left' | 'right', boolean> = { left: false, right: false };
+    let touching = false;
+    let near = false;
     for (const hand of HANDS) {
-      const ray = this.player.raySpaces[hand];
-      if (!ray) continue;
-      ray.getWorldPosition(_o);
-      ray.getWorldQuaternion(_bq);
-      _dir.set(0, 0, -1).applyQuaternion(_bq).normalize();
-      _toBtn.copy(_btn).sub(_o);
-      const dist = _toBtn.length();
-      if (dist < 1e-3 || dist > RESET_AIM_MAX) continue;
-      if (_toBtn.divideScalar(dist).dot(_dir) < RESET_AIM_CONE_COS) continue;
-      aimed[hand] = true;
+      const grip = this.player.gripSpaces[hand];
+      if (!grip) continue;
+      grip.getWorldPosition(_o);
+      const contact =
+        Math.abs(_o.x - _btn.x) <= 0.07 && Math.abs(_o.y - _btn.y) <= 0.07 && Math.abs(_o.z - _btn.z) <= 0.09;
+      if (_o.distanceTo(_btn) < RESET_NEAR) near = true;
+      if (!contact) {
+        this.resetArmed[hand] = true;
+        continue;
+      }
+      touching = true;
+      if (this.resetArmed[hand]) {
+        this.resetArmed[hand] = false;
+        this.resetBoard();
+      }
     }
 
-    const hot = aimed.left || aimed.right;
+    const hot = near || touching;
     if (hot !== this.resetHover) {
       this.resetHover = hot;
       const mat = btn.material as MeshStandardMaterial;
-      // Shift the EMISSIVE toward white when aimed at — just bumping intensity on
-      // the red emissive only made it a brighter red, never the white pop the
-      // hover should read as. Hot = near-white + high intensity; rest = red.
+      // Shift the EMISSIVE toward white when a hand is close — just bumping
+      // intensity on the red emissive only made it a brighter red, never the
+      // white pop the affordance should read as. Hot = near-white + high
+      // intensity; rest = red.
       mat.emissive.setHex(hot ? 0xfff0f0 : 0xff2a2a);
       mat.emissiveIntensity = hot ? RESET_GLOW_HOT : RESET_GLOW_REST;
     }
 
-    for (const hand of HANDS) {
-      const gp = this.input.xr.gamepads[hand];
-      if (aimed[hand] && gp?.getButtonDown(InputComponent.Trigger)) {
-        this.resetBoard();
-        break;
-      }
-    }
+    // The cap physically sinks toward the wall under a touch, springs back
+    // after (the wall is −z of the cap, which faces +z into the room).
+    const k = 1 - Math.exp(-18 * delta);
+    this.resetPress += ((touching ? 1 : 0) - this.resetPress) * k;
+    btn.position.z = this.resetRestZ - 0.016 * this.resetPress;
   }
 
   private resetBoard(): void {
