@@ -77,7 +77,6 @@ export type WeakPattern = 'both' | 'alternate' | 'double' | 'triple' | 'crown' |
 
 export interface BossDef {
   name: string;
-  epithet: string;
   /** Signature glow colour — eye/visor, core, trims, telegraph strikes. */
   accent: number;
   /** Which bespoke chassis this titan wears. */
@@ -127,7 +126,6 @@ export interface BossDef {
 export const BOSSES: BossDef[] = [
   {
     name: 'RUSTHOOK',
-    epithet: 'the scrapyard sentinel',
     accent: PALETTE.coolFlame,
     style: 'hook',
     scale: 1.25,
@@ -148,7 +146,6 @@ export const BOSSES: BossDef[] = [
   },
   {
     name: 'PISTONKAISER',
-    epithet: 'the forge hammer',
     accent: PALETTE.amber,
     style: 'piston',
     scale: 1.5,
@@ -169,7 +166,6 @@ export const BOSSES: BossDef[] = [
   },
   {
     name: 'VULTURE',
-    epithet: 'arena executioner',
     accent: 0x7cff4a,
     style: 'vulture',
     scale: 1.8,
@@ -190,7 +186,6 @@ export const BOSSES: BossDef[] = [
   },
   {
     name: 'JUGGERNAUT',
-    epithet: 'the rolling fortress',
     accent: 0xb26bff,
     style: 'fortress',
     scale: 2.15,
@@ -211,7 +206,6 @@ export const BOSSES: BossDef[] = [
   },
   {
     name: 'GOLIATH',
-    epithet: 'king of the scrap',
     accent: PALETTE.danger,
     style: 'king',
     scale: 2.6,
@@ -282,7 +276,6 @@ export function raidBoss(def: BossDef, stage: number, raiders: number): BossDef 
  */
 export const GOOPLIATH_DEF: BossDef = {
   name: 'GOOPLIATH',
-  epithet: 'the living tide',
   accent: 0x36e05a,
   style: 'goop',
   scale: GOOPLIATH.scaleCampaign,

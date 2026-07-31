@@ -988,7 +988,9 @@ export class CampaignSystem extends createSystem({
     const titleStart = klaxonTime + riseTime;
     if (this.t >= titleStart && this.t - delta < titleStart) {
       this.entrancePose(1);
-      this.hud.title(this.def.name, this.def.epithet, this.accentCss());
+      // Just the name, big and centred — the epithet sub-lines ("arena
+      // executioner" and kin) are gone; the chassis does the talking.
+      this.hud.title(this.def.name, '', this.accentCss());
       if (!playBossVoice(this.def.name)) sfx.bossRoar(this.def.scale * 0.8);
     }
 
