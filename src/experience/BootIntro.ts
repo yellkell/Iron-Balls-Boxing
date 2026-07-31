@@ -25,6 +25,7 @@ import {
   type Scene,
 } from 'three';
 import { glowTexture } from '../materials/glow.js';
+import { setBootIntroActive } from './introGate.js';
 
 const CARD_SECONDS = 3;
 const FADE_SECONDS = 0.5;
@@ -161,6 +162,7 @@ function drawMark(ctx: CanvasRenderingContext2D, w: number, h: number, logo: HTM
  * VR-comfort anti-pattern.
  */
 export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue: () => void): void {
+  setBootIntroActive(true); // park the menu's pointers behind the curtain
   const shade = new Mesh(
     // Oversized to cover the whole per-eye frustum (see LoadingOverlay).
     // transparent:true (at full opacity) is LOAD-BEARING: it moves the shade
@@ -257,6 +259,7 @@ export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue
     if (finished) return;
     finished = true;
     window.clearInterval(timer);
+    setBootIntroActive(false); // curtain down — the menu takes its pointers back
     try {
       scene.remove(root);
       camera.remove(shade);

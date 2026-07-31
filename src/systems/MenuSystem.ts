@@ -26,6 +26,7 @@ import {
   type Intersection,
 } from 'three';
 import { app, DEFAULT_ACCENT_HUE, DEFAULT_ACCENT_LIGHT, saveAccentHue, saveAccentLight, saveDifficulty, saveEnvironment, saveOnlyBots, saveShootBack, type AppState, type ArcadeMode } from '../menu/appState.js';
+import { bootIntroActive } from '../experience/introGate.js';
 import { DIFFICULTY_ORDER, type Difficulty } from '../config.js';
 import { difficultyUnlocked } from '../campaign/campaignState.js';
 import {
@@ -241,6 +242,14 @@ export class MenuSystem extends createSystem({}) {
     if (app.state !== this.lastState) this.applyState();
     this.applyOwnSkins();
     this.pulseBannerGlow();
+
+    // The BOOT INTRO owns the view: the lobby is live behind the black shade,
+    // so without this the pointers sweep panels nobody can see — chirping the
+    // hover zap through the whole sequence and able to click things blind.
+    if (bootIntroActive()) {
+      this.hidePointers();
+      return;
+    }
 
     if (app.state === 'training' || app.state === 'playing') {
       this.updateActionPanel();

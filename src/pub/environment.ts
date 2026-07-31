@@ -627,6 +627,11 @@ export function buildPub(world: World): PubRefs {
   dartsResetButton.name = 'darts-reset';
   dartsResetButton.rotation.x = Math.PI / 2;
   dartsResetButton.position.set(resetBtnX, resetBtnY, darts.wallZ + 0.05); // proud of the bezel
+  // Off IWSDK's pointer entirely: this is a PHYSICAL button you push with a
+  // hand, so the grab cursor must not light it (or let it be poked) from
+  // across the room. The proximity glow in DartsSystem is its only highlight.
+  dartsResetButton.pointerEvents = 'none';
+  resetBezel.pointerEvents = 'none';
   root.add(dartsResetButton);
 
   // --- IRON SNAKE arcade cabinet (north-west corner) -----------------------------
