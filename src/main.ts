@@ -16,7 +16,8 @@ import { installClubExperienceManager } from './experience/ClubExperienceManager
 import { requestArenaReturn, requestClubEntry } from './experience/clubNavigation.js';
 import { initLeaderboard } from './net/leaderboard.js';
 import { initGazette } from './net/gazette.js';
-import { enterMenuMusic } from './audio/menuMusic.js';
+import { enterMenuMusic, preloadMenuMusic } from './audio/menuMusic.js';
+import { runBootIntro } from './experience/BootIntro.js';
 import { ensureAudio } from './audio/sfx.js';
 import { preloadTutorVoice } from './audio/tutorVoice.js';
 import { app } from './menu/appState.js';
@@ -48,6 +49,26 @@ import { PerfHudSystem } from './systems/PerfHudSystem.js';
 import { FOVEATION, pubUrl } from './config.js';
 
 installCrashTrap(); // headset playtests have no console — trap + persist crashes
+
+// The stash is console-only by design, but the headset HAS no console: visit
+// ?crashes=1 to read it on-device (flat browser), ?crashes=clear to wipe it.
+const crashesParam = new URLSearchParams(location.search).get('crashes');
+if (crashesParam) {
+  const helpers = window as unknown as { ibbCrashes?: () => string[]; ibbClearCrashes?: () => void };
+  const stash = helpers.ibbCrashes?.() ?? [];
+  if (crashesParam === 'clear') helpers.ibbClearCrashes?.();
+  const pre = document.createElement('pre');
+  pre.style.cssText =
+    'position:fixed;inset:12px;z-index:99999;overflow:auto;background:#0b0d12;' +
+    'color:#8ef58e;font:13px/1.6 monospace;padding:14px;white-space:pre-wrap;border:1px solid #2a2f3a';
+  pre.textContent =
+    crashesParam === 'clear'
+      ? 'crash stash cleared'
+      : stash.length
+        ? stash.join('\n\n')
+        : 'no stored crashes';
+  document.body.append(pre);
+}
 
 const container = document.getElementById('scene-container') as HTMLDivElement;
 const enterVrButton = document.getElementById('enter-vr') as HTMLButtonElement | null;
@@ -202,9 +223,15 @@ World.create(container, {
   const vrSupported = (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
   const xrSupported = arSupported || vrSupported;
 
+  let introPlayed = false;
+  let sessionPoll = 0;
+
   const startXR = () => {
     enterVrButton?.setAttribute('disabled', '');
-    enterMenuMusic(); // lobby music (unless muted last time) — within the gesture
+    // Decode starts NOW; playback waits for the boot intro's final cut. (In a
+    // browser this runs within the click gesture, so the AudioContext is
+    // already unlocked by sfx.ts's pointerdown listener.)
+    preloadMenuMusic();
     // A boxer who hasn't run the tutorial is headed straight for it — warm
     // Ember's voice clips now (decode works while the context is young), so
     // her very first "Over here." speaks instead of falling back to caption.
@@ -223,19 +250,32 @@ World.create(container, {
     if (sessionMode === SessionMode.ImmersiveVR && app.environment === 'ar') app.environment = 'desert';
     launchXR(world, { sessionMode });
 
-    const watchForSession = () => {
-      if (world.session) {
-        hideLanding();
-        world.session.addEventListener('end', showLanding, { once: true });
-        return;
+    // Poll for the session on a TIMER, not requestAnimationFrame: Quest
+    // Browser suspends window rAF while an immersive session presents, so an
+    // rAF poll is a race — if the session activates between ticks, the poll
+    // never fires again and everything hung off it (landing hide, boot intro,
+    // the music cue) silently never happens. Timers keep ticking in-session.
+    window.clearInterval(sessionPoll);
+    sessionPoll = window.setInterval(() => {
+      if (!world.session) return;
+      window.clearInterval(sessionPoll);
+      hideLanding();
+      world.session.addEventListener('end', showLanding, { once: true });
+      // XR controller input counts as a user gesture: first press unlocks
+      // the AudioContext on headsets that haven't earned autoplay yet, and
+      // any music already started while suspended simply begins sounding.
+      world.session.addEventListener('select', ensureAudio);
+      if (!introPlayed) {
+        introPlayed = true; // once per page load — relaunches are a fresh page
+        try {
+          runBootIntro(world.camera, enterMenuMusic);
+        } catch {
+          enterMenuMusic(); // curtain failed — never take the music down with it
+        }
+      } else {
+        enterMenuMusic();
       }
-
-      if (!document.body.classList.contains('app-entered')) {
-        requestAnimationFrame(watchForSession);
-      }
-    };
-
-    requestAnimationFrame(watchForSession);
+    }, 50);
     window.setTimeout(() => {
       if (!world.session) enterVrButton?.removeAttribute('disabled');
     }, 4000);

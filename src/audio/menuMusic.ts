@@ -122,9 +122,18 @@ onMusicVolume(() => {
 });
 
 /**
- * Start the lobby music — call once, inside the enter-VR click gesture, so the
- * browser allows playback. No-op if the player muted it on a previous visit or
- * isn't in the lobby.
+ * Kick the track's fetch + decode WITHOUT starting playback — called the
+ * moment the app boots so that by the time the boot intro's cards have run
+ * (6s), the buffer is ready and enterMenuMusic() starts in the same frame.
+ */
+export function preloadMenuMusic(): void {
+  ensureAudio();
+}
+
+/**
+ * Start the lobby music — called when the boot intro's curtain drops (or, in
+ * a plain browser, after the enter-VR click has already unlocked audio).
+ * No-op if the player muted it on a previous visit or isn't in the lobby.
  */
 export function enterMenuMusic(): void {
   entered = true;
