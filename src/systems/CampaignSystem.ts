@@ -2964,10 +2964,14 @@ export class CampaignSystem extends createSystem({
     // Clearing a RUN opens the next difficulty (Normal→Hard→Blazing).
     const unlocked = run && lastStage ? bankDifficultyClear(this.activeDifficulty()) : null;
 
-    // Felling the king crowns you: the CHAMPION pad joins your locker.
-    // (Also granted retroactively to saves that beat GOLIATH pre-reward. The
-    // tide crowns no one — that pad is the KING's bounty.)
-    const crowned = lastStage && !stageGoop && !platformOwned('champion');
+    // Felling the KING crowns you: the CHAMPION pad joins your locker.
+    // Strictly GOLIATH now. The old gate was `lastStage && !stageGoop`, and a
+    // single titan bout is its own last stage — so felling RUSTHOOK in a
+    // one-off line-up bout handed out the crown. Keyed to the boss instead of
+    // the bout shape, any first GOLIATH fell crowns (line-up bout, run stage,
+    // raid finale) and nothing else does. (The tide crowns no one — that pad
+    // is the KING's bounty.)
+    const crowned = this.def.name === 'GOLIATH' && !platformOwned('champion');
     if (crowned) {
       ownPlatform('champion');
       setPlatformSkin('champion');
