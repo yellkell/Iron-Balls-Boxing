@@ -565,9 +565,11 @@ function buildPantherHead(accent: number): Group {
 
 /** VALKYRIE → EAGLE, lofted for accuracy: a sleek rounded raptor skull with
  *  a heavy supraorbital ledge shading fierce side-set eyes, the huge hooked
- *  beak lofted through its real down-curve (cere, nostrils, and a smaller
- *  lower mandible tucked beneath), and a hackle ruff of layered feathers
- *  around the nape instead of a fantasy mohawk. */
+ *  beak lofted through its real down-curve (with cere and nostrils), and a
+ *  hackle ruff of layered feathers around the nape instead of a fantasy
+ *  mohawk. The anatomical lower mandible is deliberately GONE — under the
+ *  giant upper beak it read as a small black tab hanging off the face, and
+ *  the clean single-wedge profile is the look. */
 function buildEagleHead(accent: number): Group {
   const r = BODY_IK.headRadius;
   const g = taggedHead('valkyrie');
@@ -616,19 +618,8 @@ function buildEagleHead(accent: number): Group {
   );
   g.add(beak);
 
-  // The lower mandible scaled up with it, tucked under the cutting edge.
-  const mandible = new Mesh(
-    loftGeometry(
-      [
-        { top: [-0.46, -0.78], bot: [-0.64, -0.7], w: 0.17, n: 1.9 },
-        { top: [-0.5, -1.06], bot: [-0.66, -0.98], w: 0.125, n: 1.85 },
-        { top: [-0.56, -1.32], bot: [-0.64, -1.26], w: 0.055, n: 1.8 },
-      ],
-      r,
-    ),
-    darkMat(),
-  );
-  g.add(mandible);
+  // (No lower mandible — see the note above. The upper beak carries the face
+  // on its own; the cere below still closes the head/beak seam.)
 
   // Cere saddle wrapping the beak root, hiding the head/beak seam, with the
   // two nostril slits ahead of it.
