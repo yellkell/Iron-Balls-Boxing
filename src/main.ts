@@ -228,15 +228,18 @@ World.create(container, {
 
   const startXR = () => {
     enterVrButton?.setAttribute('disabled', '');
-    // Decode starts NOW; playback waits for the boot intro's final cut. (In a
-    // browser this runs within the click gesture, so the AudioContext is
-    // already unlocked by sfx.ts's pointerdown listener.)
+    // Warm the audio engine NOW so the boot intro's music cue lands with a
+    // live context instead of paying resume latency on the cut. On
+    // autoplay-trusted headsets (and inside a browser click gesture) the
+    // context starts running here; on fresh headsets this fails silently and
+    // the first trigger pull unlocks it instead — same as before.
+    ensureAudio();
+    // Decode starts NOW; playback waits for the boot intro's music cue.
     preloadMenuMusic();
     // A boxer who hasn't run the tutorial is headed straight for it — warm
     // Ember's voice clips now (decode works while the context is young), so
     // her very first "Over here." speaks instead of falling back to caption.
     if (!app.tutorialDone) {
-      ensureAudio();
       preloadTutorVoice();
     }
     const sessionMode =

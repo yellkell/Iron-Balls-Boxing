@@ -26,6 +26,13 @@ import {
 const CARD_SECONDS = 3;
 const FADE_SECONDS = 0.5;
 const TOTAL_SECONDS = CARD_SECONDS * 2;
+/** Fire the music cue this far BEFORE the curtain drops: starting a WebAudio
+ *  source carries a beat of output latency (context/hardware spin-up), so a
+ *  cue on the cut itself lands audibly late. This lead makes sound and
+ *  reveal hit together. (Timing is crash-safe by construction — the old
+ *  launch crash was about <audio> elements touching Android's media-session
+ *  bridge, and MusicTrack/WebAudio never goes near it at any start time.) */
+const MUSIC_LEAD_SECONDS = 0.35;
 
 /** Per-card fade envelope: 0.5s in, 2s hold, 0.5s out. */
 function envelope(t: number): number {
@@ -163,10 +170,11 @@ function drawMark(ctx: CanvasRenderingContext2D, w: number, h: number, logo: HTM
 }
 
 /**
- * Play the boot sequence on the given camera. Calls `onDone` exactly once,
- * on the frame the shade drops — start the lobby music there.
+ * Play the boot sequence on the given camera. Fires `onMusicCue` exactly once,
+ * MUSIC_LEAD_SECONDS before the shade drops (and guaranteed no later than
+ * teardown, whatever happens) — hang the lobby music on it.
  */
-export function runBootIntro(camera: PerspectiveCamera, onDone: () => void): void {
+export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void): void {
   const root = new Group();
 
   const shade = new Mesh(
@@ -197,6 +205,13 @@ export function runBootIntro(camera: PerspectiveCamera, onDone: () => void): voi
 
   const started = performance.now();
   let finished = false;
+  let cued = false;
+
+  const cue = (): void => {
+    if (cued) return;
+    cued = true;
+    onMusicCue();
+  };
 
   const finish = (): void => {
     if (finished) return;
@@ -212,12 +227,13 @@ export function runBootIntro(camera: PerspectiveCamera, onDone: () => void): voi
       shade.geometry.dispose();
       (shade.material as MeshBasicMaterial).dispose();
     } finally {
-      onDone(); // whatever happens to the props, the music cue always fires
+      cue(); // whatever happens to the props, the music cue always fires
     }
   };
 
   const timer = window.setInterval(() => {
     const t = (performance.now() - started) / 1000;
+    if (t >= TOTAL_SECONDS - MUSIC_LEAD_SECONDS) cue();
     if (t >= TOTAL_SECONDS) {
       finish();
       return;
