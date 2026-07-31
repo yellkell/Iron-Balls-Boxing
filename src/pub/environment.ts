@@ -484,65 +484,98 @@ export function buildPub(world: World): PubRefs {
   const rackSlots: [number, number, number][] = [];
   const boxX = darts.boardX - 0.85; // toward the bar side, clear of the wall
   const boxZ = darts.ocheZ;
+  // Station metrics: the crate shrank to 65% (the old box read oversized in
+  // the corner) and the stand dropped from bar height to a low side table.
+  // The crate sits toward the BACK of the top; the face-up PRESS button rides
+  // the front edge, where a palm naturally falls.
+  const S = 0.65; // crate scale
+  const TOP = 0.92; // table surface height (was 1.15)
+  const CZ = boxZ - 0.04; // crate centre, pushed back to make button room
   const dartBox = {
-    center: [boxX, 1.3, boxZ] as [number, number, number],
-    half: [0.3, 0.22, 0.24] as [number, number, number],
+    center: [boxX, TOP + 0.08, CZ] as [number, number, number],
+    half: [0.2, 0.14, 0.17] as [number, number, number],
   };
   const crateWood = new MeshStandardMaterial({ map: woodTexture('#7a4a24', [2, 1]), roughness: 0.86, metalness: 0.03 });
   // Shared by all four crate walls — PropSystem lifts its emissive to make the
-  // whole box glow amber when a hand can pull a dart from it.
+  // whole box glow amber when a hand can take a dart from it.
   crateWood.emissive.setHex(0xff9024);
   crateWood.emissiveIntensity = 0;
   const crateDarkWood = new MeshStandardMaterial({ map: woodTexture('#3b2414', [1.5, 1]), roughness: 0.9, metalness: 0.02 });
-  const tallLeg = new Mesh(new CylinderGeometry(0.04, 0.11, 1.13, 8), gunmetal(0.3));
-  tallLeg.position.set(boxX, 0.565, boxZ);
+  const tallLeg = new Mesh(new CylinderGeometry(0.04, 0.11, TOP - 0.02, 8), gunmetal(0.3));
+  tallLeg.position.set(boxX, (TOP - 0.02) / 2, boxZ);
   root.add(tallLeg);
-  const tallTop = new Mesh(new BoxGeometry(0.56, 0.05, 0.46), crateDarkWood);
-  tallTop.position.set(boxX, 1.15, boxZ);
+  const tallTop = new Mesh(new BoxGeometry(0.44, 0.05, 0.42), crateDarkWood);
+  tallTop.position.set(boxX, TOP - 0.025, boxZ);
   root.add(tallTop);
-  // Open wooden crate walls with a small amber rim.
-  const crateBase = new Mesh(new BoxGeometry(0.48, 0.035, 0.38), crateDarkWood);
-  crateBase.position.set(boxX, 1.185, boxZ);
+  // Open wooden crate walls with a small amber rim (crate metrics ride S).
+  const crateBase = new Mesh(new BoxGeometry(0.48 * S, 0.035, 0.38 * S), crateDarkWood);
+  crateBase.position.set(boxX, TOP + 0.0175, CZ);
   root.add(crateBase);
   for (const [bw, bd, ox, oz] of [
-    [0.5, 0.035, 0, -0.185],
-    [0.5, 0.035, 0, 0.185],
-    [0.035, 0.38, -0.245, 0],
-    [0.035, 0.38, 0.245, 0],
+    [0.5 * S, 0.03, 0, -0.185 * S],
+    [0.5 * S, 0.03, 0, 0.185 * S],
+    [0.03, 0.38 * S, -0.245 * S, 0],
+    [0.03, 0.38 * S, 0.245 * S, 0],
   ] as const) {
-    const wall = new Mesh(new BoxGeometry(bw, 0.13, bd), crateWood);
-    wall.position.set(boxX + ox, 1.24, boxZ + oz);
+    const wall = new Mesh(new BoxGeometry(bw, 0.13 * S, bd), crateWood);
+    wall.position.set(boxX + ox, TOP + 0.078, CZ + oz);
     root.add(wall);
   }
   for (const [ox, oz] of [
-    [-0.245, -0.185],
-    [0.245, -0.185],
-    [-0.245, 0.185],
-    [0.245, 0.185],
+    [-0.245 * S, -0.185 * S],
+    [0.245 * S, -0.185 * S],
+    [-0.245 * S, 0.185 * S],
+    [0.245 * S, 0.185 * S],
   ] as const) {
-    const post = new Mesh(new BoxGeometry(0.045, 0.17, 0.045), crateDarkWood);
-    post.position.set(boxX + ox, 1.255, boxZ + oz);
+    const post = new Mesh(new BoxGeometry(0.04, 0.17 * S, 0.04), crateDarkWood);
+    post.position.set(boxX + ox, TOP + 0.09, CZ + oz);
     root.add(post);
   }
-  const lip = new Mesh(new BoxGeometry(0.54, 0.015, 0.42), amberGlow(0.18));
-  lip.position.set(boxX, 1.285, boxZ);
+  const lip = new Mesh(new BoxGeometry(0.54 * S, 0.015, 0.42 * S), amberGlow(0.18));
+  lip.position.set(boxX, TOP + 0.115, CZ);
   root.add(lip);
-  // "GRAB DARTS" painted across the crate floor, lit amber so it reads in the
-  // gloom. The box no longer shows darts poking out — PropSystem keeps any dart
-  // resting here hidden, so the label IS the prompt: reach in to pull one.
+  // The PRESS button — the darts RESET button's anatomy (gunmetal bezel +
+  // glowing cap) laid face-up on the table's front edge. PropSystem detects a
+  // bare hand landing on it, sinks the cap, and puts a dart in that hand.
+  const btnZ = boxZ + 0.15;
+  const btnBezel = new Mesh(new CylinderGeometry(0.055, 0.06, 0.024, 24), gunmetal(0.4));
+  btnBezel.position.set(boxX, TOP + 0.012, btnZ);
+  root.add(btnBezel);
+  const dartBtnMat = new MeshStandardMaterial({
+    color: 0xff9024,
+    emissive: 0xff9024,
+    emissiveIntensity: 0.4,
+    roughness: 0.35,
+    metalness: 0.1,
+  });
+  const dartButtonCap = new Mesh(new CylinderGeometry(0.042, 0.046, 0.045, 24), dartBtnMat);
+  dartButtonCap.position.set(boxX, TOP + 0.04, btnZ);
+  root.add(dartButtonCap);
+  const dartButton = {
+    center: [boxX, TOP + 0.045, btnZ] as [number, number, number],
+    cap: dartButtonCap,
+    capMat: dartBtnMat,
+    restY: TOP + 0.04,
+  };
+  // "PRESS FOR DARTS" painted across the crate floor, lit amber so it reads
+  // in the gloom. The box never shows darts — PropSystem keeps any dart
+  // resting here hidden — so the label teaches the button: press, don't fish.
   const labelCanvas = document.createElement('canvas');
   labelCanvas.width = 512;
   labelCanvas.height = 256;
   const lctx = labelCanvas.getContext('2d')!;
   lctx.textAlign = 'center';
   lctx.textBaseline = 'middle';
-  lctx.font = "900 100px 'Arial Black', 'Arial Narrow', system-ui, sans-serif";
   lctx.lineWidth = 13;
   lctx.strokeStyle = 'rgba(6,5,4,0.92)';
   lctx.fillStyle = '#ffb000';
   lctx.shadowColor = '#ff7a18';
   lctx.shadowBlur = 24;
-  for (const [text, y] of [['GRAB', 74], ['DARTS', 182]] as const) {
+  for (const [text, y, size] of [
+    ['PRESS', 74, 100],
+    ['FOR DARTS', 182, 76],
+  ] as const) {
+    lctx.font = `900 ${size}px 'Arial Black', 'Arial Narrow', system-ui, sans-serif`;
     lctx.strokeText(text, 256, y);
     lctx.fillText(text, 256, y);
   }
@@ -550,12 +583,12 @@ export function buildPub(world: World): PubRefs {
   labelTex.colorSpace = SRGBColorSpace;
   labelTex.minFilter = LinearFilter;
   const dartBoxLabel = new Mesh(
-    new PlaneGeometry(0.34, 0.26),
+    new PlaneGeometry(0.34 * S, 0.26 * S),
     new MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false }),
   );
   dartBoxLabel.name = 'dart-box-label';
   dartBoxLabel.rotation.x = -Math.PI / 2; // lie flat in the crate, facing up
-  dartBoxLabel.position.set(boxX, 1.205, boxZ); // just proud of the crate floor
+  dartBoxLabel.position.set(boxX, TOP + 0.038, CZ); // just proud of the crate floor
   root.add(dartBoxLabel);
   // "DARTS" stencilled on the crate's outer faces so the box reads as the dart
   // supply from across the room (the GRAB DARTS prompt inside only shows when
@@ -580,20 +613,20 @@ export function buildPub(world: World): PubRefs {
   const sideMat = new MeshBasicMaterial({ map: sideTex, transparent: true, depthWrite: false });
   const dartLabelDecal = (w: number, x: number, z: number, ry: number): void => {
     const m = new Mesh(new PlaneGeometry(w, w * (96 / 256)), sideMat);
-    m.position.set(x, 1.24, z);
+    m.position.set(x, TOP + 0.078, z);
     m.rotation.y = ry;
     root.add(m);
   };
-  dartLabelDecal(0.32, boxX, boxZ + 0.205, 0); // room-facing front (+z)
-  dartLabelDecal(0.32, boxX, boxZ - 0.205, Math.PI); // back (−z)
-  dartLabelDecal(0.26, boxX + 0.265, boxZ, Math.PI / 2); // right side (+x)
-  dartLabelDecal(0.26, boxX - 0.265, boxZ, -Math.PI / 2); // left side (−x)
+  dartLabelDecal(0.21, boxX, CZ + 0.135, 0); // room-facing front (+z)
+  dartLabelDecal(0.21, boxX, CZ - 0.135, Math.PI); // back (−z)
+  dartLabelDecal(0.17, boxX + 0.175, CZ, Math.PI / 2); // right side (+x)
+  dartLabelDecal(0.17, boxX - 0.175, CZ, -Math.PI / 2); // left side (−x)
   // Dart home slots: the six house darts rest here OUT OF SIGHT (PropSystem
-  // hides any dart resting in the box) until you reach in and pull one.
+  // hides any dart resting in the box) until the button hands one out.
   for (let i = 0; i < darts.rackSlots; i++) {
     const col = i % 3;
     const row = Math.floor(i / 3);
-    rackSlots.push([boxX - 0.12 + col * 0.12, 1.3, boxZ - 0.08 + row * 0.16]);
+    rackSlots.push([boxX + (col - 1) * 0.12 * S, TOP + 0.09, CZ + (row - 0.5) * 0.16 * S]);
   }
 
   // Leaderboard panel on the wall, between the board and the bar.
@@ -690,6 +723,7 @@ export function buildPub(world: World): PubRefs {
     dartRackSlots: rackSlots,
     dartBox,
     dartBoxMat: crateWood,
+    dartButton,
     glassSlots,
     dartsBoardPanel,
     dartsResetButton,

@@ -21,8 +21,8 @@
 
 import { createSystem, Grabbed, InputComponent, OneHandGrabbable, type Entity, type World } from '@iwsdk/core';
 import { Group, Object3D, Quaternion, Raycaster, Vector3 } from 'three';
-import { dartFloor, dartStick, glassClink, glassTap, throwWhoosh } from '../../audio/sfx.js';
-import { GLASS, PROP_PHYS, PUB, SURFACES } from '../config.js';
+import { dartFloor, dartStick, glassClink, glassTap, throwWhoosh, uiClick } from '../../audio/sfx.js';
+import { BLOCKERS, GLASS, PROP_PHYS, PUB, SURFACES } from '../config.js';
 import { pubSendRaw } from '../net.js';
 import type { PropKind, QuatT, Vec3T } from '../protocol.js';
 import { buildDart, buildPintGlass, fadeOpacity, restoreOpacity, setGlassFill, setPropHighlight } from '../props.js';
@@ -244,6 +244,12 @@ export class PropSystem extends createSystem({
   private offlineRestock = 0;
   /** The prop the empty hand is currently aimed at — it glows until grabbed. */
   private highlighted: PropRec | null = null;
+  /** Physical dart-button state: dispense cooldown, per-hand re-arm (leave
+   *  the cap before it fires again), and the cap's eased visual sink. */
+  private dartBtnCooldown = 0;
+  private dartBtnArmed: Record<Hand, boolean> = { left: true, right: true };
+  private dartBtnPress = 0;
+
   /** Eased glow on the dart-crate walls while a hand can pull a dart (0..1). */
   private dartGlow = 0;
 
@@ -349,8 +355,8 @@ export class PropSystem extends createSystem({
       }
     }
 
-    const didRangeGrab = this.updateRangeGrab();
-    if (!didRangeGrab) this.tryDartBoxDispense();
+    this.updateRangeGrab();
+    this.tryDartButton(delta);
     this.updateDartBoxGlow(delta);
 
     for (const rec of recs) {
@@ -542,21 +548,44 @@ export class PropSystem extends createSystem({
     this.beginManualGrab(rec, hand, grip);
   }
 
-  private tryDartBoxDispense(): void {
+  /** The dart station's PHYSICAL button: no highlight-and-trigger — you put
+   *  your hand ON the cap like a real arcade button. Contact from a bare hand
+   *  sinks the cap and lands a house dart in that hand; the hand must leave
+   *  the button before it presses again (per-hand re-arm + a short cooldown),
+   *  so resting a palm on it doesn't machine-gun the crate empty. */
+  private tryDartButton(delta: number): void {
     const refs = pub.refs;
     const player = this.player;
     if (!refs || !player) return;
+    const btn = refs.dartButton;
+    this.dartBtnCooldown = Math.max(0, this.dartBtnCooldown - delta);
+    const [bx, by, bz] = btn.center;
+    let pressing = false;
     for (const hand of HANDS) {
-      if (this.handBusy(hand)) continue; // a full hand can't draw a second dart
-      const gp = this.input.xr.gamepads[hand];
       const grip = player.gripSpaces[hand];
-      if (!gp || !grip || !gp.getButtonDown(InputComponent.Squeeze)) continue;
+      if (!grip) continue;
       grip.getWorldPosition(_a);
-      if (!this.inDartBox(_a)) continue;
-      const rec = this.nextBoxDart();
-      if (!rec) continue;
-      this.grabDartFromBox(rec, hand, grip);
+      const onButton =
+        Math.abs(_a.x - bx) <= 0.08 && Math.abs(_a.z - bz) <= 0.08 && _a.y - by >= -0.05 && _a.y - by <= 0.1;
+      if (!onButton) {
+        this.dartBtnArmed[hand] = true;
+        continue;
+      }
+      if (this.handBusy(hand)) continue; // a full hand can mash — nothing comes
+      pressing = true;
+      if (this.dartBtnArmed[hand] && this.dartBtnCooldown <= 0) {
+        const rec = this.nextBoxDart();
+        if (!rec) continue;
+        this.dartBtnArmed[hand] = false;
+        this.dartBtnCooldown = 0.45;
+        uiClick();
+        this.grabDartFromBox(rec, hand, grip);
+      }
     }
+    // The cap physically sinks under a pressing hand and springs back after.
+    const k = 1 - Math.exp(-18 * delta);
+    this.dartBtnPress += ((pressing || this.dartBtnCooldown > 0.25 ? 1 : 0) - this.dartBtnPress) * k;
+    btn.cap.position.y = btn.restY - 0.018 * this.dartBtnPress;
   }
 
   /** Glow the whole dart crate amber when an empty hand is in reach to pull a
@@ -567,6 +596,9 @@ export class PropSystem extends createSystem({
     const k = 1 - Math.exp(-12 * delta);
     this.dartGlow += ((this.boxActionable() ? 1 : 0) - this.dartGlow) * k;
     mat.emissiveIntensity = this.dartGlow * 0.9;
+    // The button cap brightens with the same approach cue.
+    const btn = pub.refs?.dartButton;
+    if (btn) btn.capMat.emissiveIntensity = 0.4 + this.dartGlow * 0.75;
   }
 
   /** An empty hand is near enough the stocked crate to pull a dart from it. */
@@ -726,6 +758,46 @@ export class PropSystem extends createSystem({
       p.y = PUB.ceiling - _glassBoundsY.max;
       rec.vel.y *= -PROP_PHYS.restitution;
       rec.angVel.multiplyScalar(PROP_PHYS.spinDamping);
+    }
+
+    // Solid furniture (bar body, bench seating): push the glass out along the
+    // least-penetrated axis and reflect that axis' velocity — a pint now
+    // bounces off the bar's front panel and the seats instead of sailing
+    // through them. Tops defer to SURFACES (blockers stop a hair lower), so
+    // landing/settling from above is untouched; the top-skim branch below
+    // exists for the slivers that AREN'T surfaces (the backrest rail), where
+    // a slow glass must rest instead of micro-bouncing (and tapping) forever.
+    for (const blk of BLOCKERS) {
+      const penX = Math.min(p.x + _glassBoundsX.max, blk.maxX) - Math.max(p.x + _glassBoundsX.min, blk.minX);
+      if (penX <= 0) continue;
+      const penY = Math.min(p.y + _glassBoundsY.max, blk.maxY) - Math.max(p.y + _glassBoundsY.min, blk.minY);
+      if (penY <= 0) continue;
+      const penZ = Math.min(p.z + _glassBoundsZ.max, blk.maxZ) - Math.max(p.z + _glassBoundsZ.min, blk.minZ);
+      if (penZ <= 0) continue;
+      if (penY <= penX && penY <= penZ) {
+        const above = p.y >= (blk.minY + blk.maxY) / 2;
+        p.y += above ? penY : -penY;
+        if (above && rec.vel.y <= 0 && rec.vel.y > -0.35) {
+          // Skimming a blocker top: hold it, let friction grind it to rest.
+          rec.vel.y = 0;
+          const f = Math.exp(-PROP_PHYS.slideFriction * delta);
+          rec.vel.x *= f;
+          rec.vel.z *= f;
+          rec.angVel.multiplyScalar(f);
+        } else {
+          if (Math.abs(rec.vel.y) > 0.35) glassTap(true);
+          rec.vel.y = (above ? 1 : -1) * Math.abs(rec.vel.y) * PROP_PHYS.restitution;
+          rec.angVel.multiplyScalar(PROP_PHYS.spinDamping);
+        }
+      } else if (penX <= penZ) {
+        p.x += p.x >= (blk.minX + blk.maxX) / 2 ? penX : -penX;
+        if (Math.abs(rec.vel.x) > 0.5) glassTap(true);
+        rec.vel.x *= -PROP_PHYS.restitution;
+      } else {
+        p.z += p.z >= (blk.minZ + blk.maxZ) / 2 ? penZ : -penZ;
+        if (Math.abs(rec.vel.z) > 0.5) glassTap(true);
+        rec.vel.z *= -PROP_PHYS.restitution;
+      }
     }
 
     // Floor + table/bar tops. Test the lowest point of the complete tilted

@@ -273,6 +273,12 @@ export interface Surface {
   maxZ: number;
 }
 
+// Banquette run extents — MUST match environment.ts buildBanquette (x0/x1 are
+// centres ± 1.0; plinth spans z HALF_D−1.0…HALF_D; cushion top is
+// STEP 0.12 + 0.37 + 0.05 = 0.54; the tufted back rises to 1.35).
+const BANQ_X0 = BOOTH_CENTRES[0] - 1.0;
+const BANQ_X1 = BOOTH_CENTRES[BOOTH_CENTRES.length - 1] + 1.0;
+
 export const SURFACES: Surface[] = [
   // Bar counter top.
   {
@@ -293,6 +299,56 @@ export const SURFACES: Surface[] = [
     maxX: cx + 0.35,
     minZ: HALF_D - 1.8,
     maxZ: HALF_D - 1.1,
+  })),
+  // Banquette seat cushion — a pint can land and SETTLE on the bench like a
+  // regular's, in front of the tufted back.
+  { y: 0.54, minX: BANQ_X0, maxX: BANQ_X1, minZ: HALF_D - 1.05, maxZ: HALF_D - 0.3 },
+  // The freestanding booth benches across the tables (pad top 0.35 + 0.045).
+  ...BOOTH_CENTRES.map((cx) => ({
+    y: 0.395,
+    minX: cx - 0.45,
+    maxX: cx + 0.45,
+    minZ: HALF_D - 2.15,
+    maxZ: HALF_D - 1.75,
+  })),
+];
+
+/** Solid furniture a thrown glass bounces OFF instead of sailing through —
+ *  the collision model only knew horizontal TOPS, so a pint lobbed at the
+ *  bar's front panel vanished into the barkeep's aisle and one thrown at the
+ *  wall benches passed clean through the seats. Tops sit a hair BELOW their
+ *  SURFACES twin so landing-from-above stays the surface code's job. */
+export interface Blocker {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export const BLOCKERS: Blocker[] = [
+  // Bar body: floor to just under the counter top, the full counter footprint.
+  {
+    minX: -PUB.bar.halfLength,
+    maxX: PUB.bar.halfLength,
+    minY: 0,
+    maxY: PUB.bar.top - 0.02,
+    minZ: PUB.bar.z - PUB.bar.depth,
+    maxZ: PUB.bar.z,
+  },
+  // Banquette plinth + bench, floor to just under the cushion top.
+  { minX: BANQ_X0, maxX: BANQ_X1, minY: 0, maxY: 0.53, minZ: HALF_D - 1.05, maxZ: HALF_D },
+  // Its channel-tufted back, up to the capping rail.
+  { minX: BANQ_X0, maxX: BANQ_X1, minY: 0, maxY: 1.35, minZ: HALF_D - 0.3, maxZ: HALF_D },
+  // The freestanding booth benches (seat box + low back as one block).
+  ...BOOTH_CENTRES.map((cx) => ({
+    minX: cx - 0.45,
+    maxX: cx + 0.45,
+    minY: 0,
+    maxY: 0.385,
+    minZ: HALF_D - 2.17,
+    maxZ: HALF_D - 1.75,
   })),
 ];
 

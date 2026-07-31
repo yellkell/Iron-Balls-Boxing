@@ -49,8 +49,11 @@ export interface PubRefs {
   /** World-space dispenser volume: grip inside this box to pull a house dart. */
   dartBox: { center: [number, number, number]; half: [number, number, number] };
   /** The crate-wall material — its emissive lifts to glow the box when a hand
-   *  can pull a dart (set by PropSystem). */
+   *  can take a dart (set by PropSystem). */
   dartBoxMat: MeshStandardMaterial;
+  /** The face-up PRESS button on the dart table: land a bare hand on the cap
+   *  and a house dart appears in it. PropSystem drives press + dispense. */
+  dartButton: { center: [number, number, number]; cap: Mesh; capMat: MeshStandardMaterial; restY: number };
   glassSlots: [number, number, number][];
   dartsBoardPanel: Panel;
   /** The red RESET push-button beneath the leaderboard — wipes the chalkboard.
