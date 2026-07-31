@@ -14,24 +14,28 @@
  * Playback rides the SFX volume knob (it's diegetic arena noise, not
  * music). CampaignSystem preloads at stage setup so the file has the whole
  * klaxon + rise (1.9–3.8s) to arrive before its cue.
+ *
+ * MusicTrack (WebAudio), never `new Audio()`: a media element here would be
+ * the arena's first — and a crash on the boss's name card (the Meta Browser
+ * media-session NPE, see musicTrack.ts) is the worst possible timing.
  */
 
+import { MusicTrack } from './musicTrack.js';
 import { sfxVolume } from './sfx.js';
 
 const VOLUME = 0.9; // over the sfx knob — the one voice in the arena, let it carry
 
-type Slot = { audio: HTMLAudioElement; state: 'loading' | 'ready' | 'missing' };
+type Slot = { track: MusicTrack; state: 'loading' | 'ready' | 'missing' };
 const slots = new Map<string, Slot>();
 
 function slotFor(name: string): Slot {
   const key = name.toLowerCase();
   let slot = slots.get(key);
   if (!slot) {
-    const audio = new Audio(`voice/${key}.m4a`);
-    audio.preload = 'auto';
-    slot = { audio, state: 'loading' };
-    audio.addEventListener('canplaythrough', () => (slot!.state = 'ready'), { once: true });
-    audio.addEventListener('error', () => (slot!.state = 'missing'), { once: true });
+    const track = new MusicTrack(`voice/${key}.m4a`);
+    const made: Slot = { track, state: 'loading' };
+    void track.preload().then((ok) => (made.state = ok ? 'ready' : 'missing'));
+    slot = made;
     slots.set(key, slot);
   }
   return slot;
@@ -50,10 +54,10 @@ export function preloadBossVoice(name: string): void {
 export function playBossVoice(name: string): boolean {
   const slot = slotFor(name);
   if (slot.state !== 'ready') return false;
-  slot.audio.volume = Math.min(1, VOLUME * sfxVolume());
-  slot.audio.currentTime = 0;
-  void slot.audio.play().catch(() => {
-    /* autoplay refusal — the roar already ceded its slot, accept the miss */
+  slot.track.volume = Math.min(1, VOLUME * sfxVolume());
+  slot.track.currentTime = 0;
+  void slot.track.play().catch(() => {
+    /* decode surprise — the roar already ceded its slot, accept the miss */
   });
   return true;
 }

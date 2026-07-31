@@ -31,6 +31,18 @@ interface LoadedTrack {
 
 const bufferCache = new Map<string, Promise<LoadedTrack | null>>();
 
+async function decodeTrack(url: string): Promise<LoadedTrack | null> {
+  const ctx = audioContext();
+  if (!ctx) return null;
+  try {
+    const res = await fetch(url);
+    const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    return { buffer, head: firstAudibleSecond(buffer) };
+  } catch {
+    return null; // fetch/decode failed — the track just stays silent
+  }
+}
+
 function firstAudibleSecond(buffer: AudioBuffer): number {
   // Windowed RMS, not first-sample-over-threshold: real exports carry dither
   // and stray clicks in their "silent" head (Smoldering has a -66 dB blip in
@@ -53,17 +65,7 @@ function firstAudibleSecond(buffer: AudioBuffer): number {
 function loadBuffer(url: string): Promise<LoadedTrack | null> {
   let pending = bufferCache.get(url);
   if (!pending) {
-    pending = (async () => {
-      const ctx = audioContext();
-      if (!ctx) return null;
-      try {
-        const res = await fetch(url);
-        const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
-        return { buffer, head: firstAudibleSecond(buffer) };
-      } catch {
-        return null; // fetch/decode failed — the track just stays silent
-      }
-    })();
+    pending = decodeTrack(url);
     bufferCache.set(url, pending);
   }
   return pending;
@@ -83,16 +85,38 @@ export class MusicTrack {
   private _playing = false;
   private _ended = false;
   private _playSeq = 0; // invalidates in-flight play() decodes on pause/src swap
+  /** Cached mode (default) keeps decoded buffers in the module-wide cache —
+   *  right for the handful of score tracks that replay all session. Uncached
+   *  mode holds ONE decode on the instance and drops it on src swap — for the
+   *  jukebox, where songs are full-length and cycling through the catalogue
+   *  must not pile hundreds of decoded MB onto a Quest. */
+  private _cache = true;
+  private _uncached: { url: string; pending: Promise<LoadedTrack | null> } | null = null;
 
-  constructor(src?: string) {
+  constructor(src?: string, opts?: { cache?: boolean }) {
+    this._cache = opts?.cache !== false;
     if (src) this.src = src;
+  }
+
+  private load(url: string): Promise<LoadedTrack | null> {
+    if (this._cache) return loadBuffer(url);
+    if (this._uncached?.url !== url) this._uncached = { url, pending: decodeTrack(url) };
+    return this._uncached.pending;
+  }
+
+  /** Kick (or join) the decode without playing: true = ready, false = failed.
+   *  The element-era 'canplaythrough'/'error' readiness signal, as a promise. */
+  preload(): Promise<boolean> {
+    if (!this._src) return Promise.resolve(false);
+    return this.load(this._src).then((loaded) => loaded !== null);
   }
 
   get src(): string {
     return this._src;
   }
 
-  /** Swapping the source stops playback and rewinds, like an element would. */
+  /** Swapping the source stops playback and rewinds, like an element would.
+   *  In uncached mode the old decode is dropped here (GC reclaims it). */
   set src(url: string) {
     if (url === this._src) return;
     this._playSeq += 1;
@@ -101,8 +125,9 @@ export class MusicTrack {
     this._ended = false;
     this._offset = 0;
     this._buffer = null;
+    this._uncached = null;
     this._src = url;
-    void loadBuffer(url); // start decoding now so play() lands fast
+    if (url) void this.load(url); // start decoding now so play() lands fast
   }
 
   get volume(): number {
@@ -156,7 +181,7 @@ export class MusicTrack {
     if (ctx.state === 'suspended') void ctx.resume();
     this._playing = true;
     const seq = ++this._playSeq;
-    return loadBuffer(this._src).then((loaded) => {
+    return this.load(this._src).then((loaded) => {
       if (seq !== this._playSeq) return; // paused or re-pointed mid-decode
       if (!loaded) {
         this._playing = false;

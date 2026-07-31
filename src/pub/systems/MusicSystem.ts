@@ -7,15 +7,19 @@
  * that asks the server, which broadcasts the choice to everyone, so the room
  * always hears the same thing (and late joiners catch whatever's on).
  *
- * Each track is a plain <audio> element pointed at the bundled file. The
- * selected song plays ONCE and then stops — it does NOT loop; feed another coin
- * to start the NEXT track. We roll the element's own `volume` with distance to
- * the cabinet and duck it while anyone's talking — the walk-up "louder up
- * close" feel, no Web Audio routing needed for same-origin files.
+ * Playback rides ONE shared MusicTrack (WebAudio, uncached so cycling the
+ * catalogue never piles decoded songs into Quest memory) — NEVER an <audio>
+ * element: an audible media element trips Meta Browser's media-session crash
+ * (see musicTrack.ts), and since the launch-music fix the jukebox would be
+ * the session's FIRST media element — the coin-drop crash. The selected song
+ * plays ONCE and then stops — it does NOT loop; feed another coin to start
+ * the NEXT track. We roll the track's `volume` with distance to the cabinet
+ * and duck it while anyone's talking — the walk-up "louder up close" feel.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { MusicTrack } from '../../audio/musicTrack.js';
 import { uiClick } from '../../audio/sfx.js';
 import { JUKEBOX } from '../config.js';
 import { TRACKS } from '../songs.js';
@@ -43,8 +47,8 @@ const JUKE_AIM_Y = 1.1; // aim at the cabinet body, not its floor-level origin
 const MARQUEE_SCROLL_SPEED = 70; // px/s a too-long title scrolls across the screen
 
 export class MusicSystem extends createSystem({}) {
-  /** One <audio> per track, created the first time that track is selected. */
-  private audios: (HTMLAudioElement | null)[] = TRACKS.map(() => null);
+  /** The one shared player — src swaps per station, dropping the old decode. */
+  private audio: MusicTrack | null = null;
   /** Track currently playing locally (−1 = off) — mirrors pub.music. */
   private station = -1;
   /** A play() the browser blocked (autoplay policy) — retry on the next trigger. */
@@ -66,9 +70,11 @@ export class MusicSystem extends createSystem({}) {
   /** Set by the last render: does the main line overflow (and so scroll)? */
   private marqueeScrolls = false;
 
-  /** Silence every jukebox element when the shared app returns to the arena. */
+  /** Silence the jukebox when the shared app returns to the arena — and drop
+   *  the decoded song (src = '') so the pub's memory goes back with you. */
   leaveClub(): void {
-    for (const audio of this.audios) audio?.pause();
+    this.audio?.pause();
+    if (this.audio) this.audio.src = '';
     this.station = -1;
     this.pendingPlay = false;
     this.ended = false;
@@ -141,7 +147,7 @@ export class MusicSystem extends createSystem({}) {
     if (this.pendingPlay && triggered) this.resume();
 
     // Distance volume + voice duck on the active station.
-    const audio = this.station >= 0 ? this.audios[this.station] : null;
+    const audio = this.station >= 0 ? this.audio : null;
     if (audio) {
       const fade = (JUKEBOX.hearFar - jukeDist) / (JUKEBOX.hearFar - JUKEBOX.hearNear);
       let vol = JUKEBOX.volume * Math.max(0, Math.min(1, fade));
@@ -178,33 +184,41 @@ export class MusicSystem extends createSystem({}) {
     this.setStation(next); // optimistic; the server's echo is idempotent
   }
 
-  /** Switch to `s` (−1 = off): stop the old stream, start the new, redraw the marquee. */
+  /** Switch to `s` (−1 = off): stop the old song, start the new, redraw the marquee. */
   private setStation(s: number): void {
     if (s === this.station) return;
-    const old = this.station >= 0 ? this.audios[this.station] : null;
-    old?.pause();
+    this.audio?.pause();
     this.station = s;
     this.pendingPlay = false;
     this.ended = false;
     this.signal = 'connecting';
     if (s >= 0 && s < TRACKS.length) {
-      const audio = this.ensureAudio(s);
-      try {
-        audio.currentTime = 0; // always start a freshly-picked track from the top
-      } catch {
-        /* not seekable yet — it'll start at 0 anyway */
-      }
+      const audio = this.ensureAudio();
+      audio.src = TRACKS[s].url; // swap drops the previous song's decode
+      audio.currentTime = 0; // always start a freshly-picked track from the top
       audio.volume = 0; // the update loop sets the real level from distance
-      audio.play().catch((e: unknown) => this.onPlayReject(e));
+      this.startPlayback(s, audio);
     }
     this.drawMarquee();
+  }
+
+  /** Kick playback and map the outcome onto the marquee: a resolved play()
+   *  is the old element's 'playing' event, a rejection its 'error'. */
+  private startPlayback(s: number, audio: MusicTrack): void {
+    audio.play().then(
+      () => {
+        if (s === this.station) this.setSignal('live');
+      },
+      (e: unknown) => {
+        if (s === this.station) this.onPlayReject(e);
+      },
+    );
   }
 
   /** Retry a play() the autoplay policy blocked — driven by a fresh trigger gesture. */
   private resume(): void {
     this.pendingPlay = false;
-    const audio = this.station >= 0 ? this.audios[this.station] : null;
-    audio?.play().catch((e: unknown) => this.onPlayReject(e));
+    if (this.station >= 0 && this.audio) this.startPlayback(this.station, this.audio);
   }
 
   /** Tell an autoplay block (retry on a gesture) from a dead stream (show it). */
@@ -219,33 +233,20 @@ export class MusicSystem extends createSystem({}) {
     this.drawMarquee();
   }
 
-  private ensureAudio(s: number): HTMLAudioElement {
-    let audio = this.audios[s];
-    if (!audio) {
-      audio = new Audio(TRACKS[s].url);
-      audio.preload = 'none';
-      audio.loop = false; // play once, then stop — a coin starts the next track
-      audio.crossOrigin = null; // same-origin bundled file — no CORS need
-      audio.volume = 0;
-      // A file that won't decode shows "no signal" (skippable); a real start
-      // flips the marquee to playing.
-      audio.addEventListener('playing', () => {
-        if (s === this.station) this.setSignal('live');
-      });
-      audio.addEventListener('error', () => {
-        if (s === this.station) this.setSignal('nosignal');
-      });
+  private ensureAudio(): MusicTrack {
+    if (!this.audio) {
+      this.audio = new MusicTrack(undefined, { cache: false });
+      this.audio.loop = false; // play once, then stop — a coin starts the next track
+      this.audio.volume = 0;
       // Reached the end on its own: stop here (don't replay) and prompt for a
-      // coin — the next one advances to the next track.
-      audio.addEventListener('ended', () => {
-        if (s === this.station) {
-          this.ended = true;
-          this.drawMarquee();
-        }
-      });
-      this.audios[s] = audio;
+      // coin — the next one advances to the next track. (Manual stops/src
+      // swaps never fire onended, so no station check is needed.)
+      this.audio.onended = () => {
+        this.ended = true;
+        this.drawMarquee();
+      };
     }
-    return audio;
+    return this.audio;
   }
 
   /** Work out what the marquee should say, reset the scroll, and paint it. */
