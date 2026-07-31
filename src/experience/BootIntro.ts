@@ -24,6 +24,7 @@ import {
   type PerspectiveCamera,
   type Scene,
 } from 'three';
+import { glowTexture } from '../materials/glow.js';
 
 const CARD_SECONDS = 3;
 const FADE_SECONDS = 0.5;
@@ -96,26 +97,10 @@ function drawPublisher(ctx: CanvasRenderingContext2D, w: number, h: number): voi
   ctx.fillText('P R E S E N T S', cx, h / 2 + 84);
 }
 
-/** Soft elliptical red pool behind the mark. Elliptical and sized to reach
- *  zero BEFORE the canvas borders — a circular pool tall enough to glow gets
- *  guillotined by the 1280x640 canvas top/bottom, which reads as faint square
- *  edges against the void. */
-function drawPool(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(1, 0.5);
-  const pool = ctx.createRadialGradient(0, 0, 20, 0, 0, 580);
-  pool.addColorStop(0, 'rgba(196,18,8,0.55)');
-  pool.addColorStop(0.55, 'rgba(196,18,8,0.18)');
-  pool.addColorStop(1, 'rgba(196,18,8,0)');
-  ctx.fillStyle = pool;
-  ctx.fillRect(-640, -640, 1280, 1280);
-  ctx.restore();
-}
-
 /** The FIRE FIGHT mark — the committed neon sign art when available (same
- *  crop as LoadingOverlay), else the banner's stencil colourway. The red
- *  pool sits behind either, echoing the lobby sign's breathing glow. */
+ *  crop as LoadingOverlay), else the banner's stencil colourway. The glow is
+ *  NOT baked in here: live glowTexture planes breathe behind the card (the
+ *  lobby banner's exact treatment), so the canvas carries lettering only. */
 function drawMark(ctx: CanvasRenderingContext2D, w: number, h: number, logo: HTMLImageElement | null): void {
   const cx = w / 2;
   const cy = h / 2;
@@ -143,16 +128,9 @@ function drawMark(ctx: CanvasRenderingContext2D, w: number, h: number, logo: HTM
     ctx.fillStyle = feather;
     ctx.fillRect(-width / 2, -width / 2, width, width);
     ctx.restore();
-    // Now lay the glow pool BEHIND the feathered sign: destination-over only
-    // paints where the canvas is still transparent, so the sign keeps its
-    // photo-true core and the pool takes over where the feather fades out.
-    ctx.globalCompositeOperation = 'destination-over';
-    drawPool(ctx, cx, cy);
     ctx.globalCompositeOperation = 'source-over';
     return;
   }
-
-  drawPool(ctx, cx, cy);
 
   ctx.font = "900 150px 'Arial Black', system-ui, sans-serif";
   const fire = ctx.createLinearGradient(0, cy - 75, 0, cy + 75);
@@ -207,8 +185,40 @@ export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue
   sign.onload = () => logo.redraw((ctx, w, h) => drawMark(ctx, w, h, sign));
   sign.src = '/signs/fire-fight.png';
 
+  // The lobby banner's living glow, recreated behind the sign card: a wide
+  // haze + a hot core (normal blending like banner.ts so it reads on the
+  // void), breathing to MenuSystem.pulseBannerGlow's exact rhythm in the
+  // tick loop below. Opacities start 0 and ride the card's fade envelope.
+  // Draw order is explicit — shade 10000, haze 10001, core 10002, sign 10003.
+  const GLOW_BASE = [0.5, 0.7] as const;
+  const logoGlow = new Group();
+  const glowMats: MeshBasicMaterial[] = [];
+  const glowSpecs: Array<[number, number]> = [
+    [3.0, 0xc41208], // wide haze
+    [1.9, 0xff2a10], // hot core
+  ];
+  for (const [size, color] of glowSpecs) {
+    const mat = new MeshBasicMaterial({
+      map: glowTexture(),
+      color,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const plane = new Mesh(new PlaneGeometry(size, size), mat);
+    plane.position.z = -0.06 + glowMats.length * 0.01;
+    plane.renderOrder = 10_001 + glowMats.length;
+    glowMats.push(mat);
+    logoGlow.add(plane);
+  }
+  logo.mesh.renderOrder = 10_003;
+
+  const logoGroup = new Group();
+  logoGroup.add(logoGlow, logo.mesh);
+
   const root = new Group();
-  root.add(pub.mesh, logo.mesh);
+  root.add(pub.mesh, logoGroup);
   // Both cards sit at the group origin (only one is ever visible at a time);
   // the GROUP gets planted in front of the player's gaze. 1.35x compensates
   // the longer viewing distance (2.2m world vs the 1.65m head-locked sizing).
@@ -257,6 +267,8 @@ export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue
       }
       shade.geometry.dispose();
       (shade.material as MeshBasicMaterial).dispose();
+      for (const plane of logoGlow.children) (plane as Mesh).geometry.dispose();
+      for (const mat of glowMats) mat.dispose(); // glowTexture stays — shared cache
     } finally {
       cue(); // whatever happens to the props, the music cue always fires
     }
@@ -274,6 +286,15 @@ export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue
       return;
     }
     pub.material.opacity = envelope(t);
-    logo.material.opacity = envelope(t - CARD_SECONDS);
+    const k = envelope(t - CARD_SECONDS);
+    logo.material.opacity = k;
+    // The lobby banner's breathing (MenuSystem.pulseBannerGlow): ~0.25 Hz
+    // sine over scale and translucency, here gated by the card's fade.
+    const pulse = 0.5 + 0.5 * Math.sin((performance.now() / 1000) * 1.6);
+    const s = 0.93 + pulse * 0.14;
+    logoGlow.scale.set(s, s, 1);
+    const breathe = 0.72 + pulse * 0.5;
+    glowMats[0].opacity = GLOW_BASE[0] * breathe * k;
+    glowMats[1].opacity = GLOW_BASE[1] * breathe * k;
   }, 33);
 }
