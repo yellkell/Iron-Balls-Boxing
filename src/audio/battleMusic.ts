@@ -7,10 +7,12 @@
  * return to the lobby, rings out a few more seconds there (if it has more to
  * give), then FADES, a short PAUSE, and only THEN does the lobby music come up —
  * so the sting and the lobby music never overlap. Everything sits well under the
- * lobby music (it's background). Plain HTMLAudioElements.
+ * lobby music (it's background). MusicTracks (WebAudio) — see musicTrack.ts for
+ * why music must not ride <audio> elements on Quest.
  */
 
 import { fadeInMenuMusic, isMusicMuted, noteInLobby } from './menuMusic.js';
+import { MusicTrack } from './musicTrack.js';
 import { musicVolume } from './musicVolume.js';
 import victoryUrl from '../assets/music/victory.mp3?url';
 import brainEaterUrl from '../assets/music/brain-eater.mp3?url';
@@ -42,10 +44,10 @@ const VICTORY_LOBBY_MS = 6500; // extra airtime in the lobby if the sting has mo
 const VICTORY_FADE_MS = 1500; // fade the sting out over this
 const VICTORY_PAUSE_MS = 1000; // silence between the sting and the lobby music
 
-let battle: HTMLAudioElement | null = null;
-let victory: HTMLAudioElement | null = null;
+let battle: MusicTrack | null = null;
+let victory: MusicTrack | null = null;
 /** The bespoke final-section track (raid GOLIATH's second life). */
-let finale: HTMLAudioElement | null = null;
+let finale: MusicTrack | null = null;
 let timers: number[] = [];
 let handoffActive = false;
 
@@ -80,7 +82,7 @@ export function startBattleMusic(volume: number = BATTLE_VOLUME): void {
     return;
   }
   const url = battleUrls[Math.floor(Math.random() * battleUrls.length)];
-  if (!battle) battle = new Audio();
+  if (!battle) battle = new MusicTrack();
   battle.loop = false;
   battle.onended = () => rollNextTrack(volume);
   if (battle.src !== url) battle.src = url;
@@ -123,7 +125,7 @@ export function startFinaleTrack(): void {
   battle?.pause();
   if (isMusicMuted()) return;
   if (!finale) {
-    finale = new Audio(brainEaterUrl);
+    finale = new MusicTrack(brainEaterUrl);
     finale.loop = true;
   }
   finale.volume = FINALE_VOLUME * musicVolume();
@@ -138,7 +140,7 @@ export function playVictory(): void {
   battle?.pause();
   finale?.pause();
   if (isMusicMuted()) return;
-  if (!victory) victory = new Audio(victoryUrl);
+  if (!victory) victory = new MusicTrack(victoryUrl);
   victory.onended = null;
   victory.volume = VICTORY_VOLUME * musicVolume();
   victory.currentTime = 0;

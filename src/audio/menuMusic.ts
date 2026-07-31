@@ -7,12 +7,14 @@
  * REMEMBERED in localStorage — mute it once and it stays silent on every future
  * visit until you un-mute.
  *
- * Plain HTMLAudioElement (not the WebAudio SFX graph): it's a long looping
- * track that just needs play/pause, nothing spatial. Playback is the AND of
+ * Rides a MusicTrack (WebAudio) rather than an <audio> element: an audible
+ * media element at launch trips a Meta Browser media-session crash in the
+ * packaged PWA (see musicTrack.ts). Playback is the AND of
  * three gates — entered VR, in the lobby, not muted — funnelled through sync().
  */
 
 import musicUrl from '../assets/music/smoldering.m4a?url';
+import { MusicTrack } from './musicTrack.js';
 import { musicVolume, onMusicVolume } from './musicVolume.js';
 
 const MUTE_KEY = 'ibb-music-muted';
@@ -22,7 +24,7 @@ function targetVol(): number {
   return BASE_VOLUME * musicVolume();
 }
 
-let audio: HTMLAudioElement | null = null;
+let audio: MusicTrack | null = null;
 let entered = false; // has the player entered VR (the autoplay-unlocking gesture)?
 let lobbyActive = true; // are we in the menu/lobby (vs a bout or training)?
 let fadeTimer: number | null = null;
@@ -50,9 +52,9 @@ function setMuted(muted: boolean): void {
   }
 }
 
-function ensureAudio(): HTMLAudioElement {
+function ensureAudio(): MusicTrack {
   if (!audio) {
-    audio = new Audio(musicUrl);
+    audio = new MusicTrack(musicUrl);
     audio.loop = true;
     audio.volume = targetVol();
   }
