@@ -3001,7 +3001,7 @@ export class CampaignSystem extends createSystem({
       setPlatformSkin('blazing');
       playCash();
     }
-    const padTag = tidebroke && blazed ? ' · 2 PADS UNLOCKED' : tidebroke || blazed ? ' · PAD UNLOCKED' : '';
+    const padTag = tidebroke && blazed ? ' · 2 PLATFORMS UNLOCKED' : tidebroke || blazed ? ' · PLATFORM UNLOCKED' : '';
 
     // Mid-run fells chain straight to the next boss after a short collapse.
     this.advanceAfterVictory = run && !lastStage;

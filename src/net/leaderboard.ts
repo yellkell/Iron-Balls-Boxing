@@ -293,6 +293,10 @@ export function setPlayerName(raw: string): void {
   if (!name) return;
   try {
     localStorage.setItem('ff-player-name', name);
+    // When the player typed THIS name — a rename filed for the account on the
+    // doc (renameTo/renameAt, below) only wins over a local name that is
+    // OLDER than the filing.
+    localStorage.setItem('ff-player-name-at', String(Date.now()));
   } catch {
     /* keep it for this session at least */
   }
@@ -406,6 +410,32 @@ export function initLeaderboard(): void {
         profile.raidBest = (d.raidBest as number) ?? 0;
         profile.raidBestHc = (d.raidBestHc as number) ?? 0;
         profile.goopBest = (d.goopBest as number) ?? 0;
+        // A rename FILED FOR this account rides `renameTo`/`renameAt` — doc
+        // fields the client's ordinary writes never touch, so a correction
+        // survives however many times an old build's name re-sync (below)
+        // stamps the stale callsign back over `name`. Adopt it unless the
+        // player has typed a NEWER name themselves. (This is what lets a
+        // rename be repaired server-side at all: `name` alone can't carry a
+        // correction, because every client write re-asserts the local name.)
+        {
+          const renameTo = d.renameTo as string | undefined;
+          const renameAt = (d.renameAt as number) ?? 0;
+          let localAt = 0;
+          try {
+            localAt = parseInt(localStorage.getItem('ff-player-name-at') ?? '0', 10) || 0;
+          } catch {
+            /* no stamp readable — treat the local name as old */
+          }
+          if (renameTo && renameTo !== profile.name && localAt < renameAt) {
+            profile.name = renameTo;
+            try {
+              localStorage.setItem('ff-player-name', renameTo);
+              localStorage.setItem('ff-player-name-at', String(Date.now()));
+            } catch {
+              /* session-only adoption — re-adopts next boot */
+            }
+          }
+        }
         // A locally renamed player syncs the doc's stale callsign.
         if ((d.name as string) !== profile.name) writeMine({});
         // Seasons that closed since our last visit: claim any honours.
@@ -497,8 +527,13 @@ export async function refreshLeaderboard(force = false): Promise<void> {
         // ranks — the same squad's normal, hard, blazing and hardcore clears
         // are different achievements, so each keeps its own best row. Rows
         // arrive fastest-first, so the first per key is its best.
+        //
+        // EASY never ranks. reportRun refuses easy runs at write time, but
+        // rows posted before that guard existed are immortal (the run
+        // collections are append-only by rule), so the board filters them on
+        // read too — belt and braces, one line each side.
         const seen = new Set<string>();
-        return rows.filter((r) => {
+        return rows.filter((r) => r.difficulty !== 'easy').filter((r) => {
           const key = `${r.names.map((n) => n.toLowerCase()).sort().join('|')}|${r.difficulty}|${r.hardcore ? 'hc' : ''}`;
           if (seen.has(key)) return false;
           seen.add(key);
