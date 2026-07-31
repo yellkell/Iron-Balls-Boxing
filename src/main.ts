@@ -271,7 +271,7 @@ World.create(container, {
       if (!introPlayed) {
         introPlayed = true; // once per page load — relaunches are a fresh page
         try {
-          runBootIntro(world.camera, enterMenuMusic);
+          runBootIntro(world.camera, world.scene, enterMenuMusic);
         } catch {
           enterMenuMusic(); // curtain failed — never take the music down with it
         }

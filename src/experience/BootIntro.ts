@@ -20,7 +20,9 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
   SRGBColorSpace,
+  Vector3,
   type PerspectiveCamera,
+  type Scene,
 } from 'three';
 
 const CARD_SECONDS = 3;
@@ -69,7 +71,6 @@ function makeCard(draw: (ctx: CanvasRenderingContext2D, w: number, h: number) =>
     depthWrite: false,
   });
   const mesh = new Mesh(new PlaneGeometry(2.08, 1.04), material);
-  mesh.position.z = -1.65;
   mesh.renderOrder = 10_001;
   return {
     mesh,
@@ -173,10 +174,15 @@ function drawMark(ctx: CanvasRenderingContext2D, w: number, h: number, logo: HTM
  * Play the boot sequence on the given camera. Fires `onMusicCue` exactly once,
  * MUSIC_LEAD_SECONDS before the shade drops (and guaranteed no later than
  * teardown, whatever happens) — hang the lobby music on it.
+ *
+ * The SHADE is head-locked (a featureless black cover has to follow the view
+ * so turning around never breaks the blackout — and being featureless, the
+ * locking is imperceptible). The CARDS are WORLD-locked: planted once, ahead
+ * of wherever the player faces as the session opens, so they hold still like
+ * a cinema screen instead of riding head motion — head-locked content is a
+ * VR-comfort anti-pattern.
  */
-export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void): void {
-  const root = new Group();
-
+export function runBootIntro(camera: PerspectiveCamera, scene: Scene, onMusicCue: () => void): void {
   const shade = new Mesh(
     // Oversized to cover the whole per-eye frustum (see LoadingOverlay).
     // transparent:true (at full opacity) is LOAD-BEARING: it moves the shade
@@ -190,6 +196,7 @@ export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void):
   );
   shade.position.z = -1.7;
   shade.renderOrder = 10_000;
+  camera.add(shade);
 
   const pub = makeCard(drawPublisher);
   const logo = makeCard((ctx, w, h) => drawMark(ctx, w, h, null));
@@ -200,8 +207,31 @@ export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void):
   sign.onload = () => logo.redraw((ctx, w, h) => drawMark(ctx, w, h, sign));
   sign.src = '/signs/fire-fight.png';
 
-  root.add(shade, pub.mesh, logo.mesh);
-  camera.add(root);
+  const root = new Group();
+  root.add(pub.mesh, logo.mesh);
+  // Both cards sit at the group origin (only one is ever visible at a time);
+  // the GROUP gets planted in front of the player's gaze. 1.35x compensates
+  // the longer viewing distance (2.2m world vs the 1.65m head-locked sizing).
+  root.scale.setScalar(1.35);
+  scene.add(root);
+
+  // Plant the cards ahead of the CURRENT gaze: eye-height, yaw-only forward
+  // (a downward glance must not tilt the screen into the floor). Placed at
+  // call time, then refined once ~0.15s in — the first session pose can lag
+  // a frame or two, and the cards are still near-invisible that early.
+  const placeCards = (): void => {
+    const eye = new Vector3();
+    camera.getWorldPosition(eye);
+    const fwd = new Vector3();
+    camera.getWorldDirection(fwd);
+    fwd.y = 0;
+    if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
+    fwd.normalize();
+    root.position.copy(eye).addScaledVector(fwd, 2.2);
+    root.lookAt(eye);
+  };
+  placeCards();
+  let placementRefined = false;
 
   const started = performance.now();
   let finished = false;
@@ -218,7 +248,8 @@ export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void):
     finished = true;
     window.clearInterval(timer);
     try {
-      camera.remove(root);
+      scene.remove(root);
+      camera.remove(shade);
       for (const card of [pub, logo]) {
         card.mesh.geometry.dispose();
         card.material.dispose();
@@ -233,6 +264,10 @@ export function runBootIntro(camera: PerspectiveCamera, onMusicCue: () => void):
 
   const timer = window.setInterval(() => {
     const t = (performance.now() - started) / 1000;
+    if (!placementRefined && t >= 0.15) {
+      placementRefined = true;
+      placeCards(); // first real XR pose is in by now; cards still ~invisible
+    }
     if (t >= TOTAL_SECONDS - MUSIC_LEAD_SECONDS) cue();
     if (t >= TOTAL_SECONDS) {
       finish();
