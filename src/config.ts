@@ -265,11 +265,13 @@ export const CURL = {
 /**
  * The curl rate (rad/s) a throw earns: the swing's raw turn rate above the
  * dead zone, scaled by `gain`, capped at `max`, and ramped in linearly with
- * how committed the swing was.
+ * how committed the swing was. `strength` is the player's CURVE STRENGTH
+ * dial (0.1..1, ADVANCED face of the loadout panel) — it scales the whole
+ * result, so the feel gates (sfx/haptics/trail) follow it for free.
  */
-export function curlRateFor(raw: number, handSpeed: number): number {
+export function curlRateFor(raw: number, handSpeed: number, strength = 1): number {
   const speedK = Math.max(0, Math.min(1, (handSpeed - CURL.speedMin) / (CURL.speedFull - CURL.speedMin)));
-  return (raw <= CURL.min ? 0 : Math.min(CURL.max, (raw - CURL.min) * CURL.gain)) * speedK;
+  return (raw <= CURL.min ? 0 : Math.min(CURL.max, (raw - CURL.min) * CURL.gain)) * speedK * strength;
 }
 
 /**

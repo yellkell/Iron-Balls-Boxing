@@ -18,7 +18,7 @@ import {
   PlaneGeometry,
   type Scene,
 } from 'three';
-import { app, DEFAULT_ACCENT_HUE, saveBallArc, saveBallAttach, type AppEnvironment } from './appState.js';
+import { app, DEFAULT_ACCENT_HUE, saveBallArc, saveBallAttach, saveCurveStrength, saveShowBody, type AppEnvironment } from './appState.js';
 import { avatarOwned, customization, platformOwned } from './customization.js';
 import { rankBadge, rankBadgeZoom } from './rankBadges.js';
 import { coinImage } from './coinIcon.js';
@@ -1593,13 +1593,22 @@ const ROW_L_Y = 120; // left-fist tile row top
 const ROW_R_Y = 262; // right-fist tile row top (clear of the left row's ARC box)
 const DESC_Y = 366;
 const tileX = (i: number): number => BMX + i * (TILE_W + BGAP);
-const ARC_BS = 26; // arc checkbox size
-const arcBox = (rowY: number): { x: number; y: number; s: number } => ({ x: BALL_W - BMX - ARC_BS, y: rowY - 40, s: ARC_BS });
+
+// --- the ADVANCED sub-face (gear cog, top-right) ---------------------------
+// One CURVE tick for both fists (the old per-fist boxes cluttered the rows),
+// a CURVE STRENGTH slider, and the SHOW MY BODY toggle.
+const GEAR = { x: BALL_W - 42, y: 46, r: 17, hit: 26 };
+const ADV_BS = 26; // checkbox size on the advanced face
+const ADV_CURVE_Y = 104; // curve checkbox top
+const ADV_SLIDER_Y = 228; // slider bar top
+const ADV_SLIDER_H = 16;
+const ADV_SLIDER_W = BALL_W - 2 * BMX - 88; // % readout rides to the right
+const ADV_BODY_Y = 312; // body checkbox top
+/** Is the loadout panel showing its ADVANCED face? */
+let ballAdvOpen = false;
 
 /** Last attachment whose description is shown in the box (−1 = none yet). */
 let ballDescIdx = -1;
-/** When true, the description box explains the ARC toggle instead. */
-let ballDescArc = false;
 
 /** A small arrowhead triangle at (x,y) pointing along `ang`. */
 function arrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, size: number): void {
@@ -1664,22 +1673,9 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number,
   if (line) ctx.fillText(line, x, cy);
 }
 
-function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, rowY: number): void {
-  const equipped = app.ballAttach[side] ?? 0;
-  ctx.textAlign = 'left';
-  ctx.font = '700 23px system-ui, sans-serif';
-  ctx.fillStyle = UI.text;
-  const eqName = equipped ? ATTACHMENTS[equipped - 1].name.toLowerCase() : 'none';
-  ctx.fillText(`${label}  ·  ${eqName}`, BMX, rowY - 16);
-
-  // 'Arc' toggle for this fist — the ball curves along the punch when on.
-  const on = app.ballArc[side];
-  const b = arcBox(rowY);
-  ctx.textAlign = 'right';
-  ctx.font = '700 20px system-ui, sans-serif';
-  ctx.fillStyle = on ? UI.emberBright : UI.textDim;
-  ctx.fillText('CURVE', b.x - 12, rowY - 18);
-  plate(ctx, b.x, b.y, b.s, b.s, {
+/** A square steel checkbox with an amber tick when on. */
+function drawCheckbox(ctx: CanvasRenderingContext2D, x: number, y: number, on: boolean): void {
+  plate(ctx, x, y, ADV_BS, ADV_BS, {
     cut: 6,
     fill: on ? 'rgba(255,176,0,0.22)' : 'rgba(18,19,24,0.7)',
     stroke: on ? UI.amber : UI.steelDim,
@@ -1690,11 +1686,43 @@ function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, 
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(b.x + 6, b.y + 13);
-    ctx.lineTo(b.x + 11, b.y + 19);
-    ctx.lineTo(b.x + 20, b.y + 7);
+    ctx.moveTo(x + 6, y + 13);
+    ctx.lineTo(x + 11, y + 19);
+    ctx.lineTo(x + 20, y + 7);
     ctx.stroke();
   }
+}
+
+/** The gear cog opening/closing the ADVANCED face — amber while open. */
+function drawGear(ctx: CanvasRenderingContext2D): void {
+  const { x, y, r } = GEAR;
+  const color = ballAdvOpen ? UI.amber : UI.steel;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  for (let i = 0; i < 8; i++) {
+    ctx.save();
+    ctx.rotate((i * Math.PI) / 4);
+    ctx.fillRect(-3.2, -r - 3, 6.4, 6);
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, rowY: number): void {
+  const equipped = app.ballAttach[side] ?? 0;
+  ctx.textAlign = 'left';
+  ctx.font = '700 23px system-ui, sans-serif';
+  ctx.fillStyle = UI.text;
+  const eqName = equipped ? ATTACHMENTS[equipped - 1].name.toLowerCase() : 'none';
+  ctx.fillText(`${label}  ·  ${eqName}`, BMX, rowY - 16);
 
   for (let i = 0; i < 3; i++) {
     const type = TYPES[i];
@@ -1715,11 +1743,18 @@ function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, 
   }
 }
 
-/** BALL LOADOUT: per-fist attachment picker with click-to-read descriptions.
+/** BALL LOADOUT: per-fist attachment picker with click-to-read descriptions,
+ *  plus the gear-cog ADVANCED face (curve, curve strength, body visibility).
  *  Exported: the tutorial's console draws the same panel in-arena. */
 export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
   const hover = hoverAction !== null;
-  panelBg(ctx, hover, UI.emberBright, 'BALL LOADOUT', BALL_W, BALL_H);
+  panelBg(ctx, hover, UI.emberBright, ballAdvOpen ? 'ADVANCED' : 'BALL LOADOUT', BALL_W, BALL_H);
+  drawGear(ctx);
+
+  if (ballAdvOpen) {
+    drawBallsAdvanced(ctx);
+    return;
+  }
 
   drawBallRow(ctx, 0, 'LEFT FIST', ROW_L_Y);
   drawBallRow(ctx, 1, 'RIGHT FIST', ROW_R_Y);
@@ -1732,14 +1767,7 @@ export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction
     rivets: false,
   });
   ctx.textAlign = 'left';
-  if (ballDescArc) {
-    ctx.font = '800 24px system-ui, sans-serif';
-    ctx.fillStyle = UI.amber;
-    ctx.fillText('CURVE', BMX + 20, DESC_Y + 28);
-    ctx.font = '500 20px system-ui, sans-serif';
-    ctx.fillStyle = UI.text;
-    wrapText(ctx, 'The ball curves to follow the arc of your punch. Hook it past their guard.', BMX + 20, DESC_Y + 58, BALL_W - 2 * BMX - 40, 26);
-  } else if (ballDescIdx < 0) {
+  if (ballDescIdx < 0) {
     ctx.font = '600 22px system-ui, sans-serif';
     ctx.fillStyle = UI.textDim;
     ctx.fillText('tap an attachment to read what it does', BMX + 20, DESC_Y + 52);
@@ -1754,21 +1782,96 @@ export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction
   }
 }
 
-/** Tap a tile → equip/clear that attachment and show its description.
+/** The ADVANCED face: one CURVE tick for both fists, its strength dial, and
+ *  the SHOW MY BODY toggle. The gear (top-right) flips back. */
+function drawBallsAdvanced(ctx: CanvasRenderingContext2D): void {
+  const curveOn = app.ballArc[0] || app.ballArc[1];
+
+  // CURVE toggle.
+  drawCheckbox(ctx, BMX, ADV_CURVE_Y, curveOn);
+  ctx.textAlign = 'left';
+  ctx.font = '700 23px system-ui, sans-serif';
+  ctx.fillStyle = curveOn ? UI.emberBright : UI.text;
+  ctx.fillText('CURVE', BMX + ADV_BS + 16, ADV_CURVE_Y + 20);
+  ctx.font = '500 19px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  wrapText(ctx, 'The ball follows the arc of your punch — hook it past their guard. Curved throws get no aim assist.', BMX, ADV_CURVE_Y + 52, BALL_W - 2 * BMX, 24);
+
+  // CURVE STRENGTH slider (dimmed until curve is on).
+  ctx.globalAlpha = curveOn ? 1 : 0.38;
+  ctx.font = '700 20px system-ui, sans-serif';
+  ctx.fillStyle = UI.text;
+  ctx.fillText('CURVE STRENGTH', BMX, ADV_SLIDER_Y - 12);
+  plate(ctx, BMX, ADV_SLIDER_Y, ADV_SLIDER_W, ADV_SLIDER_H, {
+    cut: 5,
+    fill: 'rgba(18,19,24,0.7)',
+    stroke: UI.steelDim,
+    rivets: false,
+  });
+  const k = (app.curveStrength - 0.1) / 0.9;
+  if (k > 0.01) {
+    plate(ctx, BMX, ADV_SLIDER_Y, Math.max(10, ADV_SLIDER_W * k), ADV_SLIDER_H, {
+      cut: 5,
+      fill: 'rgba(255,176,0,0.45)',
+      stroke: UI.amber,
+      rivets: false,
+    });
+  }
+  ctx.textAlign = 'right';
+  ctx.font = '700 22px system-ui, sans-serif';
+  ctx.fillStyle = curveOn ? UI.amber : UI.textDim;
+  ctx.fillText(`${Math.round(app.curveStrength * 100)}%`, BALL_W - BMX, ADV_SLIDER_Y + 15);
+  ctx.globalAlpha = 1;
+
+  // SHOW MY BODY toggle.
+  drawCheckbox(ctx, BMX, ADV_BODY_Y, app.showBody);
+  ctx.textAlign = 'left';
+  ctx.font = '700 23px system-ui, sans-serif';
+  ctx.fillStyle = UI.text;
+  ctx.fillText('SHOW MY BODY', BMX + ADV_BS + 16, ADV_BODY_Y + 20);
+  ctx.font = '500 19px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  wrapText(ctx, 'Untick to hide your own body for a clearer view when you look down — like your head already is. Rivals still see you either way.', BMX, ADV_BODY_Y + 52, BALL_W - 2 * BMX, 24);
+}
+
+/** Tap a tile → equip/clear that attachment and show its description; the
+ *  gear cog flips to the ADVANCED face and back.
  *  Exported: the tutorial's console shares this hit-test. */
 export function clickBalls(u: number, v: number): boolean {
   const x = u * BALL_W;
   const y = (1 - v) * BALL_H;
-  // Arc checkboxes sit on each fist's label line, above the tiles.
-  for (const [side, rowY] of [[0, ROW_L_Y], [1, ROW_R_Y]] as const) {
-    const b = arcBox(rowY);
-    if (x >= b.x && x <= b.x + b.s && y >= b.y && y <= b.y + b.s) {
-      app.ballArc[side] = !app.ballArc[side];
+
+  // The gear cog lives on BOTH faces.
+  if (Math.abs(x - GEAR.x) <= GEAR.hit && Math.abs(y - GEAR.y) <= GEAR.hit) {
+    ballAdvOpen = !ballAdvOpen;
+    return true;
+  }
+
+  if (ballAdvOpen) {
+    // CURVE tick — one switch, both fists (storage stays per-fist for the pub).
+    if (x >= BMX && x <= BMX + ADV_BS + 160 && y >= ADV_CURVE_Y - 4 && y <= ADV_CURVE_Y + ADV_BS + 4) {
+      const on = !(app.ballArc[0] || app.ballArc[1]);
+      app.ballArc[0] = on;
+      app.ballArc[1] = on;
       saveBallArc();
-      ballDescArc = true; // show what ARC does
       return true;
     }
+    // STRENGTH slider — click sets the level (10%..100%) from the tap point.
+    if (x >= BMX - 6 && x <= BMX + ADV_SLIDER_W + 6 && y >= ADV_SLIDER_Y - 18 && y <= ADV_SLIDER_Y + ADV_SLIDER_H + 14) {
+      const k = Math.max(0, Math.min(1, (x - BMX) / ADV_SLIDER_W));
+      app.curveStrength = Math.round((0.1 + 0.9 * k) * 20) / 20; // 5% steps
+      saveCurveStrength();
+      return true;
+    }
+    // SHOW MY BODY tick.
+    if (x >= BMX && x <= BMX + ADV_BS + 260 && y >= ADV_BODY_Y - 4 && y <= ADV_BODY_Y + ADV_BS + 4) {
+      app.showBody = !app.showBody;
+      saveShowBody();
+      return true;
+    }
+    return false;
   }
+
   for (const [side, rowY] of [[0, ROW_L_Y], [1, ROW_R_Y]] as const) {
     if (y < rowY || y > rowY + TILE_H) continue;
     const i = Math.floor((x - BMX) / (TILE_W + BGAP));
@@ -1777,7 +1880,6 @@ export function clickBalls(u: number, v: number): boolean {
     if (x < tx || x > tx + TILE_W) return false;
     const type = TYPES[i];
     ballDescIdx = i;
-    ballDescArc = false;
     app.ballAttach[side] = app.ballAttach[side] === type ? 0 : type;
     saveBallAttach();
     return true;

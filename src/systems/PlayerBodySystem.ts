@@ -50,8 +50,10 @@ export class PlayerBodySystem extends createSystem({
     // In the lobby nothing reads the torso or the hitboxes (collision,
     // boundary and the pose senders are all state-gated) — skip the whole
     // solve instead of running IK on an invisible body every menu frame.
+    // app.showBody only hides the VISUAL: the solve still runs (below) so
+    // hitboxes and the pose your rival sees are untouched by the setting.
     const active = app.state === 'playing' || app.state === 'training';
-    rig.torso.visible = active;
+    rig.torso.visible = active && app.showBody;
     if (!active) return;
 
     headObj.getWorldPosition(_head);

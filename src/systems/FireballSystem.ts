@@ -495,7 +495,7 @@ export class FireballSystem extends createSystem({
       // only a deliberate hook past CURL.min bends the ball, and how HARD it
       // bends scales with the hook — see curlRateFor in config.ts.
       const raw = this.trackers[hand].curl(_curl, this.time);
-      curlRate = curlRateFor(raw, handSpeed);
+      curlRate = curlRateFor(raw, handSpeed, app.curveStrength);
       // What the swing measured, for the ?perf=1 readout — CURL is tuned
       // against these two numbers and nothing else reports them.
       recordThrow(raw, handSpeed, curlRate, this.time);

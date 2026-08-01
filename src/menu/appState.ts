@@ -68,10 +68,26 @@ function loadBallAttach(): [number, number] {
   return [clamp(parts[0]), clamp(parts[1])];
 }
 
-/** Per-fist 'Arc' toggle — when on, that fist's ball curves along the punch. */
+/** Per-fist 'Arc' toggle — when on, that fist's ball curves along the punch.
+ *  (The UI now offers ONE curve tick in the loadout's ADVANCED face and
+ *  writes both fists together, but the per-fist storage stays: the pub's
+ *  FightSystem and old saves read the same 'ff-ballarc' pair.) */
 function loadBallArc(): [boolean, boolean] {
   const parts = (localStorage.getItem('ff-ballarc') ?? '').split(',');
   return [parts[0] === '1', parts[1] === '1'];
+}
+
+/** CURVE STRENGTH (0.1..1): scales how hard an ARC throw banks. */
+function loadCurveStrength(): number {
+  const n = parseFloat(localStorage.getItem('ff-curvestrength') ?? '');
+  return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : 1;
+}
+
+/** Show your OWN torso in a bout — off = clearer view when looking down
+ *  (your head is already unseen; this extends that to the body). Rivals
+ *  always see your body either way. */
+function loadShowBody(): boolean {
+  return localStorage.getItem('ff-showbody') !== '0';
 }
 
 function loadStats(): LifetimeStats {
@@ -193,8 +209,14 @@ export const app: {
   accentLight: number;
   /** Ball attachment per fist: [left, right] (0 none/1 split/2 grow/3 shrink). */
   ballAttach: [number, number];
-  /** Per-fist 'Arc' toggle [left, right]: the ball curves along the punch. */
+  /** Per-fist 'Arc' toggle [left, right]: the ball curves along the punch.
+   *  The ADVANCED face writes both together — see loadBallArc for why the
+   *  pair survives. */
   ballArc: [boolean, boolean];
+  /** CURVE STRENGTH (0.1..1): scales how hard an ARC throw banks. */
+  curveStrength: number;
+  /** Show your OWN torso in a bout (rivals always see it regardless). */
+  showBody: boolean;
   /**
    * Which face the 1V1 panel shows: the mode list, the private-match flow, or
    * the RANKED server browser ('browser'). Hosting/joining stays on 'browser' —
@@ -274,6 +296,8 @@ export const app: {
   accentLight: loadAccentLight(),
   ballAttach: loadBallAttach(),
   ballArc: loadBallArc(),
+  curveStrength: loadCurveStrength(),
+  showBody: loadShowBody(),
   duelView: 'root',
   rankedRooms: [],
   rankedRoomId: '',
@@ -369,6 +393,22 @@ export function saveBallAttach(): void {
 export function saveBallArc(): void {
   try {
     localStorage.setItem('ff-ballarc', `${app.ballArc[0] ? 1 : 0},${app.ballArc[1] ? 1 : 0}`);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function saveCurveStrength(): void {
+  try {
+    localStorage.setItem('ff-curvestrength', app.curveStrength.toFixed(2));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function saveShowBody(): void {
+  try {
+    localStorage.setItem('ff-showbody', app.showBody ? '1' : '0');
   } catch {
     /* ignore */
   }

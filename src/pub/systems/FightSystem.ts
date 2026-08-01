@@ -289,6 +289,26 @@ function loadBallArc(): [boolean, boolean] {
   }
 }
 
+/** CURVE STRENGTH — the same 'ff-curvestrength' the loadout's ADVANCED face
+ *  writes, so the dial carries into pub bouts like the toggle does. */
+function loadCurveStrength(): number {
+  try {
+    const n = parseFloat(localStorage.getItem('ff-curvestrength') ?? '');
+    return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/** 'ff-showbody' — hide your OWN pub-bout torso too when the arena does. */
+function loadShowBody(): boolean {
+  try {
+    return localStorage.getItem('ff-showbody') !== '0';
+  } catch {
+    return true;
+  }
+}
+
 const _grip = new Vector3();
 const _gripQ = new Quaternion();
 const _vel = new Vector3();
@@ -360,6 +380,8 @@ export class FightSystem extends createSystem({}) {
   private loadout: [number, number] = [0, 0];
   /** Per-fist "Curve" toggle, refreshed alongside the loadout. */
   private ballArc: [boolean, boolean] = [false, false];
+  private curveStrength = 1;
+  private showBody = loadShowBody();
   private trackers: [VelocityTracker, VelocityTracker] = [new VelocityTracker(), new VelocityTracker()];
   /** Remote fighters' streamed balls, keyed by player id. */
   private remoteBalls = new Map<string, [RemoteBall, RemoteBall]>();
@@ -1087,7 +1109,8 @@ export class FightSystem extends createSystem({}) {
       rig.torso.visible = false;
       return;
     }
-    rig.torso.visible = true;
+    // Visual only — the solve still runs so the pose the room sees is intact.
+    rig.torso.visible = this.showBody;
     this.player.head.getWorldPosition(_head);
     this.player.head.getWorldQuaternion(_headQ);
     _head.y += FIGHT.pitDepth;
@@ -1105,6 +1128,8 @@ export class FightSystem extends createSystem({}) {
     if (this.myBalls) return;
     this.loadout = loadBallAttach(); // your arena ball loadout walks into the pub
     this.ballArc = loadBallArc(); // …and your per-fist curve toggle with it
+    this.curveStrength = loadCurveStrength(); // …and how hard the curve bites
+    this.showBody = loadShowBody(); // …and whether you see your own torso
     const team = this.teamFor(pub.myId); // a fighter's own fire is always ember
     const mk = (hand: Hand): LocalBall => {
       const visual = createFireVisual(team);
@@ -1439,7 +1464,7 @@ export class FightSystem extends createSystem({}) {
     let curlRate = 0;
     if (this.ballArc[hand]) {
       const raw = this.trackers[hand].curl(_curl, this.time);
-      curlRate = curlRateFor(raw, handSpeed);
+      curlRate = curlRateFor(raw, handSpeed, this.curveStrength);
       ball.curl.copy(_curl).multiplyScalar(curlRate);
     } else {
       ball.curl.set(0, 0, 0);
