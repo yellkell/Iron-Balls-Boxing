@@ -1438,6 +1438,9 @@ export interface ActionButton {
   id: string;
   label: string;
   accent: string;
+  /** Two consecutive 'l','r' buttons share one row at half width — the
+   *  forfeit confirm's ✕ / ✓ pair. Omit for an ordinary full-width row. */
+  half?: 'l' | 'r';
 }
 
 export interface ActionPanel {
@@ -1489,7 +1492,7 @@ export function createActionPanel(scene: Scene): ActionPanel {
   mesh.visible = false;
   scene.add(mesh);
 
-  let zones: Array<{ id: string; y0: number; y1: number }> = [];
+  let zones: Array<{ id: string; y0: number; y1: number; x0?: number; x1?: number }> = [];
   let ballsY: number | null = null; // top of the loadout section (canvas px)
 
   return {
@@ -1498,7 +1501,12 @@ export function createActionPanel(scene: Scene): ActionPanel {
       // Height-to-content: plate wraps exactly what's drawn, the rest of the
       // canvas stays transparent. The loadout sits ABOVE the buttons — gear
       // first, resign/return below where it can't be fat-fingered.
-      const buttonsH = buttons.length * 102;
+      // An l+r half pair shares one row, so count ROWS, not buttons.
+      const buttonRows = buttons.reduce(
+        (n, b, i) => n + (b.half === 'r' && buttons[i - 1]?.half === 'l' ? 0 : 1),
+        0,
+      );
+      const buttonsH = buttonRows * 102;
       const statusH = status ? 30 : 0;
       ballsY = loadout ? 84 : null;
       const buttonsY = loadout ? 84 + BALL_H + 14 : 84;
@@ -1523,19 +1531,38 @@ export function createActionPanel(scene: Scene): ActionPanel {
       ctx.stroke();
 
       if (loadout && ballsY !== null) {
-        // The lobby's exact BALL LOADOUT face, re-hosted as a section (it
-        // draws its own plate + title, so it reads as an inset card).
+        // The lobby's BALL LOADOUT face, hosted FRAMELESS (no nested plate or
+        // clear) so the section sits on this panel's one shared plate.
         ctx.save();
         ctx.translate(0, ballsY);
-        drawBalls(ctx, null);
+        drawBalls(ctx, null, false);
         ctx.restore();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        // Divider under the section, echoing the one under the title.
+        ctx.strokeStyle = UI.steelDim;
+        ctx.beginPath();
+        ctx.moveTo(36, buttonsY - 8);
+        ctx.lineTo(FW - 36, buttonsY - 8);
+        ctx.stroke();
       }
 
       zones = [];
       let y = buttonsY;
-      for (const b of buttons) {
+      for (let i = 0; i < buttons.length; i++) {
+        const b = buttons[i];
+        const rb = buttons[i + 1];
+        if (b.half === 'l' && rb?.half === 'r') {
+          // The ✕ / ✓ confirm pair: two half-width plates on one row.
+          const bw = (FW - 128 - 16) / 2;
+          buttonPlate(ctx, 64, y, bw, 84, b.label, b.accent, hoverId === b.id);
+          buttonPlate(ctx, 64 + bw + 16, y, bw, 84, rb.label, rb.accent, hoverId === rb.id);
+          zones.push({ id: b.id, y0: y - 6, y1: y + 90, x0: 64, x1: 64 + bw });
+          zones.push({ id: rb.id, y0: y - 6, y1: y + 90, x0: 64 + bw + 16, x1: FW - 64 });
+          y += 102;
+          i++;
+          continue;
+        }
         buttonPlate(ctx, 64, y, FW - 128, 84, b.label, b.accent, hoverId === b.id);
         zones.push({ id: b.id, y0: y - 6, y1: y + 90 });
         y += 102;
@@ -1551,10 +1578,13 @@ export function createActionPanel(scene: Scene): ActionPanel {
       ctx.fillText(hint, FW / 2, contentH - 34);
       texture.needsUpdate = true;
     },
-    hitTest: (_u, v) => {
+    hitTest: (u, v) => {
+      const x = u * FW;
       const y = (1 - v) * FH;
       for (const z of zones) {
-        if (y >= z.y0 && y <= z.y1) return z.id;
+        if (y < z.y0 || y > z.y1) continue;
+        if (z.x0 !== undefined && (x < z.x0 || x > (z.x1 ?? FW))) continue;
+        return z.id;
       }
       return null;
     },
@@ -1745,11 +1775,27 @@ function drawBallRow(ctx: CanvasRenderingContext2D, side: 0 | 1, label: string, 
 
 /** BALL LOADOUT: per-fist attachment picker with click-to-read descriptions,
  *  plus the gear-cog ADVANCED face (curve, curve strength, body visibility).
- *  Exported: the tutorial's console draws the same panel in-arena. */
-export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null): void {
+ *  Exported: the tutorial's console draws the same panel in-arena, and the
+ *  A-button action panel hosts it with `framed=false` — no clear, no nested
+ *  plate, just a section heading — so host + loadout read as ONE panel. */
+export function drawBalls(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null, framed = true): void {
   const hover = hoverAction !== null;
-  panelBg(ctx, hover, UI.emberBright, ballAdvOpen ? 'ADVANCED' : 'BALL LOADOUT', BALL_W, BALL_H);
+  if (framed) {
+    panelBg(ctx, hover, UI.emberBright, ballAdvOpen ? 'ADVANCED' : 'BALL LOADOUT', BALL_W, BALL_H);
+  } else {
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = stencilFont(26);
+    ctx.fillStyle = UI.amberSoft;
+    ctx.fillText(ballAdvOpen ? 'ADVANCED' : 'BALL LOADOUT', BMX, 44);
+  }
   drawGear(ctx);
+  // Small pointer at the cog so the sub-face is discoverable ('BACK' once in).
+  ctx.textAlign = 'right';
+  ctx.font = '700 16px system-ui, sans-serif';
+  ctx.fillStyle = UI.textDim;
+  ctx.fillText(ballAdvOpen ? 'BACK' : 'ADVANCED', GEAR.x - GEAR.r - 16, GEAR.y + 6);
+  arrowHead(ctx, GEAR.x - GEAR.r - 9, GEAR.y, 0, 5);
 
   if (ballAdvOpen) {
     drawBallsAdvanced(ctx);
@@ -1795,7 +1841,7 @@ function drawBallsAdvanced(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('CURVE', BMX + ADV_BS + 16, ADV_CURVE_Y + 20);
   ctx.font = '500 19px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
-  wrapText(ctx, 'The ball follows the arc of your punch — hook it past their guard. Curved throws get no aim assist.', BMX, ADV_CURVE_Y + 52, BALL_W - 2 * BMX, 24);
+  ctx.fillText('curve follows the arc of your punch', BMX, ADV_CURVE_Y + 52);
 
   // CURVE STRENGTH slider (dimmed until curve is on).
   ctx.globalAlpha = curveOn ? 1 : 0.38;
@@ -1831,7 +1877,7 @@ function drawBallsAdvanced(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('SHOW MY BODY', BMX + ADV_BS + 16, ADV_BODY_Y + 20);
   ctx.font = '500 19px system-ui, sans-serif';
   ctx.fillStyle = UI.textDim;
-  wrapText(ctx, 'Untick to hide your own body for a clearer view when you look down — like your head already is. Rivals still see you either way.', BMX, ADV_BODY_Y + 52, BALL_W - 2 * BMX, 24);
+  ctx.fillText('untick to hide your body, rivals still see you', BMX, ADV_BODY_Y + 52);
 }
 
 /** Tap a tile → equip/clear that attachment and show its description; the

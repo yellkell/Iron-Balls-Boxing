@@ -155,6 +155,8 @@ export class MenuSystem extends createSystem({}) {
   private panel!: ActionPanel;
   private panelKey = '';
   private wasMatchOver = false;
+  /** FORFEIT tapped once — the button row shows ✕ / ✓ until answered. */
+  private confirmForfeit = false;
   private keyboard!: NameKeyboard;
   /** The action waiting behind the name keyboard. */
   private kbPending: MenuAction | null = null;
@@ -1215,12 +1217,22 @@ export class MenuSystem extends createSystem({}) {
    * What the panel offers right now, or null when it has no business being
    * up (mid-bout — your hands are for punching, not menus).
    */
+  /** The resign button — or, once tapped, its are-you-sure ✕ / ✓ pair. */
+  private forfeitButtons(label: string): ActionButton[] {
+    return this.confirmForfeit
+      ? [
+          { id: 'forfeit-no', label: '✕ NO', accent: UI.cool, half: 'l' },
+          { id: 'forfeit-yes', label: `✓ ${label}`, accent: UI.danger, half: 'r' },
+        ]
+      : [{ id: 'forfeit', label, accent: UI.danger }];
+  }
+
   private panelContent(): { title: string; buttons: ActionButton[]; status: string; loadout: boolean } | null {
     if (app.state === 'training') {
       return {
         title: 'AIM TRAINING',
-        buttons: [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }],
-        status: '',
+        buttons: this.forfeitButtons('FORFEIT'),
+        status: this.confirmForfeit ? 'end the session?' : '',
         loadout: true, // practice range — swap attachments whenever
       };
     }
@@ -1229,8 +1241,8 @@ export class MenuSystem extends createSystem({}) {
     if (app.state === 'playing' && app.mode === 'campaign' && match.phase !== 'matchOver') {
       return {
         title: 'TITAN BOUT',
-        buttons: [{ id: 'forfeit', label: 'CONCEDE', accent: UI.danger }],
-        status: '',
+        buttons: this.forfeitButtons('CONCEDE'),
+        status: this.confirmForfeit ? 'give up the bout?' : '',
         loadout: true,
       };
     }
@@ -1257,8 +1269,8 @@ export class MenuSystem extends createSystem({}) {
     if (app.state === 'playing' && (match.phase === 'roundOver' || match.phase === 'countdown')) {
       return {
         title: 'ROUND BREAK',
-        buttons: app.mode === 'bot' ? [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }] : [],
-        status: '',
+        buttons: app.mode === 'bot' ? this.forfeitButtons('FORFEIT') : [],
+        status: this.confirmForfeit && app.mode === 'bot' ? 'give up the bout?' : '',
         loadout: true,
       };
     }
@@ -1268,8 +1280,8 @@ export class MenuSystem extends createSystem({}) {
     if (app.state === 'playing' && app.mode === 'bot' && match.phase === 'playing' && !app.tutorial) {
       return {
         title: 'BOT BOUT',
-        buttons: [{ id: 'forfeit', label: 'FORFEIT', accent: UI.danger }],
-        status: '',
+        buttons: this.forfeitButtons('FORFEIT'),
+        status: this.confirmForfeit ? 'give up the bout?' : '',
         loadout: false,
       };
     }
@@ -1289,12 +1301,14 @@ export class MenuSystem extends createSystem({}) {
     const content = this.panelContent();
     if (!content) {
       this.panel.mesh.visible = false;
+      this.confirmForfeit = false;
       this.hidePointers();
       return;
     }
 
     if (this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
       this.panel.mesh.visible = !this.panel.mesh.visible;
+      this.confirmForfeit = false; // dismissing or reopening disarms the ✕/✓
       if (this.panel.mesh.visible) this.placePanel();
       sfx.ensureAudio();
       sfx.uiClick();
@@ -1443,7 +1457,17 @@ export class MenuSystem extends createSystem({}) {
     sfx.uiClick();
     switch (id) {
       case 'forfeit':
+        // Arm the are-you-sure ✕ / ✓ row — nothing ends on the first tap.
+        this.confirmForfeit = true;
+        this.panelKey = '';
+        break;
+      case 'forfeit-no':
+        this.confirmForfeit = false;
+        this.panelKey = '';
+        break;
+      case 'forfeit-yes':
       case 'return':
+        this.confirmForfeit = false;
         this.panel.mesh.visible = false;
         // Ends a live net bout OR stops the bot-bout background search.
         if (app.state === 'playing') net.cancel();
