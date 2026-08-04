@@ -71,6 +71,17 @@ const CLAIM_ANSWER_MS = 20_000;
  *  yet — fall back to createdAt so a mid-rollout peer can still be matched. */
 const LOBBY_LEGACY_FRESH_MS = 2 * 60 * 1000;
 
+/** A lobby dead for THIS long gets deleted by whoever scans past it. Ghosts
+ *  (crashed tabs, killed browsers — nothing client-side ran close()) used to
+ *  pile up for ever, and the claim scan reads only the first `limit()` docs in
+ *  id order: once ten ghosts sorted ahead of every live lobby, every searcher
+ *  saw nothing but ghosts, skipped them all, hosted their own lobby — and
+ *  NOBODY EVER PAIRED again (the August '26 "quick match is dead" outage).
+ *  Reaping keeps the collection tiny so live lobbies always fit in the scan.
+ *  Much longer than the freshness window, so a client whose clock probe failed
+ *  can mis-judge liveness without vandalising a real host's lobby. */
+const GHOST_REAP_MS = 10 * 60 * 1000;
+
 function millis(v: unknown): number | undefined {
   return (v as { toMillis?: () => number } | undefined)?.toMillis?.();
 }
@@ -82,6 +93,13 @@ function lobbyFresh(data: Record<string, unknown> | undefined, now: number): boo
   const seen = millis(data?.seen);
   if (typeof seen === 'number') return now - seen <= LOBBY_FRESH_MS;
   return now - (millis(data?.createdAt) ?? 0) <= LOBBY_LEGACY_FRESH_MS;
+}
+
+/** Long past any freshness window — a ghost worth reaping (see GHOST_REAP_MS).
+ *  A doc with neither stamp is malformed and counts as long dead. */
+function lobbyLongDead(data: Record<string, unknown> | undefined, now: number): boolean {
+  const last = millis(data?.seen) ?? millis(data?.createdAt) ?? 0;
+  return now - last > GHOST_REAP_MS;
 }
 
 let firebaseApp: FirebaseApp | undefined;
@@ -372,10 +390,15 @@ export class WebRtcTransport implements Transport {
   private async tryClaimLobby(
     lobbies: ReturnType<typeof collection>,
   ): Promise<DocumentReference | null> {
-    const open = await getDocs(query(lobbies, where('open', '==', true), limit(10)));
+    const open = await getDocs(query(lobbies, where('open', '==', true), limit(25)));
     const now = serverNow();
     for (const snap of open.docs) {
-      if (!lobbyFresh(snap.data(), now)) continue; // a ghost — skip it
+      if (!lobbyFresh(snap.data(), now)) {
+        // A ghost — skip it, and REAP it if it's long dead so ghosts can never
+        // crowd live lobbies out of this scan again.
+        if (lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
+        continue;
+      }
       try {
         await runTransaction(db(), async (txn) => {
           const fresh = await txn.get(snap.ref);
@@ -432,13 +455,16 @@ export class WebRtcTransport implements Transport {
    */
   private async crossOverIfRivalHost(): Promise<void> {
     const lobbies = collection(db(), 'lobbies');
-    const open = await getDocs(query(lobbies, where('open', '==', true), limit(10)));
+    const open = await getDocs(query(lobbies, where('open', '==', true), limit(25)));
     if (this.closed || this.matched || !this.lobbyRef) return;
     const now = serverNow();
     const myId = this.lobbyRef.id;
     for (const snap of open.docs) {
       if (snap.id === myId) continue;
-      if (!lobbyFresh(snap.data(), now)) continue;
+      if (!lobbyFresh(snap.data(), now)) {
+        if (lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
+        continue;
+      }
       if (myId < snap.id) continue; // we hold the smaller id — we're the keeper, they cross to us
       // We're the larger id → drop our lobby and re-queue to claim theirs.
       if (this.hostTimer) {

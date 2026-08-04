@@ -13,12 +13,20 @@
 
 import type { ArcadeMode } from '../config.js';
 import { FIREBASE_ENABLED } from './firebaseConfig.js';
+import { serverNow, syncServerClock } from './serverClock.js';
 
 /** A live lobby's members stamp `beat` on the room doc every 30 s (meshImpl).
  *  A beat older than this means every member crashed/quit without cleaning up
  *  — a zombie shell, not a joinable lobby. Legacy docs without a beat fall
  *  back to createdAt, so old abandoned rooms age out the same way. */
 const BEAT_STALE_MS = 2 * 60 * 1000;
+
+/** A room silent for THIS long gets deleted by whoever's browsing — zombie
+ *  shells otherwise pile up in `arcadeRooms` for ever (nothing client-side
+ *  runs after a crash), and the quick-match outage taught us where unbounded
+ *  ghost growth ends. Far beyond any live pause, so a skewed-but-unsynced
+ *  clock can't reap a real lobby. */
+const ROOM_REAP_MS = 30 * 60 * 1000;
 
 export interface LobbyRoom {
   /** The `arcadeRooms` doc id — passed to mesh.joinLobby to claim a seat. */
@@ -59,22 +67,32 @@ export function startLobbyWatch(mode: ArcadeMode, onRooms: ListListener): void {
   void (async () => {
     try {
       const { getApp, getApps, initializeApp } = await import('firebase/app');
-      const { collection, getFirestore, onSnapshot, query, where } = await import('firebase/firestore');
+      const { collection, deleteDoc, getFirestore, onSnapshot, query, where } = await import('firebase/firestore');
       const { firebaseConfig } = await import('./firebaseConfig.js');
       const apps = getApps();
       const appFb = apps.length ? getApp() : initializeApp(firebaseConfig);
       const rooms = collection(getFirestore(appFb), 'arcadeRooms');
 
+      // Correct for device clock skew BEFORE judging beats: this watch used to
+      // trust Date.now(), so a headset clock >2 min fast saw EVERY live room as
+      // a zombie and listed nothing (queueWatch/rankedWatch already sync).
+      void syncServerClock();
       const unsub = onSnapshot(
         query(rooms, where('mode', '==', mode), where('open', '==', true)),
         (snap) => {
-          const now = Date.now();
+          const now = serverNow();
           const list: LobbyRoom[] = [];
           snap.forEach((docSnap) => {
             const data = docSnap.data();
-            if (data.started === true) return;
             const created = (data.createdAt?.toMillis?.() as number | undefined) ?? now;
             const beat = (data.beat?.toMillis?.() as number | undefined) ?? created;
+            // Long-dead shell — reap it so the collection can't silt up (the
+            // browser is the only regular reader of this collection).
+            if (now - beat > ROOM_REAP_MS) {
+              void deleteDoc(docSnap.ref).catch(() => {});
+              return;
+            }
+            if (data.started === true) return;
             if (now - beat > BEAT_STALE_MS) return; // nobody alive inside — zombie
             const seats = (data.seats as string[]) ?? [];
             const count = seats.filter(Boolean).length;

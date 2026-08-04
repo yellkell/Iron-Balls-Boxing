@@ -19,6 +19,11 @@ import { serverNow, syncServerClock } from './serverClock.js';
  *  LOBBY_FRESH_MS in webrtcTransport.ts). */
 const FRESH_MS = 40 * 1000;
 
+/** A room silent for THIS long gets deleted by whoever's browsing, so ghost
+ *  hosts (crashed tabs — nothing client-side cleans up) can't pile up for
+ *  ever. Way past any live heartbeat gap (hosts stamp every ~2.5 s). */
+const ROOM_REAP_MS = 10 * 60 * 1000;
+
 export interface RankedRoom {
   /** The `rankedRooms` doc id — passed to net.joinRanked to claim it. */
   id: string;
@@ -47,7 +52,7 @@ export function startRankedWatch(onRooms: ListListener): void {
   void (async () => {
     try {
       const { getApp, getApps, initializeApp } = await import('firebase/app');
-      const { collection, getFirestore, onSnapshot, query, where } = await import('firebase/firestore');
+      const { collection, deleteDoc, getFirestore, onSnapshot, query, where } = await import('firebase/firestore');
       const { firebaseConfig } = await import('./firebaseConfig.js');
       const apps = getApps();
       const appFb = apps.length ? getApp() : initializeApp(firebaseConfig);
@@ -65,6 +70,11 @@ export function startRankedWatch(onRooms: ListListener): void {
               (data.seen?.toMillis?.() as number | undefined) ??
               (data.createdAt?.toMillis?.() as number | undefined) ??
               now;
+            if (now - seen > ROOM_REAP_MS) {
+              // Long-dead ghost host — reap it (see the quick-match outage).
+              void deleteDoc(docSnap.ref).catch(() => {});
+              return;
+            }
             if (now - seen <= FRESH_MS) {
               list.push({ id: docSnap.id, host: typeof data.host === 'string' ? data.host : 'BOXER' });
             }
