@@ -93,6 +93,7 @@ import { mesh } from '../net/mesh.js';
 import { UI } from '../ui/industrial.js';
 import { net } from '../net/client.js';
 import { startQueueWatch, stopQueueWatch } from '../net/queueWatch.js';
+import { startRaidWatch, stopRaidWatch } from '../net/raidWatch.js';
 import { startRankedWatch, stopRankedWatch } from '../net/rankedWatch.js';
 import { startPubWatch, stopPubWatch } from '../net/pubWatch.js';
 import { PUB_REGIONS } from '../pub/config.js';
@@ -201,6 +202,8 @@ export class MenuSystem extends createSystem({}) {
       JSON.stringify(app.pubRegionCounts),
       app.lobbyRooms,
       app.rankedRooms,
+      app.raidsOpen, // the RAID button's live badge
+
       app.privateCode, // arrives async while hosting a private match
       leaderboard.ranked, // all boards are replaced together per fetch
       leaderboard.status,
@@ -1639,9 +1642,15 @@ export class MenuSystem extends createSystem({}) {
       startRankedWatch((rooms) => {
         app.rankedRooms = rooms;
       });
+      // …and the forming raid squads, so the RAID button can badge them too.
+      startRaidWatch((n) => {
+        app.raidsOpen = n;
+      });
     } else {
       stopRankedWatch();
       app.rankedRooms = [];
+      stopRaidWatch();
+      app.raidsOpen = -1;
     }
 
     // The action panel only lives inside training runs and bouts; the

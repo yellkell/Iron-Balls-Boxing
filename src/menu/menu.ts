@@ -359,6 +359,22 @@ function drawTrain(ctx: CanvasRenderingContext2D, hoverAction: MenuAction | null
   buttonPlate(ctx, 70, 140, PW - 140, 54, 'CAMPAIGN', UI.danger, !locked && hoverAction === 'open-campaign', locked);
   // The RAID — up to five raiders, five titans, one lobby.
   buttonPlate(ctx, 70, 200, PW - 140, 54, 'RAID', '#b26bff', !locked && hoverAction === 'open-raid', locked);
+  // Live "N OPEN" badge on the RAID plate — squads forming right now, so you
+  // can see there's a raid to join without opening the browser (RANKED's pill).
+  if (!locked && app.raidsOpen > 0) {
+    const label = `${app.raidsOpen} OPEN`;
+    ctx.font = '800 16px system-ui, sans-serif';
+    const pillW = ctx.measureText(label).width + 34, pillH = 24;
+    const px = PW - 70 - pillW, py = 215;
+    plate(ctx, px, py, pillW, pillH, { cut: 8, fill: 'rgba(178,107,255,0.22)', stroke: '#b26bff', rivets: false });
+    ctx.fillStyle = '#d3a5ff';
+    ctx.beginPath();
+    ctx.arc(px + 14, py + pillH / 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.fillText(label, px + 24, py + pillH / 2 + 1);
+    ctx.textAlign = 'center';
+  }
   buttonPlate(ctx, 70, 260, PW - 140, 54, 'AIM TRAINING', UI.ember, !locked && hoverAction === 'start-training', locked);
   if (locked) {
     ctx.font = '600 18px system-ui, sans-serif';

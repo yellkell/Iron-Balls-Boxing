@@ -18,8 +18,10 @@ import { serverNow, syncServerClock } from './serverClock.js';
 /** A live lobby's members stamp `beat` on the room doc every 30 s (meshImpl).
  *  A beat older than this means every member crashed/quit without cleaning up
  *  — a zombie shell, not a joinable lobby. Legacy docs without a beat fall
- *  back to createdAt, so old abandoned rooms age out the same way. */
-const BEAT_STALE_MS = 2 * 60 * 1000;
+ *  back to createdAt, so old abandoned rooms age out the same way. Two missed
+ *  beats + margin: the old 2 min window kept dead rooms on the list long
+ *  enough to read as "my old lobby is still there". */
+const BEAT_STALE_MS = 75 * 1000;
 
 /** A room silent for THIS long gets deleted by whoever's browsing — zombie
  *  shells otherwise pile up in `arcadeRooms` for ever (nothing client-side

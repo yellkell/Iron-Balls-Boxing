@@ -55,6 +55,8 @@ interface Peer {
    *  snapshot listener never re-delivers an 'added', so they'd be lost and
    *  the pair could simply never connect). */
   pending: RTCIceCandidateInit[];
+  /** Grace timer for an in-lobby 'disconnected' — see newPeer. */
+  grace: ReturnType<typeof setTimeout> | null;
 }
 
 export class MeshImpl {
@@ -285,6 +287,7 @@ export class MeshImpl {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    window.removeEventListener('pagehide', this.onPageHide);
     if (this.beatTimer !== null) {
       clearInterval(this.beatTimer);
       this.beatTimer = null;
@@ -325,8 +328,40 @@ export class MeshImpl {
     this.roomRef = null;
   }
 
+  /**
+   * Best-effort ghost prevention when the PAGE dies under us (headset browser
+   * closed, app swapped away, tab killed) — close() never runs then, and its
+   * Firestore transaction wouldn't survive teardown anyway. If we're the LAST
+   * occupant, fire a keepalive REST delete of the room doc on pagehide: with
+   * nobody left inside, no survivor exists to clean up, and the shell would
+   * otherwise sit in the browser list until the beat went stale ("my old room
+   * still says 1 player and I left minutes ago"). With others present we do
+   * nothing — their side notices our channels close within a beat and vacates
+   * the seat (adopt/dropPeer), which a blind REST write would only race.
+   */
+  private readonly onPageHide = (): void => {
+    if (this.closed || !this.roomRef) return;
+    const occ = this.state.occupants.filter(Boolean);
+    if (occ.length > 1 || this.rawSeats[this.state.mySeat] !== this.clientId) return;
+    const name = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${this.roomRef.path}`;
+    try {
+      void fetch(
+        `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:commit?key=${firebaseConfig.apiKey}`,
+        {
+          method: 'POST',
+          keepalive: true, // survives page teardown, unlike the SDK's write
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ writes: [{ delete: name }] }),
+        },
+      ).catch(() => {});
+    } catch {
+      /* the page is going down — nothing else to try */
+    }
+  };
+
   private watchRoom(): void {
     if (!this.roomRef) return;
+    window.addEventListener('pagehide', this.onPageHide);
     this.roomUnsub = onSnapshot(this.roomRef, (snap) => {
       if (!snap.exists() || this.closed) return;
       this.rawSeats = (snap.data().seats as string[]) ?? [];
@@ -408,16 +443,35 @@ export class MeshImpl {
 
   private newPeer(seat: number): Peer {
     const pc = new RTCPeerConnection(iceConfig());
-    const peer: Peer = { seat, pc, evt: null, pose: null, unsubs: [], pending: [] };
+    const peer: Peer = { seat, pc, evt: null, pose: null, unsubs: [], pending: [], grace: null };
     this.peers.set(seat, peer);
     pc.onconnectionstatechange = () => {
-      // Only terminal states drop the peer. 'disconnected' is TRANSIENT — ICE
-      // routinely blips through it and recovers (Quest Wi-Fi especially), and a
-      // drop here is PERMANENT (dropped seats are masked and never reconnected)
-      // — it was silently killing raiders who were still very much present.
-      // A genuinely dead peer still gets caught: 'failed'/'closed' land here,
-      // and in a live bout the pose-staleness backstop (MeshSystem) is faster.
-      if (['failed', 'closed'].includes(pc.connectionState)) this.dropPeer(seat);
+      // Only terminal states drop the peer outright. 'disconnected' is
+      // TRANSIENT — ICE routinely blips through it and recovers (Quest Wi-Fi
+      // especially), and a drop here is PERMANENT (dropped seats are masked
+      // and never reconnected) — it was silently killing raiders who were
+      // still very much present. A genuinely dead peer still gets caught:
+      // 'failed'/'closed' land here, and in a live bout the pose-staleness
+      // backstop (MeshSystem) is faster.
+      const state = pc.connectionState;
+      if (state === 'connected' && peer.grace !== null) {
+        clearTimeout(peer.grace);
+        peer.grace = null;
+      }
+      if (['failed', 'closed'].includes(state)) this.dropPeer(seat);
+      // While the room is still FILLING, a vanished peer must free their seat
+      // fast — a lobby seat blocked for the ~30 s ICE takes to reach 'failed'
+      // reads as "it never noticed they left". A short grace still absorbs the
+      // Wi-Fi blips; a wrongly dropped lobby peer can simply rejoin (unlike a
+      // live bout, where a drop eliminates them — there we stay patient).
+      if (state === 'disconnected' && !this.state.started && peer.grace === null && !this.closed) {
+        peer.grace = setTimeout(() => {
+          peer.grace = null;
+          if (!this.closed && this.peers.get(seat) === peer && pc.connectionState !== 'connected') {
+            this.dropPeer(seat);
+          }
+        }, 5_000);
+      }
     };
     // Spatial voice: surface this peer's mic track to the facade, keyed by seat.
     pc.ontrack = (ev) => {
@@ -467,6 +521,15 @@ export class MeshImpl {
     };
     evt.onmessage = onMsg;
     if (pose) pose.onmessage = onMsg;
+    // A peer that LEAVES cleanly (menu quit, tab closed) tears its connection
+    // down, and their evt channel closes on our side within a beat — but this
+    // was ignored, so the leaver stood in the room until ICE ground through to
+    // 'failed' (~30 s of "it hasn't noticed they left"). The 1v1 path has
+    // always dropped on channel close; the mesh now does too. Our own close()
+    // detaches first, so this never fires for our own teardown.
+    evt.onclose = () => {
+      if (!this.closed && this.peers.get(peer.seat) === peer) this.dropPeer(peer.seat);
+    };
   }
 
   private async connectAsOfferer(seat: number): Promise<void> {
@@ -572,11 +635,15 @@ export class MeshImpl {
   private dropPeer(seat: number): void {
     const peer = this.peers.get(seat);
     if (peer) {
+      if (peer.grace !== null) clearTimeout(peer.grace);
+      peer.grace = null;
       for (const u of peer.unsubs) u();
+      // Delete from the map BEFORE closing, so the channels' own onclose
+      // (fired async by our close() calls) sees a stale peer and bails.
+      this.peers.delete(seat);
       peer.evt?.close();
       peer.pose?.close();
       peer.pc.close();
-      this.peers.delete(seat);
     }
     this.state.voice.delete(seat);
     // Mask the seat so the roster/match layer sees the player as gone — even

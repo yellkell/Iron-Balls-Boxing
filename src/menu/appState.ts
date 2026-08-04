@@ -225,6 +225,9 @@ export const app: {
   duelView: 'root' | 'private' | 'hosting' | 'keypad' | 'browser';
   /** Open ranked rooms for the server browser (live from rankedWatch). */
   rankedRooms: { id: string; host: string }[];
+  /** How many raid squads are forming right now (−1 = unknown). Drives the
+   *  RAID button's live badge, like rankedRooms does for RANKED. */
+  raidsOpen: number;
   /** While hosting a ranked room, its doc id — so the browser marks our own row
    *  and leaves it unclickable. Empty when we're not hosting. */
   rankedRoomId: string;
@@ -300,6 +303,7 @@ export const app: {
   showBody: loadShowBody(),
   duelView: 'root',
   rankedRooms: [],
+  raidsOpen: -1,
   rankedRoomId: '',
   rankedHost: false,
   fromRanked: false,
