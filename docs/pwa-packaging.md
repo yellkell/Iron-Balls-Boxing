@@ -42,28 +42,31 @@ Notes:
 
 ## 2½ · MICROPHONE — the wrapper must declare it, or voice chat is dead
 
-Bubblewrap does NOT add mic permission by default, and Android auto-denies
-`getUserMedia` in an app that never declared it — **no prompt is ever shown**;
-the site's promise just rejects. In game that means everyone in the store app
-falls silently onto the `recvonly` path: they hear browser players, but
-nobody ever hears them (the "voice chat never asks for permission" bug in
-the shipped wrapper).
+An Android app that never declared `RECORD_AUDIO` auto-denies `getUserMedia`
+with **no prompt ever shown** — the site's promise just rejects, and everyone
+in the store app falls silently onto the `recvonly` path: they hear browser
+players, but nobody ever hears them.
 
-After `init` and BEFORE `build`, add to the generated
-`app/src/main/AndroidManifest.xml`, next to the other `<uses-permission>`
-entries:
+> **The REAL pipeline lives in `Desktop/firefightpwakit/` — read its
+> REBUILD.md, not this section's generic steps.** The store build comes from
+> Meta's fork (`@meta-quest/bubblewrap-cli`, project in `meta-build/`); stock
+> Bubblewrap output is hard-rejected by Meta's upload validation. In the
+> fork, the mic switch is `"enableMicrophone": true` in `twa-manifest.json` —
+> it generates the RECORD_AUDIO permission AND Meta's permission-delegation
+> activity. No hand-editing of the manifest needed (except re-setting
+> `allowBackup="false"` after every `update`, which REBUILD.md covers).
 
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-<uses-feature android:name="android.hardware.microphone" android:required="false" />
-```
-
-(`required="false"` keeps the store from filtering devices; Quests all have
-mics anyway.) A rebuilt `twa-manifest.json` regenerates the project, so
-re-apply this after any `bubblewrap update`. Then rebuild, re-test voice in
-a quick match AND the pub from the sideloaded APK, and ship the new APK as a
-store update — this cannot be fixed from the web side.
+**History — why the store shipped WITHOUT the mic:** v5 ("nomic", 1.0.3)
+deliberately stripped the mic machinery because it correlated with the
+Meta Browser launch crash (MediaSessionImpl NPE — see
+firefightpwakit/meta-support-escalation.md, 2026-07-29: 13/14 crashes with
+mic delegation vs a mic-less sibling app at 4/4 clean). Since then the web
+side eliminated every audible media element (music rides WebAudio,
+src/audio/musicTrack.ts), which removes the media-session state changes
+that NPE fired on. v6 (1.0.4, 2026-08-04) restores the mic on that basis —
+**soak-test a sideloaded v6 across MANY launches (the crash historically
+appeared only after an install accumulated browser-side origin state, not
+on a fresh install) before promoting it on the store.**
 
 ## 3 · Trust the wrapper (assetlinks)
 
