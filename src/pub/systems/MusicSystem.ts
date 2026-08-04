@@ -46,6 +46,14 @@ const JUKE_AIM_Y = 1.1; // aim at the cabinet body, not its floor-level origin
 
 const MARQUEE_SCROLL_SPEED = 70; // px/s a too-long title scrolls across the screen
 
+/** Late-join grace: joining a room with a song ON used to fire the full-song
+ *  fetch + decode straight into the middle of the pub scene load — a memory
+ *  spike that could kill the tab on Quest ("couldn't join while a song was
+ *  playing"). Adopting the room's station waits this long after the system
+ *  boots so the scene lands first; a local coin (a live gesture in a loaded
+ *  scene) skips the wait. */
+const JOIN_MUSIC_SETTLE_MS = 10_000;
+
 export class MusicSystem extends createSystem({}) {
   /** The one shared player — src swaps per station, dropping the old decode. */
   private audio: MusicTrack | null = null;
@@ -69,10 +77,18 @@ export class MusicSystem extends createSystem({}) {
   private marqueeScroll = 0;
   /** Set by the last render: does the main line overflow (and so scroll)? */
   private marqueeScrolls = false;
+  /** When the system booted — the late-join settle window counts from here. */
+  private readonly bootAt = performance.now();
+  /** A station adoption held back by the settle window (see setStation). */
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Silence the jukebox when the shared app returns to the arena — and drop
    *  the decoded song (src = '') so the pub's memory goes back with you. */
   leaveClub(): void {
+    if (this.settleTimer !== null) {
+      clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    }
     this.audio?.pause();
     if (this.audio) this.audio.src = '';
     this.station = -1;
@@ -181,11 +197,30 @@ export class MusicSystem extends createSystem({}) {
     uiClick();
     if (pub.online) pubSendRaw({ t: 'music', station: next });
     pub.music = next;
-    this.setStation(next); // optimistic; the server's echo is idempotent
+    this.applyStation(next); // a coin is a live gesture — no settle wait
+  }
+
+  /** Adopt station `s`, holding a song back through the late-join settle
+   *  window (see JOIN_MUSIC_SETTLE_MS) so the decode never lands on top of
+   *  the scene load. Off (−1) always applies at once. */
+  private setStation(s: number): void {
+    if (this.settleTimer !== null) {
+      clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    }
+    const wait = JOIN_MUSIC_SETTLE_MS - (performance.now() - this.bootAt);
+    if (s >= 0 && wait > 0) {
+      this.settleTimer = setTimeout(() => {
+        this.settleTimer = null;
+        this.applyStation(pub.music); // the room may have flipped meanwhile
+      }, wait);
+      return;
+    }
+    this.applyStation(s);
   }
 
   /** Switch to `s` (−1 = off): stop the old song, start the new, redraw the marquee. */
-  private setStation(s: number): void {
+  private applyStation(s: number): void {
     if (s === this.station) return;
     this.audio?.pause();
     this.station = s;
@@ -235,7 +270,10 @@ export class MusicSystem extends createSystem({}) {
 
   private ensureAudio(): MusicTrack {
     if (!this.audio) {
-      this.audio = new MusicTrack(undefined, { cache: false });
+      // Uncached (cycling the catalogue must not pile decodes up) AND lo-fi
+      // (24 kHz mono) — full-fidelity PCM of a whole song was a Quest-killing
+      // memory spike, and through a pub jukebox lo-fi IS the aesthetic.
+      this.audio = new MusicTrack(undefined, { cache: false, lofi: true });
       this.audio.loop = false; // play once, then stop — a coin starts the next track
       this.audio.volume = 0;
       // Reached the end on its own: stop here (don't replay) and prompt for a

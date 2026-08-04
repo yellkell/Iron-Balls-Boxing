@@ -31,16 +31,48 @@ interface LoadedTrack {
 
 const bufferCache = new Map<string, Promise<LoadedTrack | null>>();
 
-async function decodeTrack(url: string): Promise<LoadedTrack | null> {
+/** Lo-fi decode rate: a full song decoded at the context's 48 kHz stereo is
+ *  50–110 MB of PCM — a spike that can OOM a Quest tab (it did, when a pub
+ *  late-join fired the jukebox decode into the middle of the scene load).
+ *  24 kHz mono is ~an eighth of that, and through a pub jukebox it just
+ *  sounds like a pub jukebox. */
+const LOFI_RATE = 24000;
+
+async function decodeTrack(url: string, lofi = false): Promise<LoadedTrack | null> {
   const ctx = audioContext();
   if (!ctx) return null;
   try {
     const res = await fetch(url);
-    const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    const bytes = await res.arrayBuffer();
+    let buffer: AudioBuffer;
+    if (lofi) {
+      // Decode through a throwaway OfflineAudioContext pinned to LOFI_RATE, so
+      // the decoder resamples down instead of handing us a 48 kHz giant, then
+      // fold to mono. (An AudioBufferSourceNode resamples on playback, so the
+      // main context plays the low-rate buffer transparently.)
+      const octx = new OfflineAudioContext(1, 1, LOFI_RATE);
+      buffer = mixdownMono(await octx.decodeAudioData(bytes));
+    } else {
+      buffer = await ctx.decodeAudioData(bytes);
+    }
     return { buffer, head: firstAudibleSecond(buffer) };
   } catch {
     return null; // fetch/decode failed — the track just stays silent
   }
+}
+
+/** Average all channels into a fresh mono buffer (frees the stereo one). */
+function mixdownMono(src: AudioBuffer): AudioBuffer {
+  if (src.numberOfChannels === 1) return src;
+  const out = new AudioBuffer({ length: src.length, sampleRate: src.sampleRate, numberOfChannels: 1 });
+  const sum = out.getChannelData(0);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const data = src.getChannelData(c);
+    for (let i = 0; i < sum.length; i++) sum[i] += data[i];
+  }
+  const inv = 1 / src.numberOfChannels;
+  for (let i = 0; i < sum.length; i++) sum[i] *= inv;
+  return out;
 }
 
 function firstAudibleSecond(buffer: AudioBuffer): number {
@@ -91,16 +123,21 @@ export class MusicTrack {
    *  jukebox, where songs are full-length and cycling through the catalogue
    *  must not pile hundreds of decoded MB onto a Quest. */
   private _cache = true;
+  /** Lo-fi mode decodes at LOFI_RATE mono (see decodeTrack) — for the jukebox,
+   *  where full-fidelity PCM was a Quest-killing memory spike. Only honoured
+   *  uncached: the shared cache must stay one-shape-per-URL. */
+  private _lofi = false;
   private _uncached: { url: string; pending: Promise<LoadedTrack | null> } | null = null;
 
-  constructor(src?: string, opts?: { cache?: boolean }) {
+  constructor(src?: string, opts?: { cache?: boolean; lofi?: boolean }) {
     this._cache = opts?.cache !== false;
+    this._lofi = opts?.lofi === true;
     if (src) this.src = src;
   }
 
   private load(url: string): Promise<LoadedTrack | null> {
     if (this._cache) return loadBuffer(url);
-    if (this._uncached?.url !== url) this._uncached = { url, pending: decodeTrack(url) };
+    if (this._uncached?.url !== url) this._uncached = { url, pending: decodeTrack(url, this._lofi) };
     return this._uncached.pending;
   }
 

@@ -40,6 +40,31 @@ Notes:
 - `build` creates a signing keystore and asks for two passwords — SAVE THEM
   (they sign every future update). Output: `app-release-signed.apk`.
 
+## 2½ · MICROPHONE — the wrapper must declare it, or voice chat is dead
+
+Bubblewrap does NOT add mic permission by default, and Android auto-denies
+`getUserMedia` in an app that never declared it — **no prompt is ever shown**;
+the site's promise just rejects. In game that means everyone in the store app
+falls silently onto the `recvonly` path: they hear browser players, but
+nobody ever hears them (the "voice chat never asks for permission" bug in
+the shipped wrapper).
+
+After `init` and BEFORE `build`, add to the generated
+`app/src/main/AndroidManifest.xml`, next to the other `<uses-permission>`
+entries:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+<uses-feature android:name="android.hardware.microphone" android:required="false" />
+```
+
+(`required="false"` keeps the store from filtering devices; Quests all have
+mics anyway.) A rebuilt `twa-manifest.json` regenerates the project, so
+re-apply this after any `bubblewrap update`. Then rebuild, re-test voice in
+a quick match AND the pub from the sideloaded APK, and ship the new APK as a
+store update — this cannot be fixed from the web side.
+
 ## 3 · Trust the wrapper (assetlinks)
 
 So the shell opens the site full-screen as YOUR app (no browser chrome), the
