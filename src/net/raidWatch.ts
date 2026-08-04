@@ -42,7 +42,8 @@ export function startRaidWatch(onCount: CountListener): void {
       const appFb = apps.length ? getApp() : initializeApp(firebaseConfig);
       const rooms = collection(getFirestore(appFb), 'arcadeRooms');
 
-      void syncServerClock(); // correct for device clock skew (see serverClock.ts)
+      // Awaited so the first count never judges beats on a raw skewed clock.
+      await syncServerClock();
       const unsub = onSnapshot(
         query(rooms, where('mode', '==', 'raid'), where('open', '==', true)),
         (snap) => {
@@ -55,7 +56,8 @@ export function startRaidWatch(onCount: CountListener): void {
             const beat = (data.beat?.toMillis?.() as number | undefined) ?? created;
             if (now - beat > BEAT_STALE_MS) return; // zombie shell
             const seats = (data.seats as string[]) ?? [];
-            if (seats.filter(Boolean).length === 0) return; // empty shell
+            const gone = (data.gone as Record<string, boolean> | undefined) ?? {};
+            if (seats.filter((s) => s && gone[s] !== true).length === 0) return; // empty shell
             count += 1;
           });
           onCount(count);

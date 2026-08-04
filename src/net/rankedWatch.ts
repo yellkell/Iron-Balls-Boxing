@@ -13,7 +13,7 @@
  */
 
 import { FIREBASE_ENABLED } from './firebaseConfig.js';
-import { serverNow, syncServerClock } from './serverClock.js';
+import { clockConfident, serverNow, syncServerClock } from './serverClock.js';
 
 /** Rooms not heartbeated within this are abandoned hosts — hide them (mirrors
  *  LOBBY_FRESH_MS in webrtcTransport.ts). */
@@ -58,7 +58,9 @@ export function startRankedWatch(onRooms: ListListener): void {
       const appFb = apps.length ? getApp() : initializeApp(firebaseConfig);
       const rooms = collection(getFirestore(appFb), 'rankedRooms');
 
-      void syncServerClock(); // correct for device clock skew (see serverClock.ts)
+      // AWAITED so the first snapshot never judges (or reaps) rooms on a raw
+      // skewed device clock — see lobbyWatch for the failure this caused.
+      await syncServerClock();
       const unsub = onSnapshot(
         query(rooms, where('open', '==', true)),
         (snap) => {
@@ -71,8 +73,9 @@ export function startRankedWatch(onRooms: ListListener): void {
               (data.createdAt?.toMillis?.() as number | undefined) ??
               now;
             if (now - seen > ROOM_REAP_MS) {
-              // Long-dead ghost host — reap it (see the quick-match outage).
-              void deleteDoc(docSnap.ref).catch(() => {});
+              // Long-dead ghost host — reap it (see the quick-match outage),
+              // but only with a server-confirmed clock behind the judgement.
+              if (clockConfident()) void deleteDoc(docSnap.ref).catch(() => {});
               return;
             }
             if (now - seen <= FRESH_MS) {

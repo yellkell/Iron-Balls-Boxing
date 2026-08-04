@@ -331,29 +331,44 @@ export class MeshImpl {
   /**
    * Best-effort ghost prevention when the PAGE dies under us (headset browser
    * closed, app swapped away, tab killed) — close() never runs then, and its
-   * Firestore transaction wouldn't survive teardown anyway. If we're the LAST
-   * occupant, fire a keepalive REST delete of the room doc on pagehide: with
-   * nobody left inside, no survivor exists to clean up, and the shell would
-   * otherwise sit in the browser list until the beat went stale ("my old room
-   * still says 1 player and I left minutes ago"). With others present we do
-   * nothing — their side notices our channels close within a beat and vacates
-   * the seat (adopt/dropPeer), which a blind REST write would only race.
+   * Firestore transaction wouldn't survive teardown anyway. A keepalive REST
+   * commit is the one write that does. Two cases:
+   *
+   *   - LAST occupant: delete the room doc outright — nobody's left inside to
+   *     clean up, and the shell would sit in the browser list until its beat
+   *     went stale ("my old room still says 1 player, I left minutes ago").
+   *   - others still seated: stamp a `gone.<myId>` TOMBSTONE on the doc. A
+   *     blind seat-array write would race the survivors, but a single map key
+   *     is ours alone. Survivors' watchRoom masks tombstoned ids and vacates
+   *     the seat; browsers/counters skip them. This also covers the whole
+   *     squad closing their headsets at the same moment — every member fires
+   *     a tombstone, so the room reads empty even though no survivor was left
+   *     behind to notice anyone's channels close.
    */
   private readonly onPageHide = (): void => {
     if (this.closed || !this.roomRef) return;
-    const occ = this.state.occupants.filter(Boolean);
-    if (occ.length > 1 || this.rawSeats[this.state.mySeat] !== this.clientId) return;
-    const name = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${this.roomRef.path}`;
+    if (this.rawSeats[this.state.mySeat] !== this.clientId) return; // not seated
+    const db = `projects/${firebaseConfig.projectId}/databases/(default)`;
+    const name = `${db}/documents/${this.roomRef.path}`;
+    const sole = this.state.occupants.filter(Boolean).length <= 1;
+    const body = sole
+      ? { writes: [{ delete: name }] }
+      : {
+          writes: [
+            {
+              update: { name, fields: { gone: { mapValue: { fields: { [this.clientId]: { booleanValue: true } } } } } },
+              // Backtick-quoted segment: a random id can start with a digit.
+              updateMask: { fieldPaths: ['gone.`' + this.clientId + '`'] },
+            },
+          ],
+        };
     try {
-      void fetch(
-        `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:commit?key=${firebaseConfig.apiKey}`,
-        {
-          method: 'POST',
-          keepalive: true, // survives page teardown, unlike the SDK's write
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ writes: [{ delete: name }] }),
-        },
-      ).catch(() => {});
+      void fetch(`https://firestore.googleapis.com/v1/${db}/documents:commit?key=${firebaseConfig.apiKey}`, {
+        method: 'POST',
+        keepalive: true, // survives page teardown, unlike the SDK's write
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => {});
     } catch {
       /* the page is going down — nothing else to try */
     }
@@ -366,6 +381,14 @@ export class MeshImpl {
       if (!snap.exists() || this.closed) return;
       this.rawSeats = (snap.data().seats as string[]) ?? [];
       this.applyOccupants();
+      // Tombstoned members (page died mid-lobby — see onPageHide) are gone for
+      // good: mask them like any dropped peer, which also frees their seat in
+      // the doc while the room is still filling.
+      const gone = (snap.data().gone as Record<string, boolean> | undefined) ?? {};
+      for (let seat = 0; seat < this.rawSeats.length; seat++) {
+        const id = this.rawSeats[seat];
+        if (id && gone[id] === true && seat !== this.state.mySeat) this.markDropped(seat);
+      }
       this.state.locked = snap.data().open === false;
       // RAID lobby extras: seed the callsigns from the doc (the `iam` message
       // re-affirms them in the bout) and mirror the host's controls.

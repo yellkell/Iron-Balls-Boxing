@@ -43,7 +43,7 @@ export function startQueueWatch(onCount: CountListener): void {
       const appFb = apps.length ? getApp() : initializeApp(firebaseConfig);
       const lobbies = collection(getFirestore(appFb), 'lobbies');
 
-      void syncServerClock(); // correct for device clock skew (see serverClock.ts)
+      await syncServerClock(); // corrected clock BEFORE the first count lands
       const unsub = onSnapshot(
         query(lobbies, where('open', '==', true)),
         (snap) => {

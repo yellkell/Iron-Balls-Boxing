@@ -40,7 +40,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebaseConfig.js';
-import { serverNow, syncServerClock } from './serverClock.js';
+import { clockConfident, serverNow, syncServerClock } from './serverClock.js';
 import { voiceEnabled } from '../audio/voicePref.js';
 import { ensureIceServers, iceConfig } from './iceConfig.js';
 import type { PeerMessage } from './protocol.js';
@@ -395,8 +395,9 @@ export class WebRtcTransport implements Transport {
     for (const snap of open.docs) {
       if (!lobbyFresh(snap.data(), now)) {
         // A ghost — skip it, and REAP it if it's long dead so ghosts can never
-        // crowd live lobbies out of this scan again.
-        if (lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
+        // crowd live lobbies out of this scan again. Only with a
+        // server-confirmed clock: a raw skewed clock must never delete.
+        if (clockConfident() && lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
         continue;
       }
       try {
@@ -462,7 +463,7 @@ export class WebRtcTransport implements Transport {
     for (const snap of open.docs) {
       if (snap.id === myId) continue;
       if (!lobbyFresh(snap.data(), now)) {
-        if (lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
+        if (clockConfident() && lobbyLongDead(snap.data(), now)) void deleteDoc(snap.ref).catch(() => {});
         continue;
       }
       if (myId < snap.id) continue; // we hold the smaller id — we're the keeper, they cross to us

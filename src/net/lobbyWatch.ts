@@ -13,7 +13,7 @@
 
 import type { ArcadeMode } from '../config.js';
 import { FIREBASE_ENABLED } from './firebaseConfig.js';
-import { serverNow, syncServerClock } from './serverClock.js';
+import { clockConfident, serverNow, syncServerClock } from './serverClock.js';
 
 /** A live lobby's members stamp `beat` on the room doc every 30 s (meshImpl).
  *  A beat older than this means every member crashed/quit without cleaning up
@@ -77,8 +77,12 @@ export function startLobbyWatch(mode: ArcadeMode, onRooms: ListListener): void {
 
       // Correct for device clock skew BEFORE judging beats: this watch used to
       // trust Date.now(), so a headset clock >2 min fast saw EVERY live room as
-      // a zombie and listed nothing (queueWatch/rankedWatch already sync).
-      void syncServerClock();
+      // a zombie and listed nothing. AWAITED, not just kicked: the first
+      // snapshot fires immediately, and letting it judge (and above all REAP)
+      // rooms with a raw skewed clock deleted LIVE rooms — a viewer whose
+      // clock ran fast assassinated every fresh raid lobby the moment they
+      // opened the browser ("I host, nobody ever sees my server").
+      await syncServerClock();
       const unsub = onSnapshot(
         query(rooms, where('mode', '==', mode), where('open', '==', true)),
         (snap) => {
@@ -89,15 +93,20 @@ export function startLobbyWatch(mode: ArcadeMode, onRooms: ListListener): void {
             const created = (data.createdAt?.toMillis?.() as number | undefined) ?? now;
             const beat = (data.beat?.toMillis?.() as number | undefined) ?? created;
             // Long-dead shell — reap it so the collection can't silt up (the
-            // browser is the only regular reader of this collection).
+            // browser is the only regular reader of this collection). ONLY
+            // with a server-confirmed clock: deleting on an unsynced skewed
+            // clock is how live rooms got assassinated.
             if (now - beat > ROOM_REAP_MS) {
-              void deleteDoc(docSnap.ref).catch(() => {});
+              if (clockConfident()) void deleteDoc(docSnap.ref).catch(() => {});
               return;
             }
             if (data.started === true) return;
             if (now - beat > BEAT_STALE_MS) return; // nobody alive inside — zombie
             const seats = (data.seats as string[]) ?? [];
-            const count = seats.filter(Boolean).length;
+            // Members who died with the page fire a `gone` tombstone (meshImpl
+            // onPageHide) — don't count them as still in the room.
+            const gone = (data.gone as Record<string, boolean> | undefined) ?? {};
+            const count = seats.filter((s) => s && gone[s] !== true).length;
             if (count === 0) return; // an empty shell isn't a lobby
             const names = (data.names as string[]) ?? [];
             list.push({

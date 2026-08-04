@@ -21,11 +21,22 @@
 
 let offset: number | null = null;
 let syncing: Promise<void> | null = null;
+/** True only after a SUCCESSFUL probe — the failure fallback (offset 0) keeps
+ *  this false. Destructive freshness judgements (reaping other people's room
+ *  docs) must check this: an unsynced skewed clock hiding a room is a blip,
+ *  but an unsynced skewed clock DELETING a live room takes the lobby down for
+ *  everyone. */
+let confident = false;
 
 /** The local clock corrected onto server time (ms). Equals Date.now() until the
  *  first successful {@link syncServerClock}. */
 export function serverNow(): number {
   return Date.now() + (offset ?? 0);
+}
+
+/** Did a real server probe back the current offset? Gate reaping on this. */
+export function clockConfident(): boolean {
+  return confident;
 }
 
 /** Measure the server-clock offset once (cached). Cheap to over-call: a no-op
@@ -45,7 +56,12 @@ export function syncServerClock(): Promise<void> {
         const ref = await addDoc(collection(dbi, 'lobbies'), { open: false, probe: true, t: serverTimestamp() });
         const snap = await getDocFromServer(ref); // server read → the stamp is resolved
         const sv = (snap.data()?.t as { toMillis?: () => number } | undefined)?.toMillis?.();
-        offset = typeof sv === 'number' ? sv - Date.now() : 0;
+        if (typeof sv === 'number') {
+          offset = sv - Date.now();
+          confident = true;
+        } else {
+          offset = 0;
+        }
         void deleteDoc(ref).catch(() => {});
       } catch {
         offset = 0; // can't probe — assume no skew (status quo, never worse)
