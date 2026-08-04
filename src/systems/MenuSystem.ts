@@ -189,6 +189,8 @@ export class MenuSystem extends createSystem({}) {
    *  only repaint (canvas redraw + texture upload ×8) when one of these
    *  actually changed, not blindly twice a second. */
   private lastLive: unknown[] = [];
+  /** Monotonic token for lobby-join attempts — see the lobby-join handler. */
+  private lobbyJoinSeq = 0;
 
   /** Everything the lobby panels draw that can change WITHOUT a local click:
    *  network watches, fetches, the mesh lobby, the profile-hint timer. Click,
@@ -1032,14 +1034,35 @@ export class MenuSystem extends createSystem({}) {
           net.joinRanked(action.slice('ranked-join-'.length));
         } else if (action.startsWith('lobby-join-')) {
           // Claim a seat in a listed lobby; a race with a final joiner drops
-          // you back on the (fresh) list.
+          // you back on the (fresh) list. The lobby view opens ONLY once the
+          // claim actually lands: entering it optimistically stranded players
+          // in a nameless empty room whenever the claim hung or the network
+          // died mid-join (a wedged Quest write stream does exactly this) —
+          // "it put me in the lobby but there are no names, not even mine".
           if (!app.onlyBots && app.lobbyMode) {
-            app.lobbyView = 'lobby';
-            void mesh
-              .joinLobby(app.lobbyMode, action.slice('lobby-join-'.length), myStats().name, (s) => (app.netStatus = s))
+            const roomId = action.slice('lobby-join-'.length);
+            app.netStatus = 'joining the lobby…';
+            // Token so a second click while this claim is in flight makes this
+            // one a bystander — mesh.joinLobby close()s the older attempt
+            // itself, and a stale handler must not cancel() the newer one.
+            const seq = ++this.lobbyJoinSeq;
+            const attempt = mesh.joinLobby(app.lobbyMode, roomId, myStats().name, (s) => (app.netStatus = s));
+            const timeout = new Promise<false>((resolve) =>
+              setTimeout(() => resolve(false), 15_000),
+            );
+            const failed = (): void => {
+              if (seq !== this.lobbyJoinSeq) return; // a newer attempt owns the mesh
+              mesh.cancel(); // a late success must still free the seat
+              app.lobbyView = 'browser';
+              app.netStatus = 'could not join, try again';
+            };
+            void Promise.race([attempt, timeout])
               .then((ok) => {
-                if (!ok) app.lobbyView = 'browser';
-              });
+                if (seq !== this.lobbyJoinSeq) return;
+                if (ok) app.lobbyView = 'lobby';
+                else failed(); // hung, refused, or lost the race for the seat
+              })
+              .catch(failed);
           }
         }
         break;
