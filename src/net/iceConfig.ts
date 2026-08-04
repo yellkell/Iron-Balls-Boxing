@@ -28,8 +28,18 @@ const METERED_API_KEY = 'c515a1719a26b14df71020c53db644d3acaf';
  *  direct P2P path (when one exists) is always cheaper than relaying. */
 const STUN_ONLY: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 
+/** Give the credentials fetch this long, then go on without TURN. The old code
+ *  had NO bound and cached the in-flight promise for ever: one fetch that hung
+ *  at boot (headset Wi-Fi blips do this) left every later `await` stuck on a
+ *  promise that never settles. In 1v1 hostPrivate that await sits BEFORE the
+ *  code is allocated — so the player just never got a code, with no error,
+ *  while the mesh modes (which mint their code first) worked fine. */
+const TURN_FETCH_TIMEOUT_MS = 4_000;
+
 let cached: RTCIceServer[] = STUN_ONLY;
 let priming: Promise<RTCIceServer[]> | null = null;
+/** True once real TURN credentials landed — only then do we stop refetching. */
+let primed = false;
 
 /** The current ICE servers (STUN-only until/unless the TURN fetch resolves). */
 export function iceConfig(): RTCConfiguration {
@@ -37,27 +47,36 @@ export function iceConfig(): RTCConfiguration {
 }
 
 /**
- * Resolve the ICE servers, fetching Metered's rotating TURN credentials once
- * and caching them. Safe to await before every connection — the fetch runs at
- * most once (subsequent calls return the same in-flight/settled promise), and
- * any failure leaves the STUN-only fallback in place so a connection is still
- * attempted (direct paths keep working; only relay-needing peers lose out).
+ * Resolve the ICE servers, fetching Metered's rotating TURN credentials and
+ * caching them. Safe to await before every connection: bounded by
+ * TURN_FETCH_TIMEOUT_MS, concurrent callers share one in-flight fetch, and a
+ * failed or timed-out attempt falls back to STUN-only for THIS connection but
+ * retries on the next one (it is never cached as if it had succeeded).
  */
 export async function ensureIceServers(): Promise<RTCIceServer[]> {
   if (!METERED_SUBDOMAIN || !METERED_API_KEY) return cached; // unconfigured — STUN only
+  if (primed) return cached;
   if (priming) return priming;
   priming = (async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TURN_FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(
         `https://${METERED_SUBDOMAIN}.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`,
+        { signal: ctrl.signal },
       );
       if (!res.ok) throw new Error(`turn creds ${res.status}`);
       const servers = (await res.json()) as RTCIceServer[];
       if (Array.isArray(servers) && servers.length) {
         cached = [STUN_ONLY[0], ...servers]; // prefer a direct path, relay as backup
+        primed = true;
       }
     } catch {
-      /* leave the STUN-only fallback — a firewalled peer just won't relay */
+      /* STUN-only this time — a firewalled peer just won't relay. NOT primed,
+         so the next connection attempt fetches again. */
+    } finally {
+      clearTimeout(timer);
+      priming = null; // settled either way — never poisons later calls
     }
     return cached;
   })();
