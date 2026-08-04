@@ -348,6 +348,15 @@ export function saveDifficulty(): void {
 
 function loadTutorialDone(): boolean {
   try {
+    // `?tutorial=done` clears the gate (and `?tutorial=reset` puts it back) so
+    // a playtest headset can reach RANKED/RAID/2V2 without running the basics
+    // first — there's no console or keyboard on a Quest to poke localStorage
+    // with. It WRITES the flag, so the rest of the session (and every later
+    // launch) behaves exactly like a boxer who really did clear the tutorial.
+    const param = new URLSearchParams(location.search).get('tutorial');
+    if (param === 'done' || param === 'reset') {
+      localStorage.setItem('ff-tutorial-done', param === 'done' ? '1' : '0');
+    }
     return localStorage.getItem('ff-tutorial-done') === '1';
   } catch {
     return false;
