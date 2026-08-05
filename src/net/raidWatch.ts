@@ -56,8 +56,8 @@ export function startRaidWatch(onCount: CountListener): void {
             const beat = (data.beat?.toMillis?.() as number | undefined) ?? created;
             if (now - beat > BEAT_STALE_MS) return; // zombie shell
             const seats = (data.seats as string[]) ?? [];
-            const gone = (data.gone as Record<string, boolean> | undefined) ?? {};
-            if (seats.filter((s) => s && gone[s] !== true).length === 0) return; // empty shell
+            const gone = (data.gone as Record<string, unknown> | undefined) ?? {};
+            if (seats.filter((s) => s && gone[s] === undefined).length === 0) return; // empty shell
             count += 1;
           });
           onCount(count);

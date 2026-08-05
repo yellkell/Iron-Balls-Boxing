@@ -103,10 +103,10 @@ export function startLobbyWatch(mode: ArcadeMode, onRooms: ListListener): void {
             if (data.started === true) return;
             if (now - beat > BEAT_STALE_MS) return; // nobody alive inside — zombie
             const seats = (data.seats as string[]) ?? [];
-            // Members who died with the page fire a `gone` tombstone (meshImpl
-            // onPageHide) — don't count them as still in the room.
-            const gone = (data.gone as Record<string, boolean> | undefined) ?? {};
-            const count = seats.filter((s) => s && gone[s] !== true).length;
+            // Members whose page went away fire a `gone` tombstone (meshImpl
+            // onPageHide; value = when) — don't count them as in the room.
+            const gone = (data.gone as Record<string, unknown> | undefined) ?? {};
+            const count = seats.filter((s) => s && gone[s] === undefined).length;
             if (count === 0) return; // an empty shell isn't a lobby
             const names = (data.names as string[]) ?? [];
             list.push({

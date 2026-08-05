@@ -14,7 +14,9 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
+  FieldPath,
   getFirestore,
   onSnapshot,
   runTransaction,
@@ -25,6 +27,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebaseConfig.js';
+import { serverNow } from './serverClock.js';
 import { voiceEnabled } from '../audio/voicePref.js';
 import { ensureIceServers, iceConfig } from './iceConfig.js';
 import type { ArcadeMode } from '../config.js';
@@ -32,6 +35,12 @@ import type { PeerMessage } from './protocol.js';
 import type { MeshState } from './mesh.js';
 
 const CAPACITY: Record<ArcadeMode, number> = { '1v1': 2, '2v2': 4, ffa: 4, raid: 5 };
+
+/** A member tombstoned (page hidden) for longer than this, with no live data
+ *  channel, has their seat freed for a replacement. Long enough that a Quest
+ *  doze — headset off for a moment, system menu — lifts its tombstone well
+ *  before eviction; short enough that a real death doesn't block the seat. */
+const GONE_EVICT_MS = 90 * 1000;
 
 let firebaseApp: FirebaseApp | undefined;
 function db(): Firestore {
@@ -55,8 +64,6 @@ interface Peer {
    *  snapshot listener never re-delivers an 'added', so they'd be lost and
    *  the pair could simply never connect). */
   pending: RTCIceCandidateInit[];
-  /** Grace timer for an in-lobby 'disconnected' — see newPeer. */
-  grace: ReturnType<typeof setTimeout> | null;
 }
 
 export class MeshImpl {
@@ -69,6 +76,9 @@ export class MeshImpl {
    *  of `occupants` so a hard-disconnected player stops counting as present,
    *  even though they never cleaned up their own seat in the room doc. */
   private droppedIds = new Map<number, string>();
+  /** ids currently tombstoned on the room doc (page hidden — see onPageHide).
+   *  A SOFT mask: refreshed from every snapshot, lifts when the sleeper wakes. */
+  private goneIds = new Set<string>();
   private roomUnsub: Unsubscribe | null = null;
   private closed = false;
   private micStream: MediaStream | null = null;
@@ -228,8 +238,12 @@ export class MeshImpl {
       this.watchRoom();
       this.startBeat(); // any live member keeps the lobby listed, not just the host
       return true;
-    } catch {
-      this.state.onStatus('that lobby just closed');
+    } catch (err) {
+      // Surface WHY: 'full'/'gone' are normal races, anything else is the
+      // network/rules failing us — swallowing those cost a night of guessing.
+      // eslint-disable-next-line no-console
+      console.warn('[mesh] joinLobby failed:', err);
+      this.state.onStatus(err instanceof Error && err.message === 'full' ? 'that lobby just filled' : 'that lobby just closed');
       return false;
     }
   }
@@ -288,6 +302,8 @@ export class MeshImpl {
     if (this.closed) return;
     this.closed = true;
     window.removeEventListener('pagehide', this.onPageHide);
+    window.removeEventListener('pageshow', this.onPageShow);
+    document.removeEventListener('visibilitychange', this.onVisibility);
     if (this.beatTimer !== null) {
       clearInterval(this.beatTimer);
       this.beatTimer = null;
@@ -329,39 +345,40 @@ export class MeshImpl {
   }
 
   /**
-   * Best-effort ghost prevention when the PAGE dies under us (headset browser
-   * closed, app swapped away, tab killed) — close() never runs then, and its
-   * Firestore transaction wouldn't survive teardown anyway. A keepalive REST
-   * commit is the one write that does. Two cases:
+   * Best-effort ghost prevention when the PAGE goes away under us — closed
+   * tab, killed browser, OR a Quest headset merely DOZING (proximity sensor,
+   * system menu: pagehide fires for all of them, and doze is by far the most
+   * common). close() never runs in any of these, and an SDK write wouldn't
+   * survive teardown; a keepalive REST commit does.
    *
-   *   - LAST occupant: delete the room doc outright — nobody's left inside to
-   *     clean up, and the shell would sit in the browser list until its beat
-   *     went stale ("my old room still says 1 player, I left minutes ago").
-   *   - others still seated: stamp a `gone.<myId>` TOMBSTONE on the doc. A
-   *     blind seat-array write would race the survivors, but a single map key
-   *     is ours alone. Survivors' watchRoom masks tombstoned ids and vacates
-   *     the seat; browsers/counters skip them. This also covers the whole
-   *     squad closing their headsets at the same moment — every member fires
-   *     a tombstone, so the room reads empty even though no survivor was left
-   *     behind to notice anyone's channels close.
+   * We stamp a TIMESTAMPED `gone.<myId>` tombstone — never a delete. An
+   * earlier version deleted the doc when we were the last occupant, which
+   * "cleaned up" every solo host's LIVE room the moment they glanced away
+   * from the headset (pagehide-on-doze), vaporising the lobby under them.
+   * A tombstone is reversible: onPageShow lifts it when the nap ends, while
+   * a REAL death leaves it in place — browsers/counters skip tombstoned
+   * seats immediately, and a room with nobody un-tombstoned reads empty,
+   * drops off every list, and ages into the reaper. One map key is ours
+   * alone, so this can't race the survivors' seat writes either.
    */
   private readonly onPageHide = (): void => {
     if (this.closed || !this.roomRef) return;
     if (this.rawSeats[this.state.mySeat] !== this.clientId) return; // not seated
     const db = `projects/${firebaseConfig.projectId}/databases/(default)`;
     const name = `${db}/documents/${this.roomRef.path}`;
-    const sole = this.state.occupants.filter(Boolean).length <= 1;
-    const body = sole
-      ? { writes: [{ delete: name }] }
-      : {
-          writes: [
-            {
-              update: { name, fields: { gone: { mapValue: { fields: { [this.clientId]: { booleanValue: true } } } } } },
+    const body = {
+      writes: [
+        {
+          transform: {
+            document: name,
+            fieldTransforms: [
               // Backtick-quoted segment: a random id can start with a digit.
-              updateMask: { fieldPaths: ['gone.`' + this.clientId + '`'] },
-            },
-          ],
-        };
+              { fieldPath: 'gone.`' + this.clientId + '`', setToServerValue: 'REQUEST_TIME' },
+            ],
+          },
+        },
+      ],
+    };
     try {
       void fetch(`https://firestore.googleapis.com/v1/${db}/documents:commit?key=${firebaseConfig.apiKey}`, {
         method: 'POST',
@@ -374,20 +391,48 @@ export class MeshImpl {
     }
   };
 
+  /** The nap ended (pageshow / tab visible again): lift my tombstone and
+   *  freshen the beat, so a dozing host's room comes straight back to life. */
+  private readonly onPageShow = (): void => {
+    if (this.closed || !this.roomRef || !this.state.joined) return;
+    void updateDoc(this.roomRef, new FieldPath('gone', this.clientId), deleteField(), 'beat', serverTimestamp()).catch(
+      () => {
+        /* room reaped while we slept — the next snapshot / join tells the tale */
+      },
+    );
+  };
+
+  /** Quest fires visibilitychange more reliably than pageshow on wake. */
+  private readonly onVisibility = (): void => {
+    if (document.visibilityState === 'visible') this.onPageShow();
+  };
+
   private watchRoom(): void {
     if (!this.roomRef) return;
     window.addEventListener('pagehide', this.onPageHide);
+    window.addEventListener('pageshow', this.onPageShow);
+    document.addEventListener('visibilitychange', this.onVisibility);
     this.roomUnsub = onSnapshot(this.roomRef, (snap) => {
       if (!snap.exists() || this.closed) return;
       this.rawSeats = (snap.data().seats as string[]) ?? [];
+      // Tombstones are a SOFT mask (a dozing headset lifts its own on wake —
+      // see onPageHide/onPageShow), so they're applied at read time in
+      // applyOccupants rather than through the permanent droppedIds path.
+      const goneMap = (snap.data().gone as Record<string, unknown> | undefined) ?? {};
+      this.goneIds = new Set(Object.keys(goneMap));
       this.applyOccupants();
-      // Tombstoned members (page died mid-lobby — see onPageHide) are gone for
-      // good: mask them like any dropped peer, which also frees their seat in
-      // the doc while the room is still filling.
-      const gone = (snap.data().gone as Record<string, boolean> | undefined) ?? {};
+      // A member tombstoned long past any nap, with no live channel to us,
+      // is dead — free their seat for a replacement (idempotent, any member
+      // may do it; the id guard in vacateSeatInDoc de-dupes).
+      const nowMs = serverNow();
       for (let seat = 0; seat < this.rawSeats.length; seat++) {
         const id = this.rawSeats[seat];
-        if (id && gone[id] === true && seat !== this.state.mySeat) this.markDropped(seat);
+        if (!id || seat === this.state.mySeat || !this.goneIds.has(id)) continue;
+        const stamped = (goneMap[id] as { toMillis?: () => number } | undefined)?.toMillis?.();
+        const evt = this.peers.get(seat)?.evt;
+        if (typeof stamped === 'number' && nowMs - stamped > GONE_EVICT_MS && evt?.readyState !== 'open') {
+          this.vacateSeatInDoc(seat, id);
+        }
       }
       this.state.locked = snap.data().open === false;
       // RAID lobby extras: seed the callsigns from the doc (the `iam` message
@@ -413,12 +458,18 @@ export class MeshImpl {
     });
   }
 
-  /** Publish `occupants` from the raw seats with any dropped ids masked to ''. */
+  /** Publish `occupants` from the raw seats with any dropped ids masked to ''.
+   *  Tombstoned ids (page hidden — maybe napping, maybe dead) are masked the
+   *  same way but SOFTLY: the mask lifts by itself if their tombstone clears.
+   *  Never mask MYSELF on my own tombstone — my wake-up write is in flight,
+   *  and blanking my own name out of my own lobby reads as "I vanished". */
   private applyOccupants(): void {
     // Forget a drop once the doc no longer holds that dead id there (seat freed
     // or reclaimed by a fresh player), so a replacement isn't wrongly masked.
     for (const [seat, id] of this.droppedIds) if (this.rawSeats[seat] !== id) this.droppedIds.delete(seat);
-    this.state.occupants = this.rawSeats.map((s, i) => (s && this.droppedIds.get(i) === s ? '' : s));
+    this.state.occupants = this.rawSeats.map((s, i) =>
+      s && (this.droppedIds.get(i) === s || (this.goneIds.has(s) && s !== this.clientId)) ? '' : s,
+    );
     this.state.full = this.state.occupants.length > 0 && this.state.occupants.every((s) => s);
   }
 
@@ -466,7 +517,7 @@ export class MeshImpl {
 
   private newPeer(seat: number): Peer {
     const pc = new RTCPeerConnection(iceConfig());
-    const peer: Peer = { seat, pc, evt: null, pose: null, unsubs: [], pending: [], grace: null };
+    const peer: Peer = { seat, pc, evt: null, pose: null, unsubs: [], pending: [] };
     this.peers.set(seat, peer);
     pc.onconnectionstatechange = () => {
       // Only terminal states drop the peer outright. 'disconnected' is
@@ -476,25 +527,13 @@ export class MeshImpl {
       // still very much present. A genuinely dead peer still gets caught:
       // 'failed'/'closed' land here, and in a live bout the pose-staleness
       // backstop (MeshSystem) is faster.
-      const state = pc.connectionState;
-      if (state === 'connected' && peer.grace !== null) {
-        clearTimeout(peer.grace);
-        peer.grace = null;
-      }
-      if (['failed', 'closed'].includes(state)) this.dropPeer(seat);
-      // While the room is still FILLING, a vanished peer must free their seat
-      // fast — a lobby seat blocked for the ~30 s ICE takes to reach 'failed'
-      // reads as "it never noticed they left". A short grace still absorbs the
-      // Wi-Fi blips; a wrongly dropped lobby peer can simply rejoin (unlike a
-      // live bout, where a drop eliminates them — there we stay patient).
-      if (state === 'disconnected' && !this.state.started && peer.grace === null && !this.closed) {
-        peer.grace = setTimeout(() => {
-          peer.grace = null;
-          if (!this.closed && this.peers.get(seat) === peer && pc.connectionState !== 'connected') {
-            this.dropPeer(seat);
-          }
-        }, 5_000);
-      }
+      // NO 'disconnected' drop, even in the lobby: a dozing Quest (headset
+      // off for a moment) blips through 'disconnected' constantly, and a
+      // 5 s in-lobby grace here was evicting nappers. Clean leaves are
+      // caught fast by the data channel's onclose (adopt); real deaths by
+      // 'failed'/'closed' here, the gone-tombstone eviction (watchRoom),
+      // and in live bouts the pose-staleness backstop.
+      if (['failed', 'closed'].includes(pc.connectionState)) this.dropPeer(seat);
     };
     // Spatial voice: surface this peer's mic track to the facade, keyed by seat.
     pc.ontrack = (ev) => {
@@ -658,8 +697,6 @@ export class MeshImpl {
   private dropPeer(seat: number): void {
     const peer = this.peers.get(seat);
     if (peer) {
-      if (peer.grace !== null) clearTimeout(peer.grace);
-      peer.grace = null;
       for (const u of peer.unsubs) u();
       // Delete from the map BEFORE closing, so the channels' own onclose
       // (fired async by our close() calls) sees a stale peer and bails.
