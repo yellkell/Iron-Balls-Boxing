@@ -1683,7 +1683,15 @@ export class CampaignSystem extends createSystem({
     // compress the cooldown between attacks (attackCooldown), never the
     // telegraph itself: a late-fight laser reads exactly like the first one.
     // Difficulty stretches (EASY) or tightens (BLAZING) the windup.
-    const chargeTime = (kind === 'decree' ? RAID.decreeCharge : this.def.charge[kind]) * this.diff.charge;
+    let chargeTime = (kind === 'decree' ? RAID.decreeCharge : this.def.charge[kind]) * this.diff.charge;
+    // The one exception, and it buys back readability rather than spending
+    // it: the king's second life on BLAZING gives its falling block a little
+    // longer to come down (see CAMPAIGN.phase2SlamCharge). Every client
+    // derives this from synced state (p2 rides the rst echo), so hosts and
+    // guests still build the same telegraph.
+    if (kind === 'slam' && this.p2 && this.activeDifficulty() === 'blazing') {
+      chargeTime *= CAMPAIGN.phase2SlamCharge;
+    }
     const zones: Zone[] = [];
     const zoneSeats: number[] = [];
     const telegraphs: (Telegraph | null)[] = [];

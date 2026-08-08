@@ -416,6 +416,16 @@ export const CAMPAIGN = {
   crownLoops: 3,
   // Each completed loop multiplies GOLIATH's attack cooldowns by this.
   crownHaste: 0.85,
+  /**
+   * GOLIATH's SECOND LIFE on BLAZING drops its ghost hammers this much
+   * slower. His slam windup is the tightest in the game (1.15 s squeezed to
+   * ~0.98 by the blazing charge multiplier), and the hammer's descent eases
+   * IN — it covers three quarters of its drop in the back half of the
+   * countdown — so the phase-2 slam was landing before it could be read.
+   * Only the SLAM windup stretches, and only in phase 2: the relentless
+   * enraged cadence that makes the second life what it is stays untouched.
+   */
+  phase2SlamCharge: 1.12,
 
   // The NOVA (GOLIATH only): fire floods the whole platform except one safe
   // wedge — run to the marked ground. Wedge half-width in radians (narrower
