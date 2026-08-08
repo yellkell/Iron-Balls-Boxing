@@ -19,6 +19,7 @@ import { initGazette } from './net/gazette.js';
 import { enterMenuMusic, preloadMenuMusic } from './audio/menuMusic.js';
 import { runBootIntro } from './experience/BootIntro.js';
 import { ensureAudio } from './audio/sfx.js';
+import { preflightMic } from './audio/micPermission.js';
 import { preloadTutorVoice } from './audio/tutorVoice.js';
 import { app } from './menu/appState.js';
 import { buildArena } from './arena/arena.js';
@@ -304,7 +305,15 @@ World.create(container, {
   const packaged =
     document.referrer.startsWith('android-app://') ||
     window.matchMedia?.('(display-mode: standalone)')?.matches === true;
-  if (packaged && xrSupported) startXR();
+  if (packaged && xrSupported) {
+    // Settle the mic permission FIRST, in the one moment this app is still
+    // flat. Once we're presenting, a permission prompt has nowhere to appear
+    // and getUserMedia just resolves as a silent denial — which is why the
+    // store build never asked, even carrying RECORD_AUDIO (see
+    // audio/micPermission.ts). Asked once ever, bounded, and never allowed to
+    // block the launch: whatever happens, we go straight into XR after.
+    void preflightMic().then(startXR, startXR);
+  }
 
   // eslint-disable-next-line no-console
   console.info('[FIRE FIGHT] World ready — platforms set, fists hot.');
